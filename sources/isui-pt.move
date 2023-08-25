@@ -1,5 +1,5 @@
 // Sui Liquid Staking Derivative Coin
-module interest_lsd::ISUI_PT_pt {
+module interest_lsd::isui_pt {
   use std::option;
   use std::string;
   use std::ascii;
