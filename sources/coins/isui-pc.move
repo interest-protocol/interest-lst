@@ -1,5 +1,5 @@
-// Sui Liquid Staking Derivative Coin
-module interest_lsd::isui_pt {
+// Sui Liquid Staking Principal Coin
+module interest_lsd::isui_pc {
   use std::option;
   use std::string;
   use std::ascii;
@@ -13,17 +13,20 @@ module interest_lsd::isui_pt {
 
   use interest_lsd::admin::{AdminCap};
 
+  // ** Only module that can mint/burn this coin
+  friend interest_lsd::pool;
+
   const ERROR_WRONG_FLASH_MINT_BURN_AMOUNT: u64 = 0;
 
   // ** Structs
 
   // OTW to create the Interest Sui LSD
-  struct ISUI_PT has drop {}
+  struct ISUI_PC has drop {}
 
   // Treasury Cap Wrapper
-  struct InterestSuiPTStorage has key {
+  struct InterestSuiPCStorage has key {
     id: UID,
-    treasury_cap: TreasuryCap<ISUI_PT>,
+    treasury_cap: TreasuryCap<ISUI_PC>,
   }
 
   // ** IMPORTANT DO NOT ADD ABILITIES
@@ -53,21 +56,21 @@ module interest_lsd::isui_pt {
     amount: u64
   }
 
-  fun init(witness: ISUI_PT, ctx: &mut TxContext) {
-      // Create the ISUI_PT LSD coin
-      let (treasury_cap, metadata) = coin::create_currency<ISUI_PT>(
+  fun init(witness: ISUI_PC, ctx: &mut TxContext) {
+      // Create the ISUI_PC LSD coin
+      let (treasury_cap, metadata) = coin::create_currency<ISUI_PC>(
             witness, 
             9,
             b"iSUI-PT",
-            b"Interest Sui Principal Token",
+            b"Interest Sui Principal Coin",
             b"This coin represents your principal on the Interest LSD Pool",
             option::none(),
             ctx
         );
 
-      // Share the InterestSuiPTStorage Object with the Sui network
+      // Share the InterestSuiPCStorage Object with the Sui network
       transfer::share_object(
-        InterestSuiPTStorage {
+        InterestSuiPCStorage {
           id: object::new(ctx),
           treasury_cap,
         }
@@ -78,28 +81,28 @@ module interest_lsd::isui_pt {
   }
 
   /**
-  * @dev Only friend packages can mint ISUI_PT
-  * @param storage The InterestSuiPTStorage
-  * @param value The amount of ISUI_PT to mint
-  * @return Coin<ISUI_PT> New created ISUI_PT coin
+  * @dev Only friend packages can mint ISUI_PC
+  * @param storage The InterestSuiPCStorage
+  * @param value The amount of ISUI_PC to mint
+  * @return Coin<ISUI_PC> New created ISUI_PC coin
   */
-  public(friend) fun mint(storage: &mut InterestSuiPTStorage, value: u64, ctx: &mut TxContext): Coin<ISUI_PT> {
+  public(friend) fun mint(storage: &mut InterestSuiPCStorage, value: u64, ctx: &mut TxContext): Coin<ISUI_PC> {
     emit(Mint { amount: value, user: tx_context::sender(ctx) });
     coin::mint(&mut storage.treasury_cap, value, ctx)
   }
 
   /**
-  * @dev Only friend packages can burn ISUI_PT
-  * @param storage The InterestSuiPTStorage
+  * @dev Only friend packages can burn ISUI_PC
+  * @param storage The InterestSuiPCStorage
   * @param asset The Coin to Burn out of existence
   * @return u64 The value burned
   */
-  public(friend) fun burn(storage: &mut InterestSuiPTStorage, asset: Coin<ISUI_PT>, ctx: &mut TxContext): u64 {
+  public(friend) fun burn(storage: &mut InterestSuiPCStorage, asset: Coin<ISUI_PC>, ctx: &mut TxContext): u64 {
     emit(Burn { amount: coin::value(&asset), user: tx_context::sender(ctx) });
     coin::burn(&mut storage.treasury_cap, asset)
   }
 
-  public fun flash_mint(storage: &mut InterestSuiPTStorage, value: u64, ctx: &mut TxContext): (Debt, Coin<ISUI_PT>) {
+  public fun flash_mint(storage: &mut InterestSuiPCStorage, value: u64, ctx: &mut TxContext): (Debt, Coin<ISUI_PC>) {
     emit(FlashMint { amount: value, borrower: tx_context::sender(ctx) });
     (Debt { amount: value }, coin::mint(&mut storage.treasury_cap, value, ctx))
   }
@@ -108,7 +111,7 @@ module interest_lsd::isui_pt {
     potato.amount
   }
 
-  public fun flash_burn(storage: &mut InterestSuiPTStorage, potato: Debt, asset: Coin<ISUI_PT>, ctx: &mut TxContext) {
+  public fun flash_burn(storage: &mut InterestSuiPCStorage, potato: Debt, asset: Coin<ISUI_PC>, ctx: &mut TxContext) {
     let Debt { amount } = potato;
     
     // We need to make sure the supply remains the same
@@ -118,20 +121,20 @@ module interest_lsd::isui_pt {
   }
 
   /**
-  * @dev Utility function to transfer Coin<ISUI_PT>
+  * @dev Utility function to transfer Coin<ISUI_PC>
   * @param The coin to transfer
-  * @param recipient The address that will receive the Coin<ISUI_PT>
+  * @param recipient The address that will receive the Coin<ISUI_PC>
   */
-  public entry fun transfer(asset: coin::Coin<ISUI_PT>, recipient: address) {
+  public entry fun transfer(asset: coin::Coin<ISUI_PC>, recipient: address) {
     transfer::public_transfer(asset, recipient);
   }
 
   /**
-  * It allows anyone to know the total value in existence of ISUI_PT
-  * @storage The shared ISUI_PTollarStorage
-  * @return u64 The total value of ISUI_PT in existence
+  * It allows anyone to know the total value in existence of ISUI_PC
+  * @storage The shared ISUI_PCollarStorage
+  * @return u64 The total value of ISUI_PC in existence
   */
-  public fun total_supply(storage: &InterestSuiPTStorage): u64 {
+  public fun total_supply(storage: &InterestSuiPCStorage): u64 {
     coin::total_supply(&storage.treasury_cap)
   }
 
@@ -139,28 +142,28 @@ module interest_lsd::isui_pt {
 
   /// Update name of the coin in `CoinMetadata`
   public entry fun update_name(
-        _: &AdminCap, storage: &InterestSuiPTStorage, metadata: &mut CoinMetadata<ISUI_PT>, name: string::String
+        _: &AdminCap, storage: &InterestSuiPCStorage, metadata: &mut CoinMetadata<ISUI_PC>, name: string::String
     ) {
         coin::update_name(&storage.treasury_cap, metadata, name)
     }
 
     /// Update the symbol of the coin in `CoinMetadata`
     public entry fun update_symbol(
-        _: &AdminCap, storage: &InterestSuiPTStorage, metadata: &mut CoinMetadata<ISUI_PT>, symbol: ascii::String
+        _: &AdminCap, storage: &InterestSuiPCStorage, metadata: &mut CoinMetadata<ISUI_PC>, symbol: ascii::String
     ) {
        coin::update_symbol(&storage.treasury_cap, metadata, symbol)
     }
 
     /// Update the description of the coin in `CoinMetadata`
     public entry fun update_description(
-        _: &AdminCap, storage: &InterestSuiPTStorage, metadata: &mut CoinMetadata<ISUI_PT>, description: string::String
+        _: &AdminCap, storage: &InterestSuiPCStorage, metadata: &mut CoinMetadata<ISUI_PC>, description: string::String
     ) {
         coin::update_description(&storage.treasury_cap, metadata, description)
     }
 
     /// Update the url of the coin in `CoinMetadata`
     public entry fun update_icon_url(
-        _: &AdminCap, storage: &InterestSuiPTStorage, metadata: &mut CoinMetadata<ISUI_PT>, url: ascii::String
+        _: &AdminCap, storage: &InterestSuiPCStorage, metadata: &mut CoinMetadata<ISUI_PC>, url: ascii::String
     ) {
         coin::update_icon_url(&storage.treasury_cap, metadata, url)
     }
@@ -169,11 +172,6 @@ module interest_lsd::isui_pt {
 
   #[test_only]
   public fun init_for_testing(ctx: &mut TxContext) {
-    init(ISUI_PT {}, ctx);
-  }
-
-  #[test_only]
-  public fun mint_for_testing(storage: &mut InterestSuiPTStorage, value: u64, ctx: &mut TxContext): Coin<ISUI_PT> {
-    coin::mint(&mut storage.treasury_cap, value, ctx)
+    init(ISUI_PC {}, ctx);
   }
 }
