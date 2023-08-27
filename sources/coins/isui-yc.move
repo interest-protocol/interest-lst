@@ -1,4 +1,5 @@
 // Sui Liquid Staking Yield Coin
+// A Share of the rewards accrued by Interest LSD Pool
 module interest_lsd::isui_yc {
   use std::option;
   use std::string;

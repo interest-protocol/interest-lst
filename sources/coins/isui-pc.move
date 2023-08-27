@@ -1,4 +1,5 @@
 // Sui Liquid Staking Principal Coin
+// 1 ISUI_PC is always 1 SUI
 module interest_lsd::isui_pc {
   use std::option;
   use std::string;

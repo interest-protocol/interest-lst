@@ -1,3 +1,9 @@
+// Module has the logic on the dominance fee rate
+// Formula is
+// dominance = validator_principal / total_principal
+// If the dominance >= kink
+// Fee = ((dominance - kink) * jump) + (kink * base)
+// Fee = dominance * base
 module interest_lsd::fees_utils {
 
   use interest_lsd::math::{fmul, fdiv};

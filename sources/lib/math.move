@@ -1,3 +1,5 @@
+// Fixed Point Math using 1e18 to mimic ERC20s 
+// It should give enough precision as Sui Coins have 9 decimals
 module interest_lsd::math {
 
   const SCALAR: u256 = 1000000000000000000; // 1e18 - More accuracy

@@ -1,3 +1,7 @@
+// It Stores a MAX Heap in an list like struct
+// Operations
+// Insert: Adds an item to the heap in the right position
+// Remove Max: Removes the item with the highest value from the heap
 // Based on https://github.com/Dev43/heap-solidity/blob/master/contracts/Heap.sol
 module interest_lsd::heap {
   
@@ -27,7 +31,7 @@ module interest_lsd::heap {
   }
 
   public fun length<T: store>(heap: &Heap<T>): u64 {
-    heap.size
+    heap.size - 1
   }
 
   public fun insert<T: store>(
@@ -57,10 +61,6 @@ module interest_lsd::heap {
       // Move up to parent
       current_index = current_index / 2;
     };
-  }
-
-  public fun borrow_max<T: store>(heap: &Heap<T>): &Node<T> {
-    field::borrow<u64, Node<T>>(&heap.id, MAX_INDEX)
   }
 
   public fun is_empty<T: store>(heap: &Heap<T>): bool {

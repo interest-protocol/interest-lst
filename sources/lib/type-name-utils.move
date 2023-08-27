@@ -1,3 +1,4 @@
+// Module provides utility functions to construct custom String keys to add as dynamic fields
 module interest_lsd::type_name_utils {
   use std::ascii::{Self, String}; 
   use std::vector;

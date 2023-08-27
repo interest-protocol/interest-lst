@@ -1,3 +1,4 @@
+// Utility module to deal with a vector of Coins and Coins with Zero Value
 module interest_lsd::coin_utils {
   use std::vector;
   

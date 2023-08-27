@@ -1,8 +1,9 @@
+// A module to easily calculate the amount of shares of an elastic pool of assets
 module interest_lsd::rebase {
 
   use interest_lsd::math::{mul_div_u128};
 
-   struct Rebase has store {
+  struct Rebase has store {
      base: u128,
      elastic: u128
    }

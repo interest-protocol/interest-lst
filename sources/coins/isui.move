@@ -1,4 +1,5 @@
 // Sui Liquid Staking Derivative Coin
+// A share of all the rewards + principal in Interest LSD Pool
 module interest_lsd::isui {
   use std::option;
   use std::string;
