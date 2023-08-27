@@ -14,6 +14,7 @@ module interest_lsd::pool {
   use sui::dynamic_field as field;
   use sui::tx_context::{Self, TxContext};
   use sui::linked_table::{Self, LinkedTable};
+  use sui::object_table::{Self, ObjectTable};
   use sui::table;
 
   use sui_system::sui_system::{Self, SuiSystemState};
@@ -24,7 +25,6 @@ module interest_lsd::pool {
   use interest_lsd::isui_pc::{ISUI_PC};
   use interest_lsd::isui_yc::{ISUI_YC};
   use interest_lsd::rebase::{Self, Rebase};
-  use interest_lsd::heap::{Self, Heap};
   use interest_lsd::type_name_utils::{get_type_name_string, get_coin_data_key};
   use interest_lsd::fees_utils::{calculate_fee_percentage};
   use interest_lsd::math::{fmul, scalar};
@@ -59,8 +59,8 @@ module interest_lsd::pool {
 
   struct ValidatorData has key, store {
     id: UID, // front end to grab and display data,
-    heap: Heap<StakedSui>, // max heap to find the staked sui when users wish to redeem LSD for Sui + Rewards
-    last_staked_sui: Option<StakedSui>, // cache to merge StakedSui with the same metadata to keep the heap compact
+    staked_sui_table: ObjectTable<u64, StakedSui>, // epoch => StakedSui
+    last_staked_sui: Option<StakedSui>, // cache to merge StakedSui with the same metadata to keep the table compact
     staking_pool_id: Option<ID>, // the ID of the validator StakingPool
     last_rewards: u64, // The last total rewards fetched
     total_principal: u64 // The total amount of Sui deposited in this validator without the accrueing rewards
@@ -285,7 +285,7 @@ module interest_lsd::pool {
 
 
   // @dev This function stores the StakedSui in a cache to be merged to all other StakedSui with the same metadata. 
-  // It will move the StakedSui to a MAX heap, once a StakedSui with new metadata is stored
+  // It will move the StakedSui to a table, once a StakedSui with new metadata is stored
   /*
   * @storage: The Pool Storage Shared Object (this module)
   * @staked_sui: The StakedSui Object to store
@@ -303,7 +303,7 @@ module interest_lsd::pool {
     // Save the validator data in memory
     let validator_data = linked_table::borrow_mut(&mut storage.validators_table, validator_address);
 
-    // If there is a staked sui in the cache - we wanna merge with the current one or store in the heap
+    // If there is a staked sui in the cache - we wanna merge with the current one or store in the table
     if (option::is_some(&validator_data.last_staked_sui)) {
       // Get the last staked sui out of the object storage
       let last_staked_sui = option::extract(&mut validator_data.last_staked_sui);
@@ -315,10 +315,10 @@ module interest_lsd::pool {
         // Store back in the validator data
         option::fill(&mut validator_data.last_staked_sui, last_staked_sui);
       } else {
-        // If they cannot be merged, we want to store the cache in the heap and cache the new one
+        // If they cannot be merged, we want to store the cache in the table and cache the new one
 
-        // Store the last_staked_sui in the heap
-        heap::insert(&mut validator_data.heap, staking_pool::staked_sui_amount(&last_staked_sui), last_staked_sui);
+        // Store the last_staked_sui in the Table
+        object_table::add(&mut validator_data.staked_sui_table, staking_pool::stake_activation_epoch(&last_staked_sui), last_staked_sui);
         // Store the new StakedSui in the cache
         option::fill(&mut validator_data.last_staked_sui, staked_sui);
       };
@@ -404,7 +404,7 @@ module interest_lsd::pool {
     // Add the ValidatorData to the back of the list
     linked_table::push_back(&mut storage.validators_table, validator_address, ValidatorData {
         id: object::new(ctx),
-        heap: heap::new(ctx),
+        staked_sui_table: object_table::new(ctx),
         last_staked_sui: option::none(),
         staking_pool_id: option::some(id),
         last_rewards: 0,
