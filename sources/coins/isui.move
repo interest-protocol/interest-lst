@@ -17,8 +17,6 @@ module interest_lsd::isui {
   // ** Only module that can mint/burn this coin
   friend interest_lsd::pool;
 
-  const ERROR_WRONG_FLASH_MINT_BURN_AMOUNT: u64 = 0;
-
   // ** Structs
 
   // OTW to create the Interest Sui LSD
@@ -28,11 +26,6 @@ module interest_lsd::isui {
   struct InterestSuiStorage has key {
     id: UID,
     treasury_cap: TreasuryCap<ISUI>,
-  }
-
-  // ** IMPORTANT DO NOT ADD ABILITIES
-  struct Debt {
-    amount: u64
   }
 
   // ** Events
@@ -45,16 +38,6 @@ module interest_lsd::isui {
   struct Burn has copy, drop {
     amount: u64,
     user: address
-  }
-
-  struct FlashMint has copy, drop {
-    borrower: address,
-    amount: u64
-  }
-
-  struct FlashBurn has copy, drop {
-    borrower: address,
-    amount: u64
   }
 
   fun init(witness: ISUI, ctx: &mut TxContext) {
@@ -101,24 +84,6 @@ module interest_lsd::isui {
   public(friend) fun burn(storage: &mut InterestSuiStorage, asset: Coin<ISUI>, ctx: &mut TxContext): u64 {
     emit(Burn { amount: coin::value(&asset), user: tx_context::sender(ctx) });
     coin::burn(&mut storage.treasury_cap, asset)
-  }
-
-  public fun flash_mint(storage: &mut InterestSuiStorage, value: u64, ctx: &mut TxContext): (Debt, Coin<ISUI>) {
-    emit(FlashMint { amount: value, borrower: tx_context::sender(ctx) });
-    (Debt { amount: value }, coin::mint(&mut storage.treasury_cap, value, ctx))
-  }
-
-  public fun read_debt(potato: &Debt): u64 {
-    potato.amount
-  }
-
-  public fun flash_burn(storage: &mut InterestSuiStorage, potato: Debt, asset: Coin<ISUI>, ctx: &mut TxContext) {
-    let Debt { amount } = potato;
-    
-    // We need to make sure the supply remains the same
-    assert!(coin::value(&asset) == amount, ERROR_WRONG_FLASH_MINT_BURN_AMOUNT);
-    coin::burn(&mut storage.treasury_cap, asset);
-    emit(FlashBurn { amount, borrower: tx_context::sender(ctx) });
   }
 
   /**
