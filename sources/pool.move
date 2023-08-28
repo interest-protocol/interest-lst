@@ -243,9 +243,11 @@ module interest_lsd::pool {
   * @wrapper The Sui System Shared Object
   * @storage The Pool Storage Shared Object (this module)
   * @interest_sui_storage The shared object of ISUI, it contains the treasury_cap. We need it to mint ISUI
+  * @interest_sui_pc_storage The shared object of ISUI_PC, it contains the treasury_cap. We need it to mint ISUI_PC
+  * @interest_sui_yc_storage The shared object of ISUI_YC, it contains the treasury_cap. We need it to mint ISUI_YC
   * @asset The Sui Coin, the sender wishes to stake
   * @validator_address The Sui Coin will be staked in this validator
-  * @return Coin<ISUI> in exchange for the Sui deposited
+  * @return (COIN<ISUI_PC>, COIN<ISUI_YC>)
   */
   public fun mint_isui_derivatives(
     wrapper: &mut SuiSystemState,
@@ -263,6 +265,16 @@ module interest_lsd::pool {
     ) 
   } 
 
+  // @dev This function burns ISUI_PC in exchange for SUI at 1:1 rate
+  /*
+  * @wrapper The Sui System Shared Object
+  * @storage The Pool Storage Shared Object (this module)
+  * @interest_sui_pc_storage The shared object of ISUI_PC, it contains the treasury_cap. We need it to mint ISUI_PC
+  * @validator_payload A vector containing the information about which StakedSui to unstake
+  * @asset The ISUI_PC Coin, the sender wishes to burn
+  * @validator_address The validator to re stake any remaining Sui if any
+  * @return Coin<SUI> in exchange for the ISUI_PC burned
+  */
   public fun burn_isui_pc(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
@@ -360,7 +372,7 @@ module interest_lsd::pool {
     // Save the value of Sui being staked in memory
     let stake_value = coin::value(&asset);
 
-    // Will save gas the sui_system will throw
+    // Will save gas since the sui_system will throw
     assert!(stake_value >= MIN_STAKING_THRESHOLD, INVALID_STAKE_AMOUNT);
     
     // Need to update the entire state of Sui/Sui Rewards once every epoch
