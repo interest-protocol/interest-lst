@@ -2,8 +2,7 @@
 // ISUI is a share of the total SUI principal + rewards this module owns
 // ISUI_PC is always 1 SUI as it represents the principal owned by this module
 // ISUI_YC is a share of the SUI Rewards owned by this module
-module interest_lsd::pool {
-  use std::ascii::{String}; 
+module interest_lsd::pool { 
   use std::option::{Self, Option};
   use std::vector;
 
@@ -12,7 +11,6 @@ module interest_lsd::pool {
   use sui::coin::{Self, Coin};
   use sui::object::{Self, UID, ID};
   use sui::event::{emit};
-  use sui::dynamic_field as field;
   use sui::tx_context::{Self, TxContext};
   use sui::linked_table::{Self, LinkedTable};
   use sui::object_table::{Self, ObjectTable};
@@ -26,7 +24,6 @@ module interest_lsd::pool {
   use interest_lsd::isui_pc::{Self, ISUI_PC, InterestSuiPCStorage};
   use interest_lsd::isui_yc::{Self, ISUI_YC, InterestSuiYCStorage};
   use interest_lsd::rebase::{Self, Rebase};
-  use interest_lsd::type_name_utils::{get_type_name_string, get_coin_data_key};
   use interest_lsd::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
   use interest_lsd::math::{fmul, scalar};
   use interest_lsd::staking_pool_utils::{calc_staking_pool_rewards};
@@ -51,12 +48,6 @@ module interest_lsd::pool {
     validator_address: address,
     principal: u64
   }
-  
-  // TODO MIGHT CHANGE THIS AS IT IS ONLY STORING THE DAO PROFITS
-  struct CoinData<phantom T> has key, store {
-    id: UID, // front end to grab and display data
-    dao_coin: Coin<T> // fees accumulatted by the protocol
-  }
 
   struct ValidatorData has key, store {
     id: UID, // front end to grab and display data,
@@ -77,7 +68,8 @@ module interest_lsd::pool {
     last_epoch: u64, // Last epoch that pool was updated
     validators_table: LinkedTable<address, ValidatorData>, // We need a linked table to iterate through all validators once every epoch to ensure all pool data is accurate
     total_principal: u64, // Total amount of principal deposited in Interest LSD Package
-    fee: Fee // Holds the fee data. Explanation on how the fees work above.
+    fee: Fee, // Holds the fee data. Explanation on how the fees work above.
+    dao_coin: Coin<ISUI> // Fees collected by the protocol in ISUI
   }
 
   // ** Events
@@ -97,25 +89,18 @@ module interest_lsd::pool {
   }
 
   fun init(ctx: &mut TxContext) {
-    
-    // No fees until we have over 10 validators
-    let storage = PoolStorage {
-      id: object::new(ctx),
-      pool: rebase::new(),
-      last_epoch: tx_context::epoch(ctx),
-      validators_table: linked_table::new(ctx),
-      total_principal: 0,
-      fee: new_fee()
-    };
-
-    // Register the Coin Data for the 3 assets
-    // TODO at the moment the CoinData only holds the fees. Might change in the future
-    init_coin_data<ISUI>(&mut storage, ctx);
-    init_coin_data<ISUI_PC>(&mut storage, ctx);
-    init_coin_data<ISUI_YC>(&mut storage, ctx);
-
     // Share the PoolStorage Object with the Sui network
-    transfer::share_object(storage);
+    transfer::share_object(
+        PoolStorage {
+        id: object::new(ctx),
+        pool: rebase::new(),
+        last_epoch: tx_context::epoch(ctx),
+        validators_table: linked_table::new(ctx),
+        total_principal: 0,
+        fee: new_fee(),
+        dao_coin: coin::zero<ISUI>(ctx)
+      }
+    );
   }
 
   public fun get_exchange_rate_isui_to_sui(
@@ -337,20 +322,20 @@ module interest_lsd::pool {
   * @_: The AdminCap
   * @storage: The Pool Storage Shared Object (this module)
   * @amount: The value of fees to withdraw
-  * @return the fees in Coin<T>
+  * @return the fees in Coin<ISUI>
   */
-  public fun withdraw_fees<T>(
+  public fun withdraw_fees(
     _: &AdminCap,
     storage: &mut PoolStorage, 
     amount: u64,
     ctx: &mut TxContext
-  ): Coin<T> {
+  ): Coin<ISUI> {
     
     // Emit the event
-    emit(DaoWithdraw<T> {amount, sender: tx_context::sender(ctx) });
+    emit(DaoWithdraw<ISUI> {amount, sender: tx_context::sender(ctx) });
 
     // Split the Fees and sent the desired amount
-    coin::split(&mut borrow_mut_coin_data<T>(storage).dao_coin, amount, ctx)
+    coin::split(&mut storage.dao_coin, amount, ctx)
   }
 
   // ** CORE OPERATIONS
@@ -561,20 +546,6 @@ module interest_lsd::pool {
     sui_to_return
   }
 
-  // ** Utility Fns
-
-  // TODO NEED TO SEE IF COIN DATA needs to be saved
-  // Adds a dynamic field to the storage to store the CoinData struct 
-  /*
-  * @storage: The Pool Storage Shared Object (this module)
-  */
-  fun init_coin_data<T>(storage: &mut PoolStorage, ctx: &mut TxContext) {
-    field::add(&mut storage.id, get_coin_data_key(get_type_name_string<T>()), CoinData {
-      id: object::new(ctx),
-      dao_coin: coin::zero<T>(ctx)
-    });
-  }
-
   //Adds a dynamic field to the storage to store the CoinData struct 
   /*
   * @storage: The Pool Storage Shared Object (this module)
@@ -601,10 +572,9 @@ module interest_lsd::pool {
 
     // Calculate fee
     let fee_amount = (fmul((shares as u256), fee) as u64);
-    // Save CoinData in memory
-    let coin_data = borrow_mut_coin_data<ISUI>(storage);
+
     // Mint the ISUI for the DAO. We need to make sure the total supply of ISUI is consistent with the pool shares
-    coin::join(&mut coin_data.dao_coin, isui::mint(interest_sui_storage, fee_amount, ctx));
+    coin::join(&mut storage.dao_coin, isui::mint(interest_sui_storage, fee_amount, ctx));
     // Return the shares amount to mint to the sender
     shares - fee_amount
   }
@@ -633,17 +603,5 @@ module interest_lsd::pool {
         last_rewards: 0,
         total_principal: 0
       }); 
-  }
-
-  // ** Borrow Functions
-
-  // @dev Helper Function to easily load Coin Data.
-  /*
-  * @storage: The Pool Storage Shared Object (this module)
-  * @return Mutable Ref of the CoinData
-  */
-  fun borrow_mut_coin_data<T>(storage: &mut PoolStorage): &mut CoinData<T> {
-    field::borrow_mut<String, CoinData<T>>(&mut storage.id, get_coin_data_key(get_type_name_string<T>()))
-  }
-  
+  }  
 }
