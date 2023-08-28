@@ -134,6 +134,26 @@ module interest_lsd::pool {
     transfer::share_object(storage);
   }
 
+  public fun get_exchange_rate_isui_to_sui(
+    wrapper: &mut SuiSystemState,
+    storage: &mut PoolStorage, 
+    isui_amount: u64,
+    ctx: &mut TxContext
+  ): u64 {
+    update_pool(wrapper, storage, ctx);
+    rebase::to_elastic(&storage.pool, isui_amount, false)
+  }
+
+  public fun get_exchange_rate_sui_to_isui(
+    wrapper: &mut SuiSystemState,
+    storage: &mut PoolStorage, 
+    sui_amount: u64,
+    ctx: &mut TxContext
+  ): u64 {
+    update_pool(wrapper, storage, ctx);
+    rebase::to_base(&storage.pool, sui_amount, true)
+  }
+
   // @dev This function costs a lot of gas and must be called before any interaction with Interest LSD, because it updates the pool. The pool is needed to ensure all 3 Coins exchange rate is accurate.
   // Anyone can call this function
   // It will ONLY RUN ONCE per epoch
