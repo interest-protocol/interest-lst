@@ -53,6 +53,13 @@ module interest_lsd::rebase {
      base
    }
 
+  public fun sub_elastic(rebase: &mut Rebase, elastic: u64, round_up: bool): u64 {
+     let base = to_base(rebase, elastic, round_up);
+     rebase.elastic = rebase.elastic - (elastic as u128);
+     rebase.base = rebase.base - (base as u128);
+     base
+   }
+
    public fun increase_elastic(rebase: &mut Rebase, elastic: u64) {
     rebase.elastic = rebase.elastic + (elastic as u128);
    }  

@@ -74,6 +74,39 @@ module interest_lsd::pool {
 
   // ** Events
 
+  struct MintISui has copy, drop {
+    sender: address,
+    sui_amount: u64,
+    isui_amount: u64,
+    validator: address
+  }
+
+  struct BurnISui has copy, drop {
+    sender: address,
+    sui_amount: u64,
+    isui_amount: u64,
+  }
+
+  struct MintISuiDerivatives has copy, drop {
+    sender: address,
+    sui_amount: u64,
+    isui_pc_amount: u64,
+    isui_yc_amount: u64,
+    validator: address
+  }
+
+  struct BurnISuiPC has copy, drop {
+    sender: address,
+    sui_amount: u64,
+    isui_pc_amount: u64,    
+  }
+
+  struct BurnISuiYC has copy, drop {
+    sender: address,
+    sui_amount: u64,
+    isui_yc_amount: u64,    
+  }
+
   // Emitted when the DAO updates the fee
   struct NewFee has copy, drop {
     base: u256,
@@ -135,6 +168,42 @@ module interest_lsd::pool {
   ): u64 {
     update_pool(wrapper, storage, ctx);
     rebase::to_base(&storage.pool, sui_amount, true)
+  }
+
+  // @dev It returns the exchange rate from ISUI_YC to SUI
+  /*
+  * @storage The Pool Storage Shared Object (this module)
+  * @isui_yc_amount The amount of ISUI_YC
+  * @return the exchange rate
+  */
+  public fun get_exchange_rate_isui_yc_to_sui(
+    wrapper: &mut SuiSystemState,
+    storage: &mut PoolStorage, 
+    isui_yc_amount: u64,
+    ctx: &mut TxContext
+  ): u64 {
+    update_pool(wrapper, storage, ctx);
+    // ISUI_YC is minted with the same logic as ISUI. 
+    // With ISUI, we do total amount of Sui in the pool (Principal + Yield) * shares / total shares
+    // For ISUI_YC, we apply the same logic but we remove the Principal from the equation. We know the principal as it is stored by {PoolStorage}
+    // Sub 1 for rounding to give edge to the protocol
+    (((((rebase::elastic(&storage.pool) - storage.total_principal) as u256) * (isui_yc_amount as u256)) / (rebase::base(&storage.pool) as u256)) as u64)
+  }
+
+  // @dev It returns the exchange rate from SUI to ISUI_YC
+  /*
+  * @storage The Pool Storage Shared Object (this module)
+  * @sui_amount The amount of Sui
+  * @return the exchange rate
+  */
+  public fun get_exchange_rate_sui_to_isui_yc(
+    wrapper: &mut SuiSystemState,
+    storage: &mut PoolStorage, 
+    sui_amount: u64,
+    ctx: &mut TxContext
+  ): u64 {
+    update_pool(wrapper, storage, ctx);
+    ((((sui_amount as u256) * (rebase::base(&storage.pool) as u256)) / ((rebase::elastic(&storage.pool) - storage.total_principal) as u256)) as u64)
   }
 
   // @dev This function costs a lot of gas and must be called before any interaction with Interest LSD, because it updates the pool. The pool is needed to ensure all 3 Coins exchange rate is accurate.
@@ -209,7 +278,11 @@ module interest_lsd::pool {
     validator_address: address,
     ctx: &mut TxContext,
   ): Coin<ISUI> {
+    let sui_amount = coin::value(&asset);
+    
     let shares_to_mint = mint_isui_logic(wrapper, storage, interest_sui_storage, asset, validator_address, ctx);
+
+    emit(MintISui { validator: validator_address, sender: tx_context::sender(ctx), sui_amount, isui_amount: shares_to_mint });
 
     // Mint iSUI to the caller
     isui::mint(interest_sui_storage, shares_to_mint, ctx)
@@ -238,15 +311,19 @@ module interest_lsd::pool {
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
     update_pool(wrapper, storage, ctx);
 
-    let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
+    let isui_amount = coin::value(&asset);
 
     // Update the pool 
     // Remove the shares
     // Burn the iSUI
     let sui_value_to_return = rebase::sub_base(&mut storage.pool, isui::burn(interest_sui_storage, asset, ctx), false);
 
+    let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
+
     // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
     assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, INVALID_UNSTAKE_AMOUNT);
+
+    emit(BurnISui { sender: tx_context::sender(ctx), sui_amount: sui_value_to_return, isui_amount });
 
     // Unstake Sui
     unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_value_to_return, ctx)
@@ -273,9 +350,15 @@ module interest_lsd::pool {
     validator_address: address,
     ctx: &mut TxContext,
   ):(Coin<ISUI_PC>, Coin<ISUI_YC>) {
+    let isui_pc_amount = coin::value(&asset);
+    let sui_amount = coin::value(&asset);
+    let isui_yc_amount = mint_isui_logic(wrapper, storage, interest_sui_storage, asset, validator_address, ctx);
+
+    emit(MintISuiDerivatives { sender: tx_context::sender(ctx), isui_pc_amount, isui_yc_amount, sui_amount, validator: validator_address });
+
     (
-      isui_pc::mint(interest_sui_pc_storage, coin::value(&asset), ctx),
-      isui_yc::mint(interest_sui_yc_storage, mint_isui_logic(wrapper, storage, interest_sui_storage, asset, validator_address, ctx), ctx)
+      isui_pc::mint(interest_sui_pc_storage, isui_pc_amount, ctx),
+      isui_yc::mint(interest_sui_yc_storage, isui_yc_amount, ctx)
     ) 
   } 
 
@@ -283,7 +366,7 @@ module interest_lsd::pool {
   /*
   * @wrapper The Sui System Shared Object
   * @storage The Pool Storage Shared Object (this module)
-  * @interest_sui_pc_storage The shared object of ISUI_PC, it contains the treasury_cap. We need it to mint ISUI_PC
+  * @interest_sui_pc_storage The shared object of ISUI_PC, it contains the treasury_cap. We need it to burn ISUI_PC
   * @validator_payload A vector containing the information about which StakedSui to unstake
   * @asset The ISUI_PC Coin, the sender wishes to burn
   * @validator_address The validator to re stake any remaining Sui if any
@@ -302,14 +385,67 @@ module interest_lsd::pool {
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
     update_pool(wrapper, storage, ctx);
 
-    let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
-
     // 1 ISUI_PC is always 1 SUI
     // Burn the ISUI_PC
     let sui_value_to_return = isui_pc::burn(interest_sui_pc_storage, asset, ctx);
 
+    let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
+
     // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
     assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, INVALID_UNSTAKE_AMOUNT);
+
+    // We need to update the pool
+    rebase::sub_elastic(&mut storage.pool, sui_value_to_return, false);
+
+    emit(BurnISuiPC { sui_amount: sui_value_to_return, sender: tx_context::sender(ctx), isui_pc_amount: sui_value_to_return });
+
+    // Unstake Sui
+    unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_value_to_return, ctx)
+  }
+
+    // @dev This function burns ISUI_YC in exchange for SUI. ISUI_YC grows as the yield of this pool grows
+  /*
+  * @wrapper The Sui System Shared Object
+  * @storage The Pool Storage Shared Object (this module)
+  * @interest_sui_yc_storage The shared object of ISUI_YC, it contains the treasury_cap. We need it to burn ISUI_YC
+  * @validator_payload A vector containing the information about which StakedSui to unstake
+  * @asset The ISUI_YC Coin, the sender wishes to burn
+  * @validator_address The validator to re stake any remaining Sui if any
+  * @return Coin<SUI> in exchange for the ISUI_PC burned
+  */
+  public fun burn_isui_yc(
+    wrapper: &mut SuiSystemState,
+    storage: &mut PoolStorage,
+    interest_sui_yc_storage: &mut InterestSuiYCStorage,
+    validator_payload: vector<BurnISuiValidatorPayload>,
+    asset: Coin<ISUI_YC>,
+    validator_address: address,
+    ctx: &mut TxContext,
+  ): Coin<SUI> {
+    // Need to update the entire state of Sui/Sui Rewards once every epoch
+    // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
+    update_pool(wrapper, storage, ctx);
+
+    // We cast to u256 so we can safely multiply then divide
+    // Burn ISUI_YC
+    let shares_burned = (isui_yc::burn(interest_sui_yc_storage, asset, ctx) as u256);
+    let total_shares = (rebase::base(&storage.pool) as u256);
+    let total_rewards = ((rebase::elastic(&storage.pool) - storage.total_principal) as u256);
+
+    // ISUI_YC is minted with the same logic as ISUI. 
+    // With ISUI, we do total amount of Sui in the pool (Principal + Yield) * shares / total shares
+    // For ISUI_YC, we apply the same logic but we remove the Principal from the equation. We know the principal as it is stored by {PoolStorage}
+    let sui_value_to_return = (((total_rewards * shares_burned) / total_shares) as u64);
+
+    // We need to update the pool
+    rebase::sub_elastic(&mut storage.pool, sui_value_to_return, false);
+
+    let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
+
+    // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
+    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, INVALID_UNSTAKE_AMOUNT);
+
+    emit(BurnISuiPC { sui_amount: sui_value_to_return, sender: tx_context::sender(ctx), isui_pc_amount: sui_value_to_return });
 
     // Unstake Sui
     unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_value_to_return, ctx)
@@ -520,6 +656,7 @@ module interest_lsd::pool {
 
       i = i + 1;
     };
+    storage.total_principal = storage.total_principal - total_principal_unstaked;
     (staked_sui_vector, total_principal_unstaked)
   }
 
@@ -560,8 +697,11 @@ module interest_lsd::pool {
     // Save the ValidatorData in memory so we can store any remaining Sui
     let validator_data = linked_table::borrow_mut(&mut storage.validators_table, validator_address);
 
+    let left_over_amount = coin::value(&total_sui_coin);
+
     // Update the data
-    validator_data.total_principal = validator_data.total_principal + coin::value(&total_sui_coin);
+    validator_data.total_principal = validator_data.total_principal + left_over_amount;
+    storage.total_principal = storage.total_principal + left_over_amount;
 
     // Stake the Sui and store the Staked Sui in memory
     store_staked_sui(
