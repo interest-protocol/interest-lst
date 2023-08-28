@@ -103,6 +103,13 @@ module interest_lsd::pool {
     );
   }
 
+  // @dev It returns the exchange rate from ISUI to SUI
+  /*
+  * @wrapper The Sui System Shared Object
+  * @storage The Pool Storage Shared Object (this module)
+  * @isui_amount The amount of ISUI
+  * @return the exchange rate
+  */
   public fun get_exchange_rate_isui_to_sui(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage, 
@@ -113,6 +120,13 @@ module interest_lsd::pool {
     rebase::to_elastic(&storage.pool, isui_amount, false)
   }
 
+  // @dev It returns the exchange rate from SUI to ISUI
+  /*
+  * @wrapper The Sui System Shared Object
+  * @storage The Pool Storage Shared Object (this module)
+  * @sui_amount The amount of SUI
+  * @return the exchange rate
+  */
   public fun get_exchange_rate_sui_to_isui(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage, 
