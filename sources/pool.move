@@ -27,7 +27,7 @@ module interest_lsd::pool {
   use interest_lsd::isui_yc::{ISUI_YC};
   use interest_lsd::rebase::{Self, Rebase};
   use interest_lsd::type_name_utils::{get_type_name_string, get_coin_data_key};
-  use interest_lsd::fees_utils::{calculate_fee_percentage};
+  use interest_lsd::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
   use interest_lsd::math::{fmul, scalar};
   use interest_lsd::staking_pool_utils::{calc_staking_pool_rewards};
   
@@ -43,17 +43,6 @@ module interest_lsd::pool {
   const INVALID_UNSTAKE_AMOUNT: u64 = 2; // The sender tried to unstake more than he is allowed
 
   // ** Structs
-
-  // Formula is
-  // dominance = validator_principal / total_principal
-  // If the dominance >= kink
-  // Fee = ((dominance - kink) * jump) + (kink * base)
-  // Fee = dominance * base
-  struct Fees has store {
-    base: u256,
-    kink: u256,
-    jump: u256
-  }
 
   // This struct compacts the data sent to burn_isui
   // We will remove the {principal} amount of StakedSui from the {validator_address} stored at staked_sui_table with the key {epoch}
@@ -89,13 +78,13 @@ module interest_lsd::pool {
     last_epoch: u64, // Last epoch that pool was updated
     validators_table: LinkedTable<address, ValidatorData>, // We need a linked table to iterate through all validators once every epoch to ensure all pool data is accurate
     total_principal: u64, // Total amount of principal deposited in Interest LSD Package
-    fees: Fees // Holds the fee data. Explanation on how the fees work above.
+    fee: Fee // Holds the fee data. Explanation on how the fees work above.
   }
 
   // ** Events
 
-  // Emitted when the DAO updates the fees
-  struct NewFees has copy, drop {
+  // Emitted when the DAO updates the fee
+  struct NewFee has copy, drop {
     base: u256,
     kink: u256,
     jump: u256
@@ -117,11 +106,7 @@ module interest_lsd::pool {
       last_epoch: tx_context::epoch(ctx),
       validators_table: linked_table::new(ctx),
       total_principal: 0,
-      fees: Fees {
-        base: 0,
-        kink: 0,
-        jump: 0
-      }
+      fee: new_fee()
     };
 
     // Register the Coin Data for the 3 assets
@@ -382,7 +367,7 @@ module interest_lsd::pool {
   * @kink: The new kink
   * @jump The new jump
   */
-  entry public fun update_fees(
+  entry public fun update_fee(
     _: &AdminCap,
     storage: &mut PoolStorage, 
     base: u256, 
@@ -394,12 +379,10 @@ module interest_lsd::pool {
     assert!(max >= base && max >= kink && max >= jump, INVALID_FEE);
 
     // Update the values
-    storage.fees.base = base;
-    storage.fees.kink = kink;
-    storage.fees.jump = jump;
+    set_fee(&mut storage.fee, base, kink, jump);
 
     // Emit event
-    emit(NewFees { base, kink, jump });
+    emit(NewFee { base, kink, jump });
   }
 
   // @dev This function allows the DAO to withdraw fees.
@@ -501,9 +484,7 @@ module interest_lsd::pool {
     // Find the fee % based on the validator dominance and fee parameters.  
     // Explanation on line 42
     let fee = calculate_fee_percentage(
-      storage.fees.base,
-      storage.fees.kink,
-      storage.fees.jump,
+      &storage.fee,
       (validator_principal as u256),
       (storage.total_principal as u256)
     );
