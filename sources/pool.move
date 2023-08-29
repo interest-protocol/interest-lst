@@ -37,7 +37,8 @@ module interest_lsd::pool {
 
   const INVALID_FEE: u64 = 0; // All values inside Fees Struct must be equal or below 1e18 as it represents 100%
   const INVALID_STAKE_AMOUNT: u64 = 1; // Users need to stake more than 1 MIST as the sui_system will throw 0 value stakes
-  const INVALID_UNSTAKE_AMOUNT: u64 = 2; // The sender tried to unstake more than he is allowed
+  const INVALID_UNSTAKE_AMOUNT: u64 = 2; // The sender tried to unstake more than he is allowed 
+  const INVALID_INPUT_AMOUNT: u64 = 3;
 
   // ** Structs
 
@@ -69,7 +70,9 @@ module interest_lsd::pool {
     validators_table: LinkedTable<address, ValidatorData>, // We need a linked table to iterate through all validators once every epoch to ensure all pool data is accurate
     total_principal: u64, // Total amount of principal deposited in Interest LSD Package
     fee: Fee, // Holds the fee data. Explanation on how the fees work above.
-    dao_coin: Coin<ISUI> // Fees collected by the protocol in ISUI
+    dao_coin: Coin<ISUI>, // Fees collected by the protocol in ISUI,
+    last_compound: u64, // The last timestamp in which we ran the compound function. We do not want to run until the protocol has meaningful rewards
+    compound_window: u64 // How often can the compound function be called
   }
 
   // ** Events
@@ -131,7 +134,9 @@ module interest_lsd::pool {
         validators_table: linked_table::new(ctx),
         total_principal: 0,
         fee: new_fee(),
-        dao_coin: coin::zero<ISUI>(ctx)
+        dao_coin: coin::zero<ISUI>(ctx),
+        last_compound: 0,
+        compound_window: 2629800000 // One Month in milliseconds
       }
     );
   }
@@ -182,12 +187,16 @@ module interest_lsd::pool {
     isui_yc_amount: u64,
     ctx: &mut TxContext
   ): u64 {
+    // It does not make to quote more ISUI that it exists
+    // It will break the calculation assumptions
+    assert!(rebase::base(&storage.pool) >= isui_yc_amount, INVALID_INPUT_AMOUNT);
+    // We update the pool to make sure the rewards are up to date
+    // Then find the total amount of Sui the {isui_yc_amount} would be entitled to if it was iSui as it follows the same minting logic
+    // Then we remove the principal component from it
     update_pool(wrapper, storage, ctx);
-    // ISUI_YC is minted with the same logic as ISUI. 
-    // With ISUI, we do total amount of Sui in the pool (Principal + Yield) * shares / total shares
-    // For ISUI_YC, we apply the same logic but we remove the Principal from the equation. We know the principal as it is stored by {PoolStorage}
-    // Sub 1 for rounding to give edge to the protocol
-    (((((rebase::elastic(&storage.pool) - storage.total_principal) as u256) * (isui_yc_amount as u256)) / (rebase::base(&storage.pool) as u256)) as u64)
+    let principal_reward = rebase::to_elastic(&storage.pool, isui_yc_amount, false);
+    let principal = ((isui_yc_amount as u256) * (storage.total_principal as u256) / (rebase::base(&storage.pool) as u256) as u64);
+    principal_reward - principal
   }
 
   // @dev It returns the exchange rate from SUI to ISUI_YC
@@ -202,8 +211,11 @@ module interest_lsd::pool {
     sui_amount: u64,
     ctx: &mut TxContext
   ): u64 {
-    update_pool(wrapper, storage, ctx);
-    ((((sui_amount as u256) * (rebase::base(&storage.pool) as u256)) / ((rebase::elastic(&storage.pool) - storage.total_principal) as u256)) as u64)
+    // We find the amount of ISUI in Sui (exchange rate)
+    // Then we multiply the desired Sui amount to the exchange rate
+    let value = rebase::base(&storage.pool) / 10;
+    let exchange_rate = get_exchange_rate_isui_yc_to_sui(wrapper, storage, value, ctx);
+    (((sui_amount as u256) * (value as u256) / (exchange_rate as u256)) as u64)
   }
 
   // @dev This function costs a lot of gas and must be called before any interaction with Interest LSD, because it updates the pool. The pool is needed to ensure all 3 Coins exchange rate is accurate.
@@ -219,8 +231,10 @@ module interest_lsd::pool {
     storage: &mut PoolStorage,
     ctx: &mut TxContext,
   ) {
-    // Save current epoch in memory
-    let epoch = tx_context::epoch(ctx);
+    // Save current epoch -1 in memory
+    // Rewards are given at the end of each epoch
+    // If users withdraw coins in the current epoch the rewards will change, therefore, we only calculate rewards once they are fully finalized
+    let epoch = tx_context::epoch(ctx) - 1;
 
     // if the function has been called this epoch, we do not need to do anything else
     // If there are no shares in the pool, it means there is no sui being staked. So there is no updates
@@ -350,14 +364,13 @@ module interest_lsd::pool {
     validator_address: address,
     ctx: &mut TxContext,
   ):(Coin<ISUI_PC>, Coin<ISUI_YC>) {
-    let isui_pc_amount = coin::value(&asset);
     let sui_amount = coin::value(&asset);
     let isui_yc_amount = mint_isui_logic(wrapper, storage, interest_sui_storage, asset, validator_address, ctx);
 
-    emit(MintISuiDerivatives { sender: tx_context::sender(ctx), isui_pc_amount, isui_yc_amount, sui_amount, validator: validator_address });
+    emit(MintISuiDerivatives { sender: tx_context::sender(ctx), isui_pc_amount: sui_amount, isui_yc_amount, sui_amount, validator: validator_address });
 
     (
-      isui_pc::mint(interest_sui_pc_storage, isui_pc_amount, ctx),
+      isui_pc::mint(interest_sui_pc_storage, sui_amount, ctx),
       isui_yc::mint(interest_sui_yc_storage, isui_yc_amount, ctx)
     ) 
   } 
@@ -422,33 +435,23 @@ module interest_lsd::pool {
     validator_address: address,
     ctx: &mut TxContext,
   ): Coin<SUI> {
-    // Need to update the entire state of Sui/Sui Rewards once every epoch
-    // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
-    update_pool(wrapper, storage, ctx);
-
-    // We cast to u256 so we can safely multiply then divide
-    // Burn ISUI_YC
-    let shares_burned = (isui_yc::burn(interest_sui_yc_storage, asset, ctx) as u256);
-    let total_shares = (rebase::base(&storage.pool) as u256);
-    let total_rewards = ((rebase::elastic(&storage.pool) - storage.total_principal) as u256);
-
-    // ISUI_YC is minted with the same logic as ISUI. 
-    // With ISUI, we do total amount of Sui in the pool (Principal + Yield) * shares / total shares
-    // For ISUI_YC, we apply the same logic but we remove the Principal from the equation. We know the principal as it is stored by {PoolStorage}
-    let sui_value_to_return = (((total_rewards * shares_burned) / total_shares) as u64);
+    
+    // Burn the {asset} and figure out how much Sui is worth
+    let isui_pc_amount = isui_yc::burn(interest_sui_yc_storage, asset, ctx);
+    let sui_amount = get_exchange_rate_isui_yc_to_sui(wrapper, storage, isui_pc_amount, ctx);
 
     // We need to update the pool
-    rebase::sub_elastic(&mut storage.pool, sui_value_to_return, false);
+    rebase::sub_elastic(&mut storage.pool, sui_amount, false);
 
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
     // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
-    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, INVALID_UNSTAKE_AMOUNT);
+    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_amount, INVALID_UNSTAKE_AMOUNT);
 
-    emit(BurnISuiPC { sui_amount: sui_value_to_return, sender: tx_context::sender(ctx), isui_pc_amount: sui_value_to_return });
+    emit(BurnISuiPC { sui_amount, sender: tx_context::sender(ctx), isui_pc_amount });
 
     // Unstake Sui
-    unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_value_to_return, ctx)
+    unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_amount, ctx)
   }
 
   // ** Admin Functions
