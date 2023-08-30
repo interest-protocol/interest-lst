@@ -12,6 +12,7 @@ module interest_lsd::pool {
   use sui::object::{Self, UID, ID};
   use sui::event::{emit};
   use sui::tx_context::{Self, TxContext};
+  use sui::object_table::{Self, ObjectTable};
   use sui::linked_table::{Self, LinkedTable};
   use sui::table;
 
@@ -51,7 +52,7 @@ module interest_lsd::pool {
 
   struct ValidatorData has key, store {
     id: UID, // front end to grab and display data,
-    staked_sui_table: LinkedTable<u64, StakedSui>, // epoch => StakedSui
+    staked_sui_table: ObjectTable<u64, StakedSui>, // epoch => StakedSui
     last_staked_sui: Option<StakedSui>, // cache to merge StakedSui with the same metadata to keep the table compact
     staking_pool_id: Option<ID>, // the ID of the validator StakingPool
     last_rewards: u64, // The last total rewards fetched
@@ -593,13 +594,13 @@ module interest_lsd::pool {
 
         let activation_epoch = staking_pool::stake_activation_epoch(&last_staked_sui);
 
-        if (linked_table::contains(&validator_data.staked_sui_table, activation_epoch)) {
+        if (object_table::contains(&validator_data.staked_sui_table, activation_epoch)) {
           // If there is already a Staked Sui stored we join them
-          staking_pool::join_staked_sui(linked_table::borrow_mut(&mut validator_data.staked_sui_table, activation_epoch), last_staked_sui);
+          staking_pool::join_staked_sui(object_table::borrow_mut(&mut validator_data.staked_sui_table, activation_epoch), last_staked_sui);
         } else {
           // If the slot is empty we simply add the Staked Sui
           // Store the last_staked_sui in the Table
-          linked_table::push_back(&mut validator_data.staked_sui_table, staking_pool::stake_activation_epoch(&last_staked_sui), last_staked_sui);
+          object_table::add(&mut validator_data.staked_sui_table, staking_pool::stake_activation_epoch(&last_staked_sui), last_staked_sui);
         };
 
         // Store the new StakedSui in the cache
@@ -640,7 +641,7 @@ module interest_lsd::pool {
 
       // Epoch of zero retrieves from the cache - because it is long passed
       let staked_sui = if (payload.epoch != 0) 
-          linked_table::remove(&mut validator_data.staked_sui_table, payload.epoch) 
+          object_table::remove(&mut validator_data.staked_sui_table, payload.epoch) 
         else 
           option::extract(&mut validator_data.last_staked_sui);
 
@@ -771,7 +772,7 @@ module interest_lsd::pool {
     // Add the ValidatorData to the back of the list
     linked_table::push_back(&mut storage.validators_table, validator_address, ValidatorData {
         id: object::new(ctx),
-        staked_sui_table: linked_table::new(ctx),
+        staked_sui_table: object_table::new(ctx),
         last_staked_sui: option::none(),
         staking_pool_id: option::some(id),
         last_rewards: 0,
