@@ -10,7 +10,7 @@ module interest_lsd::pools_test {
   use sui::sui::{SUI};
 
   use sui_system::sui_system::{SuiSystemState};
-  use sui_system::governance_test_utils::{set_up_sui_system_state, advance_epoch};
+  use sui_system::governance_test_utils::{set_up_sui_system_state, advance_epoch, assert_validator_non_self_stake_amounts};
   use sui_system::staking_pool;
   
   use interest_lsd::pool::{Self, PoolStorage};
@@ -25,6 +25,7 @@ module interest_lsd::pools_test {
   const FIGMENT: address = @0x5;
   const COINBASE_CLOUD: address = @0x6;
   const INITIAL_SUI_AMOUNT: u64 = 600000000000000000;
+  const JOSE: address = @0x7;
 
   public fun init_test(test: &mut Scenario) {
     let (alice, _) = people();
@@ -39,7 +40,7 @@ module interest_lsd::pools_test {
   }
 
   #[test]
-  fun test_mint_isui() {
+  fun test_first_mint_isui() {
     let scenario = scenario();
 
     let test = &mut scenario;
@@ -116,12 +117,14 @@ module interest_lsd::pools_test {
       test::return_shared(wrapper);
       test::return_shared(pool_storage);
     };    
+
+    // Test if we deposited to the right validator
+    advance_epoch(test);
+    next_tx(test, @0x0);
+    {
+      assert_validator_non_self_stake_amounts(vector[MYSTEN_LABS, FIGMENT, COINBASE_CLOUD], vector[add_decimals(1000, 9), 0, 0], test);
+    };
+
     test::end(scenario); 
   }
 }
-
-//  &data.staked_sui_table,
-//       &data.last_staked_sui,
-//       data.staking_pool_id,
-//       data.last_rewards,
-//       data.total_principal
