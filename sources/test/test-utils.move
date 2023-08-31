@@ -11,6 +11,10 @@ module interest_lsd::test_utils {
   public fun people():(address, address) { (@0xBEEF, @0x1337)}
 
   public fun mint<T>(amount: u64, decimals: u8, ctx: &mut TxContext): Coin<T> {
-    mint_for_testing<T>(amount * math::pow(10, decimals), ctx)
+    mint_for_testing<T>(add_decimals(amount, decimals), ctx)
   }
+
+  public fun add_decimals(amount: u64, decimals: u8): u64 {
+    amount * math::pow(10, decimals)
+  } 
 }

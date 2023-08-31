@@ -23,7 +23,7 @@ module interest_lsd::isui {
   struct ISUI has drop {}
 
   // Treasury Cap Wrapper
-  struct InterestSuiStorage has key {
+  struct InterestISuiStorage has key {
     id: UID,
     treasury_cap: TreasuryCap<ISUI>,
   }
@@ -54,7 +54,7 @@ module interest_lsd::isui {
 
       // Share the InterestSuiStorage Object with the Sui network
       transfer::share_object(
-        InterestSuiStorage {
+        InterestISuiStorage {
           id: object::new(ctx),
           treasury_cap,
         }
@@ -70,7 +70,7 @@ module interest_lsd::isui {
   * @param value The amount of ISUI to mint
   * @return Coin<ISUI> New created ISUI coin
   */
-  public(friend) fun mint(storage: &mut InterestSuiStorage, value: u64, ctx: &mut TxContext): Coin<ISUI> {
+  public(friend) fun mint(storage: &mut InterestISuiStorage, value: u64, ctx: &mut TxContext): Coin<ISUI> {
     emit(Mint { amount: value, user: tx_context::sender(ctx) });
     coin::mint(&mut storage.treasury_cap, value, ctx)
   }
@@ -81,7 +81,7 @@ module interest_lsd::isui {
   * @param asset The Coin to Burn out of existence
   * @return u64 The value burned
   */
-  public(friend) fun burn(storage: &mut InterestSuiStorage, asset: Coin<ISUI>, ctx: &mut TxContext): u64 {
+  public(friend) fun burn(storage: &mut InterestISuiStorage, asset: Coin<ISUI>, ctx: &mut TxContext): u64 {
     emit(Burn { amount: coin::value(&asset), user: tx_context::sender(ctx) });
     coin::burn(&mut storage.treasury_cap, asset)
   }
@@ -100,7 +100,7 @@ module interest_lsd::isui {
   * @storage The shared ISUIollarStorage
   * @return u64 The total value of ISUI in existence
   */
-  public fun total_supply(storage: &InterestSuiStorage): u64 {
+  public fun total_supply(storage: &InterestISuiStorage): u64 {
     coin::total_supply(&storage.treasury_cap)
   }
 
@@ -108,28 +108,28 @@ module interest_lsd::isui {
 
   /// Update name of the coin in `CoinMetadata`
   public entry fun update_name(
-        _: &AdminCap, storage: &InterestSuiStorage, metadata: &mut CoinMetadata<ISUI>, name: string::String
+        _: &AdminCap, storage: &InterestISuiStorage, metadata: &mut CoinMetadata<ISUI>, name: string::String
     ) {
         coin::update_name(&storage.treasury_cap, metadata, name)
     }
 
     /// Update the symbol of the coin in `CoinMetadata`
     public entry fun update_symbol(
-        _: &AdminCap, storage: &InterestSuiStorage, metadata: &mut CoinMetadata<ISUI>, symbol: ascii::String
+        _: &AdminCap, storage: &InterestISuiStorage, metadata: &mut CoinMetadata<ISUI>, symbol: ascii::String
     ) {
        coin::update_symbol(&storage.treasury_cap, metadata, symbol)
     }
 
     /// Update the description of the coin in `CoinMetadata`
     public entry fun update_description(
-        _: &AdminCap, storage: &InterestSuiStorage, metadata: &mut CoinMetadata<ISUI>, description: string::String
+        _: &AdminCap, storage: &InterestISuiStorage, metadata: &mut CoinMetadata<ISUI>, description: string::String
     ) {
         coin::update_description(&storage.treasury_cap, metadata, description)
     }
 
     /// Update the url of the coin in `CoinMetadata`
     public entry fun update_icon_url(
-        _: &AdminCap, storage: &InterestSuiStorage, metadata: &mut CoinMetadata<ISUI>, url: ascii::String
+        _: &AdminCap, storage: &InterestISuiStorage, metadata: &mut CoinMetadata<ISUI>, url: ascii::String
     ) {
         coin::update_icon_url(&storage.treasury_cap, metadata, url)
     }

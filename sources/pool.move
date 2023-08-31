@@ -20,9 +20,9 @@ module interest_lsd::pool {
   use sui_system::staking_pool::{Self, StakedSui};
 
   use interest_lsd::admin::{AdminCap};
-  use interest_lsd::isui::{Self, ISUI, InterestSuiStorage};
-  use interest_lsd::isui_pc::{Self, ISUI_PC, InterestSuiPCStorage};
-  use interest_lsd::isui_yc::{Self, ISUI_YC, InterestSuiYCStorage};
+  use interest_lsd::isui::{Self, ISUI, InterestISuiStorage};
+  use interest_lsd::isui_pc::{Self, ISUI_PC, InterestISuiPCStorage};
+  use interest_lsd::isui_yc::{Self, ISUI_YC, InterestISuiYCStorage};
   use interest_lsd::rebase::{Self, Rebase};
   use interest_lsd::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
   use interest_lsd::math::{fmul, scalar};
@@ -283,7 +283,7 @@ module interest_lsd::pool {
   public fun mint_isui(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    interest_sui_storage: &mut InterestSuiStorage,
+    interest_sui_storage: &mut InterestISuiStorage,
     asset: Coin<SUI>,
     validator_address: address,
     ctx: &mut TxContext,
@@ -311,7 +311,7 @@ module interest_lsd::pool {
   public fun burn_isui(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    interest_sui_storage: &mut InterestSuiStorage,
+    interest_sui_storage: &mut InterestISuiStorage,
     validator_payload: vector<BurnISuiValidatorPayload>,
     asset: Coin<ISUI>,
     validator_address: address,
@@ -353,9 +353,9 @@ module interest_lsd::pool {
   public fun mint_isui_derivatives(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    interest_sui_storage: &mut InterestSuiStorage,
-    interest_sui_pc_storage: &mut InterestSuiPCStorage,
-    interest_sui_yc_storage: &mut InterestSuiYCStorage,
+    interest_sui_storage: &mut InterestISuiStorage,
+    interest_sui_pc_storage: &mut InterestISuiPCStorage,
+    interest_sui_yc_storage: &mut InterestISuiYCStorage,
     asset: Coin<SUI>,
     validator_address: address,
     ctx: &mut TxContext,
@@ -384,7 +384,7 @@ module interest_lsd::pool {
   public fun burn_isui_pc(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    interest_sui_pc_storage: &mut InterestSuiPCStorage,
+    interest_sui_pc_storage: &mut InterestISuiPCStorage,
     validator_payload: vector<BurnISuiValidatorPayload>,
     asset: Coin<ISUI_PC>,
     validator_address: address,
@@ -425,7 +425,7 @@ module interest_lsd::pool {
   public fun burn_isui_yc(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    interest_sui_yc_storage: &mut InterestSuiYCStorage,
+    interest_sui_yc_storage: &mut InterestISuiYCStorage,
     validator_payload: vector<BurnISuiValidatorPayload>,
     asset: Coin<ISUI_YC>,
     validator_address: address,
@@ -513,7 +513,7 @@ module interest_lsd::pool {
   fun mint_isui_logic(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    interest_sui_storage: &mut InterestSuiStorage,
+    interest_sui_storage: &mut InterestISuiStorage,
     asset: Coin<SUI>,
     validator_address: address,
     ctx: &mut TxContext,    
@@ -718,7 +718,7 @@ module interest_lsd::pool {
   */
   fun charge_isui_mint(
     storage: &mut PoolStorage,
-    interest_sui_storage: &mut InterestSuiStorage,
+    interest_sui_storage: &mut InterestISuiStorage,
     validator_principal: u64,
     shares: u64,
     ctx: &mut TxContext

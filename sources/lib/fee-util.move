@@ -48,4 +48,9 @@ module interest_lsd::fee_utils {
     fee.jump = jump;
   }
 
+  #[test_only]
+  public fun read_fee(fee:&Fee): (u256, u256, u256) {
+    (fee.base, fee.kink, fee.jump)
+  }
+
 }
