@@ -54,7 +54,7 @@ module interest_lsd::pool {
     id: UID, // front end to grab and display data,
     staked_sui_table: ObjectTable<u64, StakedSui>, // epoch => StakedSui
     last_staked_sui: Option<StakedSui>, // cache to merge StakedSui with the same metadata to keep the table compact
-    staking_pool_id: Option<ID>, // the ID of the validator StakingPool
+    staking_pool_id: ID, // the ID of the validator StakingPool
     last_rewards: u64, // The last total rewards fetched
     total_principal: u64 // The total amount of Sui deposited in this validator without the accrueing rewards
   }
@@ -70,9 +70,7 @@ module interest_lsd::pool {
     validators_table: LinkedTable<address, ValidatorData>, // We need a linked table to iterate through all validators once every epoch to ensure all pool data is accurate
     total_principal: u64, // Total amount of principal deposited in Interest LSD Package
     fee: Fee, // Holds the fee data. Explanation on how the fees work above.
-    dao_coin: Coin<ISUI>, // Fees collected by the protocol in ISUI,
-    last_compound: u64, // The last timestamp in which we ran the compound function. We do not want to run until the protocol has meaningful rewards
-    compound_window: u64 // How often can the compound function be called
+    dao_coin: Coin<ISUI> // Fees collected by the protocol in ISUI,
   }
 
   // ** Events
@@ -134,9 +132,7 @@ module interest_lsd::pool {
         validators_table: linked_table::new(ctx),
         total_principal: 0,
         fee: new_fee(),
-        dao_coin: coin::zero<ISUI>(ctx),
-        last_compound: 0,
-        compound_window: 2629800000 // One Month in milliseconds
+        dao_coin: coin::zero<ISUI>(ctx)
       }
     );
   }
@@ -218,12 +214,6 @@ module interest_lsd::pool {
     (((sui_amount as u256) * (value as u256) / (exchange_rate as u256)) as u64)
   }
 
-  entry public fun compound(
-
-  ) {
-
-  }
-
   // @dev This function costs a lot of gas and must be called before any interaction with Interest LSD, because it updates the pool. The pool is needed to ensure all 3 Coins exchange rate is accurate.
   // Anyone can call this function
   // It will ONLY RUN ONCE per epoch
@@ -260,7 +250,7 @@ module interest_lsd::pool {
       if (validator_data.total_principal != 0) {
         // We calculate the total rewards we will get based on our current principal staked in the validator
         let total_rewards = calc_staking_pool_rewards(
-          table::borrow(sui_system::pool_exchange_rates(wrapper, option::borrow(&validator_data.staking_pool_id)), epoch),
+          table::borrow(sui_system::pool_exchange_rates(wrapper, &validator_data.staking_pool_id), epoch),
           validator_data.total_principal
         );
 
@@ -774,7 +764,7 @@ module interest_lsd::pool {
         id: object::new(ctx),
         staked_sui_table: object_table::new(ctx),
         last_staked_sui: option::none(),
-        staking_pool_id: option::some(id),
+        staking_pool_id: id,
         last_rewards: 0,
         total_principal: 0
       }); 
