@@ -3,6 +3,8 @@ module interest_lsd::pools_test {
 
   use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
   use sui::test_utils::{assert_eq};
+
+  use sui_system::governance_test_utils;
   
   use interest_lsd::pool;
   use interest_lsd::isui;

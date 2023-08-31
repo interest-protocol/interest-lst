@@ -9,9 +9,9 @@ module interest_lsd::fee_utils {
   // Fee = ((dominance - kink) * jump) + (kink * base)
   // Fee = dominance * base
   struct Fee has store {
-    base: u256,
-    kink: u256,
-    jump: u256
+    base: u256, // Base Multiplier
+    kink: u256, // Threshold
+    jump: u256 // Jump Multiplier
   }
 
   public fun new(): Fee {

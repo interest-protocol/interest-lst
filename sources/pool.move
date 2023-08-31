@@ -774,4 +774,36 @@ module interest_lsd::pool {
   public fun init_for_testing(ctx: &mut TxContext) {
     init(ctx);
   }
+
+  #[test_only]
+  public fun read_pool_storage(storage: &PoolStorage): (&Rebase, u64, &LinkedTable<address, ValidatorData>, u64, &Fee, &Coin<ISUI>) {
+    (
+      &storage.pool, 
+      storage.last_epoch, 
+      &storage.validators_table, 
+      storage.total_principal, 
+      &storage.fee, 
+      &storage.dao_coin
+    ) 
+  }
+
+  #[test_only]
+  public fun read_validator_data(data: &ValidatorData): (&ObjectTable<u64, StakedSui>, &Option<StakedSui>, ID, u64, u64) {
+    (
+      &data.staked_sui_table,
+      &data.last_staked_sui,
+      data.staking_pool_id,
+      data.last_rewards,
+      data.total_principal
+    )
+  }
+
+  #[test_only]
+  public fun create_burn_isui_validator_payload(validator_address: address, epoch: u64, principal: u64): BurnISuiValidatorPayload {
+    BurnISuiValidatorPayload {
+      validator_address,
+      epoch, 
+      principal
+    }
+  }
 }
