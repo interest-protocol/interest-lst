@@ -35,12 +35,12 @@ Interest Liquid Staking Derivative allows users to stake and unstake Sui in thei
 
 Selling any of these coins, means selling the entire position. Coins do not require any other object to mint/burn. Therefore, they are composable with DeFi.
 
-### Features
+### Core Values
 
 - **Decentralized:** Users can deposit/withdraw from any validator
 - **Non-custodial:** The admin does not have any access to the funds. It uses a Coin accounting system to keep track of deposits/rewards
 - **Fair:** The deposit fee increases as a validator gets higher stake compared to the other. It incentivizes users to deposit in other validators.
-- **Flexible:** Users can mint iSui to track the entire pool or mint iSuiPC & iSuiYC to track the pool's principal and rewards separately
+- **Flexible:** Users have granular control over their deposit via the 3 Coin options.
 
 ## Repo Structure
 
