@@ -14,7 +14,7 @@ module interest_lsd::pools_test {
   use sui_system::staking_pool;
   
   use interest_lsd::pool::{Self, PoolStorage};
-  use interest_lsd::isui::{Self, InterestISuiStorage};
+  use interest_lsd::isui::{Self, InterestSuiStorage};
   use interest_lsd::isui_pc;
   use interest_lsd::isui_yc;
   use interest_lsd::rebase;
@@ -75,12 +75,12 @@ module interest_lsd::pools_test {
 
       // First deposit should update the data correctly
       let wrapper = test::take_shared<SuiSystemState>(test);
-      let interest_isui_storage = test::take_shared<InterestISuiStorage>(test);
+      let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
 
       let coin_isui = pool::mint_isui(
         &mut wrapper,
         &mut pool_storage,
-        &mut interest_isui_storage,
+        &mut interest_sui_storage,
         mint<SUI>(1000, 9, ctx(test)),
         MYSTEN_LABS,
         ctx(test)
@@ -113,7 +113,7 @@ module interest_lsd::pools_test {
       assert_eq(last_rewards, 0);
       assert_eq(total_principal ,add_decimals(1000, 9));
 
-      test::return_shared(interest_isui_storage);
+      test::return_shared(interest_sui_storage);
       test::return_shared(wrapper);
       test::return_shared(pool_storage);
     };    

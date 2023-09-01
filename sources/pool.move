@@ -23,20 +23,20 @@ module interest_lsd::pool {
   use interest_lsd::admin::{AdminCap};
   use interest_lsd::math::{fmul, scalar};
   use interest_lsd::rebase::{Self, Rebase};
-  use interest_lsd::isui::{Self, ISUI, InterestISuiStorage};
-  use interest_lsd::isui_pc::{Self, ISUI_PC, InterestISuiPCStorage};
-  use interest_lsd::isui_yc::{Self, ISUI_YC, InterestISuiYCStorage};
+  use interest_lsd::isui::{Self, ISUI, InterestSuiStorage};
+  use interest_lsd::isui_pc::{Self, ISUI_PC, InterestSuiPCStorage};
+  use interest_lsd::isui_yc::{Self, ISUI_YC, InterestSuiYCStorage};
   use interest_lsd::staking_pool_utils::{calc_staking_pool_rewards};
   use interest_lsd::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
   
   // ** Constants
 
-  /// StakedSui objects cannot be split to below this amount.
+  // StakedSui objects cannot be split to below this amount.
   const MIN_STAKING_THRESHOLD: u64 = 1_000_000_000; // 1 SUI
 
   // ** Errors
 
-  const INVALID_FEE: u64 = 0; // All values inside Fees Struct must be equal or below 1e18 as it represents 100%
+  const INVALID_FEE: u64 = 0; // All values inside the Fees Struct must be equal or below 1e18 as it represents 100%
   const INVALID_STAKE_AMOUNT: u64 = 1; // Users need to stake more than 1 MIST as the sui_system will throw 0 value stakes
   const INVALID_UNSTAKE_AMOUNT: u64 = 2; // The sender tried to unstake more than he is allowed 
   const INVALID_INPUT_AMOUNT: u64 = 3;
@@ -55,23 +55,24 @@ module interest_lsd::pool {
     id: UID, // front end to grab and display data,
     staked_sui_table: ObjectTable<u64, StakedSui>, // epoch => StakedSui
     last_staked_sui: Option<StakedSui>, // cache to merge StakedSui with the same metadata to keep the table compact
-    staking_pool_id: ID, // the ID of the validator StakingPool
+    staking_pool_id: ID, // The ID of the validator StakingPool
     last_rewards: u64, // The last total rewards fetched
-    total_principal: u64 // The total amount of Sui deposited in this validator without the accrueing rewards
+    total_principal: u64 // The total amount of Sui deposited in this validator without the accruing rewards
   }
 
   // Shared Object
-  // Unfortunately, we cannot make fully exploit Sui concurrency model because we need our LSD Coins to reflect the rewards accrued
-  // This allows for users to instantly buy and "Stake Sui" by buying this coin without having to go through all the process
-  // This also makes Coins omnichain and a user in Ethereum can buy the coin and he instantly became a Sui Staker
+  // Unfortunately, we cannot fully exploit Sui's concurrency model because we need our LSD Coins to reflect the rewards accrued
+  // This allows users to instantly to stake Sui by buying this coin without having to go through the process
+  // This also makes Coins omnichannel and a user in Ethereum can buy the coin and instantly became a Sui Staker
+  // Sui StakingV3 module will have a bonding period, LSDs will be a great way to exit immediately
   struct PoolStorage has key {
     id: UID,
-    pool: Rebase, // This struct holds current total shares of ISUI and total SUI (Principal + Rewards) is represents. Rebase {base: ISUI total supply, elastic: total Sui}
+    pool: Rebase, // This struct holds the total shares of ISUI and the total SUI (Principal + Rewards). Rebase {base: ISUI total supply, elastic: total Sui}
     last_epoch: u64, // Last epoch that pool was updated
     validators_table: LinkedTable<address, ValidatorData>, // We need a linked table to iterate through all validators once every epoch to ensure all pool data is accurate
     total_principal: u64, // Total amount of principal deposited in Interest LSD Package
-    fee: Fee, // Holds the fee data. Explanation on how the fees work above.
-    dao_coin: Coin<ISUI> // Fees collected by the protocol in ISUI,
+    fee: Fee, // Holds the data to calculate the stake fee
+    dao_coin: Coin<ISUI> // Fees collected by the protocol in ISUI
   }
 
   // ** Events
@@ -184,7 +185,7 @@ module interest_lsd::pool {
     isui_yc_amount: u64,
     ctx: &mut TxContext
   ): u64 {
-    // It does not make to quote more ISUI that it exists
+    // It does not make sense to quote more ISUI than it exists
     // It will break the calculation assumptions
     assert!(rebase::base(&storage.pool) >= isui_yc_amount, INVALID_INPUT_AMOUNT);
     // We update the pool to make sure the rewards are up to date
@@ -215,10 +216,10 @@ module interest_lsd::pool {
     (((sui_amount as u256) * (value as u256) / (exchange_rate as u256)) as u64)
   }
 
-  // @dev This function costs a lot of gas and must be called before any interaction with Interest LSD, because it updates the pool. The pool is needed to ensure all 3 Coins exchange rate is accurate.
+  // @dev This function costs a lot of gas and must be called before any interaction with Interest LSD because it updates the pool. The pool is needed to ensure all 3 Coins' exchange rate is accurate.
   // Anyone can call this function
   // It will ONLY RUN ONCE per epoch
-  // Dev Team will call as soon as a new epoch stars so the first user does not need to incur this cost
+  // Dev Team will call as soon as a new epoch starts so the first user does not need to incur this cost
   /*
   * @wrapper The Sui System Shared Object
   * @storage The Pool Storage Shared Object (this module)
@@ -233,8 +234,8 @@ module interest_lsd::pool {
     // If users withdraw coins in the current epoch the rewards will change, therefore, we only calculate rewards once they are fully finalized
     let epoch = tx_context::epoch(ctx) - 1;
 
-    // if the function has been called this epoch, we do not need to do anything else
-    // If there are no shares in the pool, it means there is no sui being staked. So there is no updates
+    //If the function has been called this epoch, we do not need to do anything else
+    // If there are no shares in the pool, it means there is no sui being staked. So there are no updates
     if (epoch == storage.last_epoch || rebase::base(&storage.pool) == 0) return;
 
     // Get the first validator in the linked_table
@@ -257,7 +258,7 @@ module interest_lsd::pool {
 
         // We add the new rewards accrued to the pool. 
         // The new rewards = total_rewards_now - total_rewards_previous_epoch
-        // We round down to remain conversative
+        // We round down to remain conservative
         rebase::increase_elastic(&mut storage.pool, total_rewards - validator_data.last_rewards, false);
 
         // Update the last_rewards
@@ -276,7 +277,7 @@ module interest_lsd::pool {
   /*
   * @wrapper The Sui System Shared Object
   * @storage The Pool Storage Shared Object (this module)
-  * @interest_sui_storage The shared object of ISUI, it contains the treasury_cap. We need it to mint ISUI
+  * @interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
   * @asset The Sui Coin, the sender wishes to stake
   * @validator_address The Sui Coin will be staked in this validator
   * @return Coin<ISUI> in exchange for the Sui deposited
@@ -284,7 +285,7 @@ module interest_lsd::pool {
   public fun mint_isui(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    interest_sui_storage: &mut InterestISuiStorage,
+    interest_sui_storage: &mut InterestSuiStorage,
     asset: Coin<SUI>,
     validator_address: address,
     ctx: &mut TxContext,
@@ -299,20 +300,20 @@ module interest_lsd::pool {
     isui::mint(interest_sui_storage, shares_to_mint, ctx)
   }
 
-  // @dev This function burns ISUI and unstakes Sui 
+  // @dev This function burns ISUI and unstake Sui 
   /*
   * @wrapper The Sui System Shared Object
   * @storage The Pool Storage Shared Object (this module)
-  * @interest_sui_storage The shared object of ISUI, it contains the treasury_cap. We need it to mint ISUI
+  * @interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
   * @validator_payload A vector containing the information about which StakedSui to unstake
   * @asset The iSui Coin, the sender wishes to burn
-  * @validator_address The validator to re stake any remaining Sui if any
+  * @validator_address The validator is to re-stake any remaining Sui if any
   * @return Coin<SUI> in exchange for the iSui burned
   */
   public fun burn_isui(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    interest_sui_storage: &mut InterestISuiStorage,
+    interest_sui_storage: &mut InterestSuiStorage,
     validator_payload: vector<BurnISuiValidatorPayload>,
     asset: Coin<ISUI>,
     validator_address: address,
@@ -354,9 +355,9 @@ module interest_lsd::pool {
   public fun mint_isui_derivatives(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    interest_sui_storage: &mut InterestISuiStorage,
-    interest_sui_pc_storage: &mut InterestISuiPCStorage,
-    interest_sui_yc_storage: &mut InterestISuiYCStorage,
+    interest_sui_storage: &mut InterestSuiStorage,
+    interest_sui_pc_storage: &mut InterestSuiPCStorage,
+    interest_sui_yc_storage: &mut InterestSuiYCStorage,
     asset: Coin<SUI>,
     validator_address: address,
     ctx: &mut TxContext,
@@ -385,7 +386,7 @@ module interest_lsd::pool {
   public fun burn_isui_pc(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    interest_sui_pc_storage: &mut InterestISuiPCStorage,
+    interest_sui_pc_storage: &mut InterestSuiPCStorage,
     validator_payload: vector<BurnISuiValidatorPayload>,
     asset: Coin<ISUI_PC>,
     validator_address: address,
@@ -413,7 +414,7 @@ module interest_lsd::pool {
     unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_value_to_return, ctx)
   }
 
-    // @dev This function burns ISUI_YC in exchange for SUI. ISUI_YC grows as the yield of this pool grows
+  // @dev This function burns ISUI_YC in exchange for SUI. ISUI_YC grows as the yield of this pool grows
   /*
   * @wrapper The Sui System Shared Object
   * @storage The Pool Storage Shared Object (this module)
@@ -426,7 +427,7 @@ module interest_lsd::pool {
   public fun burn_isui_yc(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    interest_sui_yc_storage: &mut InterestISuiYCStorage,
+    interest_sui_yc_storage: &mut InterestSuiYCStorage,
     validator_payload: vector<BurnISuiValidatorPayload>,
     asset: Coin<ISUI_YC>,
     validator_address: address,
@@ -442,7 +443,7 @@ module interest_lsd::pool {
 
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
-    // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
+    // Sender must Unstake more than his principal to ensure that the leftover is above the threshold of 1 Sui
     assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_amount, INVALID_UNSTAKE_AMOUNT);
 
     emit(BurnISuiYC { sui_amount, sender: tx_context::sender(ctx), isui_yc_amount });
@@ -472,7 +473,7 @@ module interest_lsd::pool {
     // scalar represents 100% - the protocol does not allow a fee higher than that.
     assert!(max >= base && max >= kink && max >= jump, INVALID_FEE);
 
-    // Update the values
+    // Update the fee values
     set_fee(&mut storage.fee, base, kink, jump);
 
     // Emit event
@@ -496,7 +497,7 @@ module interest_lsd::pool {
     // Emit the event
     emit(DaoWithdraw<ISUI> {amount, sender: tx_context::sender(ctx) });
 
-    // Split the Fees and sent the desired amount
+    // Split the Fees and send the desired amount
     coin::split(&mut storage.dao_coin, amount, ctx)
   }
 
@@ -506,7 +507,7 @@ module interest_lsd::pool {
   /*
   * @wrapper The Sui System Shared Object
   * @storage The Pool Storage Shared Object (this module)
-  * @interest_sui_storage The shared object of ISUI, it contains the treasury_cap. We need it to mint ISUI
+  * @interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
   * @asset The Sui Coin, the sender wishes to stake
   * @validator_address The Sui Coin will be staked in this validator
   * @return Coin<ISUI> in exchange for the Sui deposited
@@ -514,7 +515,7 @@ module interest_lsd::pool {
   fun mint_isui_logic(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    interest_sui_storage: &mut InterestISuiStorage,
+    interest_sui_storage: &mut InterestSuiStorage,
     asset: Coin<SUI>,
     validator_address: address,
     ctx: &mut TxContext,    
@@ -529,8 +530,8 @@ module interest_lsd::pool {
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
     update_pool(wrapper, storage, ctx);
   
-    // Stake the Sui 
-    // We need to stake the Sui before registering the validator to have access to the pool_id
+    // Stake Sui 
+    // We need to stake Sui before registering the validator to have access to the pool_id
     let staked_sui = sui_system::request_add_stake_non_entry(wrapper, asset, validator_address, ctx);
 
     // Register the validator once in the linked_list
@@ -540,8 +541,6 @@ module interest_lsd::pool {
     let validator_data = linked_table::borrow_mut(&mut storage.validators_table, validator_address);
 
     // Store the Sui in storage
-    // It returns the total sui principal staked in the validator
-    // We need to calculate the fee
     store_staked_sui(validator_data, staked_sui);
 
     // Update the total principal in this entire module
@@ -562,19 +561,18 @@ module interest_lsd::pool {
   // @dev This function stores the StakedSui in a cache to be merged to all other StakedSui with the same metadata. 
   // It will move the StakedSui to a table, once a StakedSui with new metadata is stored
   /*
-  * @staked_sui: The StakedSui Object to store
   * @validator_data: The Struct Data for the validator where we will deposit the Sui
-  * @current_epoch: The current epoch in Sui
+  * @staked_sui: The StakedSui Object to store
   * @return The total principal staked in the validator
   */
   fun store_staked_sui(validator_data: &mut ValidatorData, staked_sui: StakedSui) {
 
-    // If there is a staked sui in the cache - we wanna merge with the current one or store in the table
+    // If there is a staked sui in the cache - we want to merge it with the current one or store it in the table
     if (option::is_some(&validator_data.last_staked_sui)) {
       // Get the last staked sui out of the object storage
       let last_staked_sui = option::extract(&mut validator_data.last_staked_sui);
 
-      // If last staked sui can be joint with the staked sui, we do merge and cache it.
+      // If the last staked sui can be joined with the staked sui, we merge them and cache it.
       if (staking_pool::is_equal_staking_metadata(&last_staked_sui, &staked_sui)) {
         // Merge the StakedSuis
         staking_pool::join_staked_sui(&mut last_staked_sui, staked_sui);
@@ -582,11 +580,10 @@ module interest_lsd::pool {
         option::fill(&mut validator_data.last_staked_sui, last_staked_sui);
       } else {
         // If they cannot be merged, we want to store the cache in the table and cache the new one
-
         let activation_epoch = staking_pool::stake_activation_epoch(&last_staked_sui);
 
         if (object_table::contains(&validator_data.staked_sui_table, activation_epoch)) {
-          // If there is already a Staked Sui stored we join them
+          // If there is already a Staked Sui of the same epoch stored we join them
           staking_pool::join_staked_sui(object_table::borrow_mut(&mut validator_data.staked_sui_table, activation_epoch), last_staked_sui);
         } else {
           // If the slot is empty we simply add the Staked Sui
@@ -599,15 +596,13 @@ module interest_lsd::pool {
       };
 
     } else {
-      // If there is nothing in the cache, we cache the most recent staked sui
+      // If there is nothing in the cache, we cache the most recent staked Sui
       option::fill(&mut validator_data.last_staked_sui, staked_sui);
     };
   }
 
   // @dev This function safely removes Staked Sui from our storage
-
   /*
-  * @wrapper The Sui System Shared Object
   * @storage The Pool Storage Shared Object (this module)
   * @validator_payload A vector containing the information about which StakedSui to unstake
   * @return (Vector of Staked Sui, total principal of Staked Sui Removed)
@@ -638,7 +633,7 @@ module interest_lsd::pool {
 
       let staked_sui_amount = staking_pool::staked_sui_amount(&staked_sui);
 
-      // We do not need to split the Sui so we can simply save in the vector
+      // We do not need to split the Sui so we can simply save it in the vector
       if (staked_sui_amount == payload.principal) {
         vector::push_back(&mut staked_sui_vector, staked_sui);     
       } else {
@@ -665,7 +660,7 @@ module interest_lsd::pool {
   * @wrapper The Sui System Shared Object
   * @storage The Pool Storage Shared Object (this module)
   * @staked_sui_vector The vector of StakedSui to unstake
-  * @validator_address The validator to re stake any remaining Sui if any
+  * @validator_address The validator is to re-stake any remaining Sui if any
   * @sui_value_to_return The desired amount of Sui to unstake
   * @return Coin<SUI> The unstaked Sui
   */
@@ -691,7 +686,7 @@ module interest_lsd::pool {
     // This should be empty
     vector::destroy_empty(staked_sui_vector);
 
-      // Split the coin with the right value to repay the user
+    // Split the coin with the right value to repay the user
     let sui_to_return = coin::split(&mut total_sui_coin, sui_value_to_return, ctx);
 
     // Save the ValidatorData in memory so we can store any remaining Sui
@@ -712,14 +707,17 @@ module interest_lsd::pool {
     sui_to_return
   }
 
-  //Adds a dynamic field to the storage to store the CoinData struct 
+  // If there is a fee, it mints iSUi for the Admin
   /*
   * @storage: The Pool Storage Shared Object (this module)
+  * @interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
+  * @validator_principal The amount of Sui principal deposited to the validator
+  * @shares The amount of iSui being minted
   * @return the amount of ISUI to mint to the sender
   */
   fun charge_isui_mint(
     storage: &mut PoolStorage,
-    interest_sui_storage: &mut InterestISuiStorage,
+    interest_sui_storage: &mut InterestSuiStorage,
     validator_principal: u64,
     shares: u64,
     ctx: &mut TxContext
