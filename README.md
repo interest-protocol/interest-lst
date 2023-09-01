@@ -1,4 +1,4 @@
-# [Interest Protocol Sui SDK](https://www.interestprotocol.com/)
+# [Interest Protocol Liquid Staking DerivativeK](https://www.interestprotocol.com/)
 
  <p> <img width="75px"height="75px" src="./assets/logo.png" /></p>
 
@@ -24,9 +24,12 @@ Make sure you have the latest version of the Sui binaries installed on your mach
 
 ### Functionality
 
-Interest Liquidity Staking Derivatives allow users to stake and unstake Sui in their validator of choice. Users have two LSD options:
+Interest Liquid Staking Derivative allows users to stake and unstake Sui in their validator of choice. Users have two Mint options:
+
+**First Option**
 
 - iSui (Interest Sui): It tracks the pool's principal and rewards. Therefore, it's value is always higher than Sui.
+  **Second Option**
 - iSui-PC (Interest Sui Principal Coin) It tracks the principal portion of a stake. This coin is always equal to Sui.
 - iSui-YC (Interest Sui Yield Coin) It tracks the rewards portion of a stake. This coin grows over time.
 
@@ -44,7 +47,7 @@ Selling any of these coins, means selling the entire position. Coins do not requ
 - **pool.move:** It mints/burns the LSD Coins
 - **admin.move:** It contains the logic to manage the AdminCap
 - **test:** It contains all tests for these packages
-- **lib:** It utility modules to support the {pool.move} module
+- **lib:** It contains utility modules to support the {pool.move} module
 - **coins:** It contains the Coins that {pool.move} mint and burn
 
 ## Contact Us
