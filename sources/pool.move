@@ -3,30 +3,31 @@
 // ISUI_PC is always 1 SUI as it represents the principal owned by this module
 // ISUI_YC is a share of the SUI Rewards owned by this module
 module interest_lsd::pool { 
-  use std::option::{Self, Option};
   use std::vector;
+  use std::option::{Self, Option};
 
+
+  use sui::table;
   use sui::transfer;
   use sui::sui::{SUI};
+  use sui::event::{emit};
   use sui::coin::{Self, Coin};
   use sui::object::{Self, UID, ID};
-  use sui::event::{emit};
   use sui::tx_context::{Self, TxContext};
   use sui::object_table::{Self, ObjectTable};
   use sui::linked_table::{Self, LinkedTable};
-  use sui::table;
 
-  use sui_system::sui_system::{Self, SuiSystemState};
   use sui_system::staking_pool::{Self, StakedSui};
+  use sui_system::sui_system::{Self, SuiSystemState};
 
   use interest_lsd::admin::{AdminCap};
+  use interest_lsd::math::{fmul, scalar};
+  use interest_lsd::rebase::{Self, Rebase};
   use interest_lsd::isui::{Self, ISUI, InterestISuiStorage};
   use interest_lsd::isui_pc::{Self, ISUI_PC, InterestISuiPCStorage};
   use interest_lsd::isui_yc::{Self, ISUI_YC, InterestISuiYCStorage};
-  use interest_lsd::rebase::{Self, Rebase};
-  use interest_lsd::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
-  use interest_lsd::math::{fmul, scalar};
   use interest_lsd::staking_pool_utils::{calc_staking_pool_rewards};
+  use interest_lsd::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
   
   // ** Constants
 
@@ -257,7 +258,7 @@ module interest_lsd::pool {
         // We add the new rewards accrued to the pool. 
         // The new rewards = total_rewards_now - total_rewards_previous_epoch
         // We round down to remain conversative
-        rebase::add_elastic(&mut storage.pool, total_rewards - validator_data.last_rewards, false);
+        rebase::increase_elastic(&mut storage.pool, total_rewards - validator_data.last_rewards, false);
 
         // Update the last_rewards
         validator_data.last_rewards = total_rewards;

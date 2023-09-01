@@ -127,4 +127,9 @@ module interest_lsd::pools_test {
 
     test::end(scenario); 
   }
+
+  #[test]
+  fun test_mint_isui_multiple_stakes_one_validator() {
+
+  }
 }
