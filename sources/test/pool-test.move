@@ -94,12 +94,11 @@ module interest_lsd::pools_test {
 
       let mysten_labs_data = linked_table::borrow(validators_table, MYSTEN_LABS);
 
-      let (staked_sui_table, last_staked_sui, staking_pool_id, total_principal) = pool::read_validator_data(mysten_labs_data);
+      let (staked_sui_table, last_staked_sui,  total_principal) = pool::read_validator_data(mysten_labs_data);
       
       // We cached the sui
       assert_eq(linked_table::length(staked_sui_table), 0);
       assert_eq(staking_pool::staked_sui_amount(option::borrow(last_staked_sui)), add_decimals(1000, 9));
-      assert_eq(staking_pool::pool_id(option::borrow(last_staked_sui)), staking_pool_id);
       assert_eq(total_principal ,add_decimals(1000, 9));
 
       test::return_shared(interest_sui_storage);
@@ -148,7 +147,7 @@ module interest_lsd::pools_test {
 
       let validator_data = linked_table::borrow(validator_data_table, MYSTEN_LABS);
 
-      let (staked_sui_table, last_staked_sui, _, validator_total_principal) = pool::read_validator_data(validator_data);
+      let (staked_sui_table, last_staked_sui,  validator_total_principal) = pool::read_validator_data(validator_data);
 
       assert_eq(last_epoch, 3);
       assert_eq(total_principal, add_decimals(40, 9));
@@ -169,6 +168,8 @@ module interest_lsd::pools_test {
 
     test::end(scenario); 
   }
+
+  // Set up Functions
 
   fun init_test(test: &mut Scenario) {
     set_up_sui_system_state();

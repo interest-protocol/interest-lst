@@ -11,7 +11,7 @@ module interest_lsd::pool {
   use sui::sui::{SUI};
   use sui::event::{emit};
   use sui::coin::{Self, Coin};
-  use sui::object::{Self, UID, ID};
+  use sui::object::{Self, UID};
   use sui::tx_context::{Self, TxContext};
   use sui::linked_table::{Self, LinkedTable};
 
@@ -53,7 +53,6 @@ module interest_lsd::pool {
     id: UID, // front end to grab and display data,
     staked_sui_table: LinkedTable<u64, StakedSui>, // activation_epoch => StakedSui
     last_staked_sui: Option<StakedSui>, // cache to merge StakedSui with the same metadata to keep the table compact
-    staking_pool_id: ID, // The ID of the validator StakingPool
     total_principal: u64 // The total amount of Sui deposited in this validator without the accruing rewards
   }
 
@@ -253,33 +252,20 @@ module interest_lsd::pool {
       if (validator_data.total_principal != 0) {
         // We calculate the total rewards we will get based on our current principal staked in the validator
 
-        let pool_exchange_rates = sui_system::pool_exchange_rates(wrapper, &validator_data.staking_pool_id);
-        let current_exchange_rate = table::borrow(pool_exchange_rates, epoch);
-
         // First need to calculate the rewards for the cached sui
-        if (option::is_some(&validator_data.last_staked_sui)) {
-          let staked_sui = option::borrow(&validator_data.last_staked_sui);
-
-          total_validator_rewards = calc_staking_pool_rewards(
-          table::borrow(pool_exchange_rates, staking_pool::stake_activation_epoch(staked_sui)),
-          current_exchange_rate,
-          staking_pool::staked_sui_amount(staked_sui)
-          );
-        };
+        if (option::is_some(&validator_data.last_staked_sui))
+          total_validator_rewards = calculate_rewards(wrapper, option::borrow(&validator_data.last_staked_sui), epoch);
 
         let next_key = linked_table::front(&validator_data.staked_sui_table);
 
         while (option::is_some(next_key)) {
           let activation_epoch = *option::borrow(next_key);
-          let staked_sui = linked_table::borrow(&validator_data.staked_sui_table, activation_epoch);
 
-          let rewards = calc_staking_pool_rewards(
-          table::borrow(pool_exchange_rates, activation_epoch),
-          current_exchange_rate,
-          staking_pool::staked_sui_amount(staked_sui)
+          total_validator_rewards = total_validator_rewards + calculate_rewards(
+            wrapper, 
+            linked_table::borrow(&validator_data.staked_sui_table, activation_epoch), 
+            epoch
           );
-
-          total_validator_rewards = total_validator_rewards + rewards;
 
           next_key = linked_table::next(&validator_data.staked_sui_table, activation_epoch);
         };
@@ -558,7 +544,7 @@ module interest_lsd::pool {
     let staked_sui = sui_system::request_add_stake_non_entry(wrapper, asset, validator_address, ctx);
 
     // Register the validator once in the linked_list
-    safe_register_validator(storage, staking_pool::pool_id(&staked_sui), validator_address, ctx);
+    safe_register_validator(storage, validator_address, ctx);
 
     // Save the validator data in memory
     let validator_data = linked_table::borrow_mut(&mut storage.validators_table, validator_address);
@@ -769,12 +755,10 @@ module interest_lsd::pool {
   // @dev Adds a Validator to the linked_list
   /*
   * @storage: The Pool Storage Shared Object (this module)
-  * @id: The StakingPool ID for this validator
   * @validator_address: The address of the validator
   */
   fun safe_register_validator(
     storage: &mut PoolStorage,
-    id: ID,
     validator_address: address,
     ctx: &mut TxContext,    
   ) {
@@ -786,9 +770,23 @@ module interest_lsd::pool {
         id: object::new(ctx),
         staked_sui_table: linked_table::new(ctx),
         last_staked_sui: option::none(),
-        staking_pool_id: id,
         total_principal: 0
       }); 
+  }
+
+  /**
+  * wrapper The Shared Object of the SuiSystem module
+  * @staked_sui We will calculate the rewards accrued by this object 
+  * @epoch The previous epoch
+  */
+  fun calculate_rewards(wrapper: &mut SuiSystemState, staked_sui: &StakedSui, epoch: u64): u64 {
+    let pool_exchange_rates = sui_system::pool_exchange_rates(wrapper, &staking_pool::pool_id(staked_sui));
+          
+    calc_staking_pool_rewards(
+      table::borrow(pool_exchange_rates, staking_pool::stake_activation_epoch(staked_sui)),
+      table::borrow(pool_exchange_rates, epoch),
+      staking_pool::staked_sui_amount(staked_sui)
+    )
   }  
 
   #[test_only]
@@ -809,11 +807,10 @@ module interest_lsd::pool {
   }
 
   #[test_only]
-  public fun read_validator_data(data: &ValidatorData): (&LinkedTable<u64, StakedSui>, &Option<StakedSui>, ID, u64) {
+  public fun read_validator_data(data: &ValidatorData): (&LinkedTable<u64, StakedSui>, &Option<StakedSui>, u64) {
     (
       &data.staked_sui_table,
       &data.last_staked_sui,
-      data.staking_pool_id,
       data.total_principal
     )
   }
