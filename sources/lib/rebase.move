@@ -60,7 +60,7 @@ module interest_lsd::rebase {
      base
    }
 
-   public fun increase_elastic(rebase: &mut Rebase, elastic: u64) {
-    rebase.elastic = rebase.elastic + (elastic as u128);
+   public fun set_elastic(rebase: &mut Rebase, elastic: u64) {
+    rebase.elastic = (elastic as u128);
    }  
 }

@@ -1,7 +1,6 @@
 // Module finds out the current total rewards an account has accrued with a validator
 // Re-engineered the logic from https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/packages/sui-system/sources/staking_pool.move
 module interest_lsd::staking_pool_utils {
-
   use sui_system::staking_pool::{Self, PoolTokenExchangeRate};
 
 
@@ -41,14 +40,18 @@ module interest_lsd::staking_pool_utils {
       (res as u64)
     }
 
-  public fun calc_staking_pool_rewards(exchange_rate: &PoolTokenExchangeRate, principal_withdraw: u64): u64 {
+  public fun calc_staking_pool_rewards(
+    staked_exchange_rate: &PoolTokenExchangeRate, 
+    current_exchange_rate: &PoolTokenExchangeRate, 
+    amount: u64
+    ): u64 {
 
-    let pool_token_withdraw_amount = get_token_amount(exchange_rate, principal_withdraw);
+    let pool_token_withdraw_amount = get_token_amount(staked_exchange_rate, amount);
 
-    let total_sui_withdraw_amount = get_sui_amount(exchange_rate, pool_token_withdraw_amount);
+    let total_sui_withdraw_amount = get_sui_amount(current_exchange_rate, pool_token_withdraw_amount);
 
-    if (total_sui_withdraw_amount >= principal_withdraw)
-      total_sui_withdraw_amount - principal_withdraw
+    if (total_sui_withdraw_amount >= amount)
+      total_sui_withdraw_amount - amount
     else 0
   }
 

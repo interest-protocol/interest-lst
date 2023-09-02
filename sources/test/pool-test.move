@@ -3,14 +3,19 @@ module interest_lsd::pools_test {
   use std::option;
 
   use sui::linked_table;
-  use sui::object_table;
   use sui::coin::{Self, burn_for_testing as burn};
   use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
   use sui::test_utils::{assert_eq};
   use sui::sui::{SUI};
 
   use sui_system::sui_system::{SuiSystemState};
-  use sui_system::governance_test_utils::{create_sui_system_state_for_testing, create_validator_for_testing, advance_epoch, assert_validator_total_stake_amounts};
+  use sui_system::governance_test_utils::{
+    create_sui_system_state_for_testing, 
+    create_validator_for_testing, 
+    advance_epoch, 
+    assert_validator_total_stake_amounts, 
+    advance_epoch_with_reward_amounts
+  };
   use sui_system::staking_pool;
   
   use interest_lsd::pool::{Self, PoolStorage};
@@ -37,8 +42,6 @@ module interest_lsd::pools_test {
 
     let (alice, _) = people();
 
-    // An epoch of 0 will throw our logic
-    advance_epoch(test);
     next_tx(test, alice);
     {
       let pool_storage = test::take_shared<PoolStorage>(test);
@@ -91,13 +94,12 @@ module interest_lsd::pools_test {
 
       let mysten_labs_data = linked_table::borrow(validators_table, MYSTEN_LABS);
 
-      let (staked_sui_table, last_staked_sui, staking_pool_id, last_rewards, total_principal) = pool::read_validator_data(mysten_labs_data);
+      let (staked_sui_table, last_staked_sui, staking_pool_id, total_principal) = pool::read_validator_data(mysten_labs_data);
       
       // We cached the sui
-      assert_eq(object_table::length(staked_sui_table), 0);
+      assert_eq(linked_table::length(staked_sui_table), 0);
       assert_eq(staking_pool::staked_sui_amount(option::borrow(last_staked_sui)), add_decimals(1000, 9));
       assert_eq(staking_pool::pool_id(option::borrow(last_staked_sui)), staking_pool_id);
-      assert_eq(last_rewards, 0);
       assert_eq(total_principal ,add_decimals(1000, 9));
 
       test::return_shared(interest_sui_storage);
@@ -117,7 +119,44 @@ module interest_lsd::pools_test {
 
   #[test]
   fun test_mint_isui_multiple_stakes_one_validator() {
+   let scenario = scenario();
 
+    let test = &mut scenario;
+
+    init_test(test);
+
+    let (alice, bob) = people();
+
+    mint_isui(test, MYSTEN_LABS, alice, 20);
+    mint_isui(test, MYSTEN_LABS,  bob, 10);
+
+    // Active Staked Sui
+    advance_epoch(test);
+    // Pay Rewards
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Advance once more so our module registers in the next call
+    advance_epoch(test);
+
+    mint_isui(test, MYSTEN_LABS,  JOSE, 10);
+
+    // Properly calculates rewards/ shares
+    next_tx(test, alice); 
+    {
+      let pool_storage = test::take_shared<PoolStorage>(test);
+
+      let (pool_rebase, last_epoch, _, total_principal, _, _) = pool::read_pool_storage(&pool_storage);
+
+      assert_eq(last_epoch, 3);
+      assert_eq(total_principal, add_decimals(40, 9));
+      // 30 (deposit from Bob and alice) * 10 (Jose Deposit) / ~35.7 (Pool principal + rewards)
+      assert_eq(rebase::base(pool_rebase), 38387096774);
+      // 40 principal (Jose + Alice + Bob) + Rewards
+      assert_eq(rebase::elastic(pool_rebase), 45769230769);
+
+      test::return_shared(pool_storage);
+    };
+
+    test::end(scenario); 
   }
 
   fun init_test(test: &mut Scenario) {
@@ -132,6 +171,7 @@ module interest_lsd::pools_test {
       isui_pc::init_for_testing(ctx(test));
       isui_yc::init_for_testing(ctx(test));
     };
+    advance_epoch(test);
   }
 
   fun set_up_sui_system_state() {
@@ -151,5 +191,27 @@ module interest_lsd::pools_test {
 
   fun validator_addrs() : vector<address> {
     vector[MYSTEN_LABS, FIGMENT, COINBASE_CLOUD, SPARTA]
+  }
+
+  fun mint_isui(test: &mut Scenario, validator: address, sender: address, amount: u64) {
+    next_tx(test, sender);
+    {
+      let pool_storage = test::take_shared<PoolStorage>(test);
+      let wrapper = test::take_shared<SuiSystemState>(test);
+      let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
+
+      burn(pool::mint_isui(
+        &mut wrapper,
+        &mut pool_storage,
+        &mut interest_sui_storage,
+        mint<SUI>(amount, 9, ctx(test)),
+        validator,
+        ctx(test)
+      ));
+
+      test::return_shared(interest_sui_storage);
+      test::return_shared(wrapper);
+      test::return_shared(pool_storage);
+    };
   }
 }
