@@ -6,7 +6,6 @@ module interest_lsd::pool {
   use std::vector;
   use std::option::{Self, Option};
 
-
   use sui::table;
   use sui::transfer;
   use sui::sui::{SUI};
@@ -259,7 +258,7 @@ module interest_lsd::pool {
         // We add the new rewards accrued to the pool. 
         // The new rewards = total_rewards_now - total_rewards_previous_epoch
         // We round down to remain conservative
-        rebase::increase_elastic(&mut storage.pool, total_rewards - validator_data.last_rewards, false);
+        rebase::increase_elastic(&mut storage.pool, total_rewards - validator_data.last_rewards);
 
         // Update the last_rewards
         validator_data.last_rewards = total_rewards;
@@ -724,7 +723,6 @@ module interest_lsd::pool {
     ): u64 {
     
     // Find the fee % based on the validator dominance and fee parameters.  
-    // Explanation on line 42
     let fee = calculate_fee_percentage(
       &storage.fee,
       (validator_principal as u256),
