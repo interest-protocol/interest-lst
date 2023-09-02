@@ -41,12 +41,12 @@ module interest_lsd::staking_pool_utils {
     }
 
   public fun calc_staking_pool_rewards(
-    staked_exchange_rate: &PoolTokenExchangeRate, 
+    activation_exchange_rate: &PoolTokenExchangeRate, 
     current_exchange_rate: &PoolTokenExchangeRate, 
     amount: u64
     ): u64 {
 
-    let pool_token_withdraw_amount = get_token_amount(staked_exchange_rate, amount);
+    let pool_token_withdraw_amount = get_token_amount(activation_exchange_rate, amount);
 
     let total_sui_withdraw_amount = get_sui_amount(current_exchange_rate, pool_token_withdraw_amount);
 

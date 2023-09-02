@@ -144,7 +144,11 @@ module interest_lsd::pools_test {
     {
       let pool_storage = test::take_shared<PoolStorage>(test);
 
-      let (pool_rebase, last_epoch, _, total_principal, _, _) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, last_epoch, validator_data_table, total_principal, _, _) = pool::read_pool_storage(&pool_storage);
+
+      let validator_data = linked_table::borrow(validator_data_table, MYSTEN_LABS);
+
+      let (staked_sui_table, last_staked_sui, _, validator_total_principal) = pool::read_validator_data(validator_data);
 
       assert_eq(last_epoch, 3);
       assert_eq(total_principal, add_decimals(40, 9));
@@ -152,6 +156,13 @@ module interest_lsd::pools_test {
       assert_eq(rebase::base(pool_rebase), 38387096774);
       // 40 principal (Jose + Alice + Bob) + Rewards
       assert_eq(rebase::elastic(pool_rebase), 45769230769);
+      assert_eq(validator_total_principal, total_principal);
+      // Jose Deposit
+      assert_eq(staking_pool::staked_sui_amount(option::borrow(last_staked_sui)), add_decimals(10, 9));
+      // Bob and Alice Deposit joint together
+      assert_eq(staking_pool::staked_sui_amount(
+        linked_table::borrow(staked_sui_table, *option::borrow(linked_table::front(staked_sui_table)))
+        ), add_decimals(30, 9));
 
       test::return_shared(pool_storage);
     };
