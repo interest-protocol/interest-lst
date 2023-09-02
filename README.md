@@ -1,4 +1,4 @@
-# [Interest Protocol Liquid Staking DerivativeK](https://www.interestprotocol.com/)
+# [IPX Liquid Staking Derivative](https://www.interestprotocol.com/)
 
  <p> <img width="75px"height="75px" src="./assets/logo.png" /></p>
 
