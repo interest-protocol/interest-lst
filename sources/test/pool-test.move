@@ -94,11 +94,13 @@ module interest_lsd::pools_test {
 
       let mysten_labs_data = linked_table::borrow(validators_table, MYSTEN_LABS);
 
-      let (staked_sui_table, last_staked_sui,  total_principal) = pool::read_validator_data(mysten_labs_data);
+      let (staked_sui_table,   total_principal) = pool::read_validator_data(mysten_labs_data);
       
       // We cached the sui
-      assert_eq(linked_table::length(staked_sui_table), 0);
-      assert_eq(staking_pool::staked_sui_amount(option::borrow(last_staked_sui)), add_decimals(1000, 9));
+      assert_eq(linked_table::length(staked_sui_table), 1);
+      // StakedSUi become active after the epoch they were created
+      // We deposited on Epoch 1, so it is activated and saved in the table at epoch 2
+      assert_eq(staking_pool::staked_sui_amount(linked_table::borrow(staked_sui_table, 2)), add_decimals(1000, 9));
       assert_eq(total_principal ,add_decimals(1000, 9));
 
       test::return_shared(interest_sui_storage);
@@ -147,7 +149,7 @@ module interest_lsd::pools_test {
 
       let validator_data = linked_table::borrow(validator_data_table, MYSTEN_LABS);
 
-      let (staked_sui_table, last_staked_sui,  validator_total_principal) = pool::read_validator_data(validator_data);
+      let (staked_sui_table,  validator_total_principal) = pool::read_validator_data(validator_data);
 
       assert_eq(last_epoch, 3);
       assert_eq(total_principal, add_decimals(40, 9));
@@ -156,12 +158,13 @@ module interest_lsd::pools_test {
       // 40 principal (Jose + Alice + Bob) + Rewards
       assert_eq(rebase::elastic(pool_rebase), 45769230769);
       assert_eq(validator_total_principal, total_principal);
-      // Jose Deposit
-      assert_eq(staking_pool::staked_sui_amount(option::borrow(last_staked_sui)), add_decimals(10, 9));
+
+      let front_staked_sui = linked_table::borrow(staked_sui_table, *option::borrow(linked_table::front(staked_sui_table)));
+      let jose_staked_sui = linked_table::borrow(staked_sui_table, *option::borrow(linked_table::next(staked_sui_table, staking_pool::stake_activation_epoch(front_staked_sui))));
       // Bob and Alice Deposit joint together
-      assert_eq(staking_pool::staked_sui_amount(
-        linked_table::borrow(staked_sui_table, *option::borrow(linked_table::front(staked_sui_table)))
-        ), add_decimals(30, 9));
+      assert_eq(staking_pool::staked_sui_amount(front_staked_sui), add_decimals(30, 9));
+      // Jose Deposit
+      assert_eq(staking_pool::staked_sui_amount(jose_staked_sui), add_decimals(10, 9));
 
       test::return_shared(pool_storage);
     };
