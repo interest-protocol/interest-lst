@@ -261,11 +261,14 @@ module interest_lsd::pool {
           
           let staked_sui = linked_table::borrow(&validator_data.staked_sui_table, activation_epoch);
           
+          // We only update the rewards if the {epoch} is greater than the {activation_epoch}
+          // Otherwise, these sui have not accrued any rewards
           // We update the total rewards
-          total_rewards = total_rewards + calc_staking_pool_rewards(
-            table::borrow(pool_exchange_rates, activation_epoch),
-            current_exchange_rate,
-            staking_pool::staked_sui_amount(staked_sui)
+          if (epoch >= activation_epoch)
+            total_rewards = total_rewards + calc_staking_pool_rewards(
+              table::borrow(pool_exchange_rates, activation_epoch),
+              current_exchange_rate,
+              staking_pool::staked_sui_amount(staked_sui)
             );
 
           next_key = linked_table::next(&validator_data.staked_sui_table, activation_epoch);
