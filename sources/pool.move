@@ -243,7 +243,6 @@ module interest_lsd::pool {
     while (option::is_some(next_validator)) {
       // Save the validator address in memory. We first check that it exists above.
       let validator_address = *option::borrow(next_validator);
-      let total_validator_rewards = 0;
       
       // Get the validator data
       let validator_data = linked_table::borrow_mut(&mut storage.validators_table, validator_address);
@@ -262,8 +261,9 @@ module interest_lsd::pool {
           
           let staked_sui = linked_table::borrow(&validator_data.staked_sui_table, activation_epoch);
           
-          total_validator_rewards = total_validator_rewards + calc_staking_pool_rewards(
-            table::borrow(pool_exchange_rates, staking_pool::stake_activation_epoch(staked_sui)),
+          // We update the total rewards
+          total_rewards = total_rewards + calc_staking_pool_rewards(
+            table::borrow(pool_exchange_rates, activation_epoch),
             current_exchange_rate,
             staking_pool::staked_sui_amount(staked_sui)
             );
@@ -272,7 +272,6 @@ module interest_lsd::pool {
         };
       };
       
-      total_rewards = total_rewards + total_validator_rewards;
       // Point the next_validator to the next one
       next_validator = linked_table::next(&storage.validators_table, validator_address);
     };
