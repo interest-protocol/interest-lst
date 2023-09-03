@@ -1,8 +1,8 @@
 // Module finds out the current total rewards an account has accrued with a validator
 // Re-engineered the logic from https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/packages/sui-system/sources/staking_pool.move
 module interest_lsd::staking_pool_utils {
-  use sui_system::staking_pool::{Self, PoolTokenExchangeRate};
 
+  use sui_system::staking_pool::{Self, PoolTokenExchangeRate};
 
   fun get_sui_amount(exchange_rate: &PoolTokenExchangeRate, token_amount: u64): u64 {
       // When either amount is 0, that means we have no stakes with this pool.

@@ -1,16 +1,15 @@
 // Sui Liquid Staking Principal Coin
 // 1 ISUI_PC is always 1 SUI
 module interest_lsd::isui_pc {
+  use std::ascii;
   use std::option;
   use std::string;
-  use std::ascii;
 
-  use sui::object::{Self, UID};
-  use sui::tx_context::{TxContext};
   use sui::transfer;
-  use sui::coin::{Self, Coin, TreasuryCap, CoinMetadata};
-  use sui::tx_context;
   use sui::event::{emit};
+  use sui::object::{Self, UID};
+  use sui::tx_context::{Self, TxContext};
+  use sui::coin::{Self, Coin, TreasuryCap, CoinMetadata};
 
   use interest_lsd::admin::{AdminCap};
 

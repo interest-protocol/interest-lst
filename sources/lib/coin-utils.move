@@ -2,10 +2,10 @@
 module interest_lsd::coin_utils {
   use std::vector;
   
-  use sui::coin::{Self, Coin};
-  use sui::tx_context::{Self, TxContext};
   use sui::pay;
   use sui::transfer;
+  use sui::coin::{Self, Coin};
+  use sui::tx_context::{Self, TxContext};
 
   public  fun handle_coin_vector<X>(
       vector_x: vector<Coin<X>>,
