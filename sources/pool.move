@@ -126,7 +126,7 @@ module interest_lsd::pool {
         PoolStorage {
         id: object::new(ctx),
         pool: rebase::new(),
-        last_epoch: tx_context::epoch(ctx),
+        last_epoch: 0,
         validators_table: linked_table::new(ctx),
         total_principal: 0,
         fee: new_fee(),
