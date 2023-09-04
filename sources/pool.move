@@ -19,7 +19,7 @@ module interest_lsd::pool {
   use sui_system::sui_system::{Self, SuiSystemState};
 
   use interest_lsd::admin::{AdminCap};
-  use interest_lsd::math::{fmul, scalar};
+  use interest_lsd::math::{fmul, fdiv, scalar};
   use interest_lsd::rebase::{Self, Rebase};
   use interest_lsd::isui::{Self, ISUI, InterestSuiStorage};
   use interest_lsd::isui_pc::{Self, ISUI_PC, InterestSuiPCStorage};
@@ -53,7 +53,7 @@ module interest_lsd::pool {
     id: UID, // front end to grab and display data,
     staking_pool_id: ID, // The ID of the Validator's {StakingPool}
     staked_sui_table: LinkedTable<u64, StakedSui>, // activation_epoch => StakedSui
-    total_principal: u64 // The total amount of Sui deposited in this validator without the accruing rewards
+    total_principal: u64 // Total amount of StakedSui principal deposited in this validator
   }
 
   // Shared Object
@@ -66,7 +66,7 @@ module interest_lsd::pool {
     pool: Rebase, // This struct holds the total shares of ISUI and the total SUI (Principal + Rewards). Rebase {base: ISUI total supply, elastic: total Sui}
     last_epoch: u64, // Last epoch that pool was updated
     validators_table: LinkedTable<address, ValidatorData>, // We need a linked table to iterate through all validators once every epoch to ensure all pool data is accurate
-    total_principal: u64, // Total amount of principal deposited in Interest LSD Package
+    total_principal: u64, // Total amount of StakedSui principal deposited in Interest LSD Package
     fee: Fee, // Holds the data to calculate the stake fee
     dao_coin: Coin<ISUI> // Fees collected by the protocol in ISUI
   }
@@ -188,9 +188,24 @@ module interest_lsd::pool {
     // Then find the total amount of Sui the {isui_yc_amount} would be entitled to if it was iSui as it follows the same minting logic
     // Then we remove the principal component from it
     update_pool(wrapper, storage, ctx);
-    let principal_reward = rebase::to_elastic(&storage.pool, isui_yc_amount, false);
-    let principal = ((isui_yc_amount as u256) * (storage.total_principal as u256) / (rebase::base(&storage.pool) as u256) as u64);
-    principal_reward - principal
+
+    // Scale the values to 1e18 and u256
+    // We need to increase the precision to avoid miscalculations
+    let principal_reward = (rebase::to_elastic(&storage.pool, isui_yc_amount, false) as u256); // We do not scale this to 1e18 because we need to return a 1e9 number u64
+    let factor = (MIN_STAKING_THRESHOLD as u256);
+    let base = (rebase::base(&storage.pool) as u256) * factor;
+    let elastic = (rebase::elastic(&storage.pool) as u256) * factor;
+
+    // Find iSui => Sui exchange rate
+    // E.g. if it is 1.2
+    // We know at T0 it was 1
+    // So 1 is the principal and 0.2 is the reward
+    let exchange_rate = fdiv(fmul(scalar(), elastic), base);
+
+    // Find what percentage of the exchange rate is the reward
+    let percentage_reward = fdiv(exchange_rate - scalar(), exchange_rate);
+    // Multiply reward % * principal + reward value
+    (fmul(percentage_reward, principal_reward) as u64)
   }
 
   // @dev It returns the exchange rate from SUI to ISUI_YC

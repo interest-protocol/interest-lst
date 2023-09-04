@@ -21,7 +21,7 @@ module interest_lsd::pools_test {
   use interest_lsd::pool::{Self, PoolStorage};
   use interest_lsd::isui::{Self, ISUI, InterestSuiStorage};
   use interest_lsd::isui_pc::{Self, InterestSuiPCStorage};
-  use interest_lsd::isui_yc::{Self, InterestSuiYCStorage};
+  use interest_lsd::isui_yc::{Self, ISUI_YC, InterestSuiYCStorage};
   use interest_lsd::rebase;
   use interest_lsd::fee_utils::{read_fee};
   use interest_lsd::test_utils::{people, scenario, mint, add_decimals}; 
@@ -476,7 +476,101 @@ module interest_lsd::pools_test {
       test::return_shared(pool_storage);
     };
     test::end(scenario);
- }  
+ }
+
+   #[test]
+  fun test_burn_isui_yc() {
+    let scenario = scenario();
+
+    let test = &mut scenario;
+
+    init_test(test);
+
+    let (alice, bob) = people(); 
+
+    mint_isui(test, MYSTEN_LABS, alice, 30);
+    mint_isui(test, COINBASE_CLOUD,  bob, 10);
+
+    // Active Staked Sui
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Pay Rewards
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Advance once more so our module registers in the next call
+    advance_epoch_with_reward_amounts(0, 100, test);
+
+    // Mint Derivative
+    next_tx(test, alice); 
+    {
+      let pool_storage = test::take_shared<PoolStorage>(test);
+      let wrapper = test::take_shared<SuiSystemState>(test);
+      let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
+      let interest_sui_pc_storage = test::take_shared<InterestSuiPCStorage>(test);
+      let interest_sui_yc_storage = test::take_shared<InterestSuiYCStorage>(test);
+
+      let (coin_isui_pc, coin_isui_yc) = pool::mint_isui_derivatives(
+        &mut wrapper,
+        &mut pool_storage,
+        &mut interest_sui_storage,
+        &mut interest_sui_pc_storage,
+        &mut interest_sui_yc_storage,
+        mint<SUI>(30, 9, ctx(test)),
+        MYSTEN_LABS,
+        ctx(test)
+      );
+      
+      burn(coin_isui_pc);
+      burn(coin_isui_yc);
+      
+      test::return_shared(interest_sui_yc_storage);
+      test::return_shared(interest_sui_pc_storage);
+      test::return_shared(interest_sui_storage);
+      test::return_shared(wrapper);
+      test::return_shared(pool_storage);
+    };
+    
+    // Test that ISUI_YC + ISUI_PC = ISUI
+    next_tx(test, alice); 
+    {
+      let pool_storage = test::take_shared<PoolStorage>(test);
+      let wrapper = test::take_shared<SuiSystemState>(test);
+      let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
+      let interest_sui_yc_storage = test::take_shared<InterestSuiYCStorage>(test);   
+
+      pool::update_pool(&mut wrapper, &mut pool_storage, ctx(test));
+
+      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
+    
+      let sui_amount = rebase::to_elastic(pool_rebase, add_decimals(10, 9), false);
+
+      let coin_sui = pool::burn_isui(
+        &mut wrapper, 
+        &mut pool_storage,
+        &mut interest_sui_storage,
+        vector[pool::create_burn_validator_payload(MYSTEN_LABS, 2, add_decimals(1, 9) + sui_amount)],
+        mint<ISUI>(10, 9, ctx(test)),
+        MYSTEN_LABS,
+        ctx(test)
+      );
+
+      let coin_sui_2 = pool::burn_isui_yc(
+        &mut wrapper,
+        &mut pool_storage,
+        &mut interest_sui_yc_storage,
+        vector[pool::create_burn_validator_payload(MYSTEN_LABS, 2,sui_amount - add_decimals(9, 9))],
+        mint<ISUI_YC>(10, 9, ctx(test)),
+        MYSTEN_LABS,
+        ctx(test)
+      );
+
+      assert_eq(burn(coin_sui), burn(coin_sui_2) + add_decimals(10, 9));
+
+      test::return_shared(interest_sui_yc_storage);
+      test::return_shared(interest_sui_storage);
+      test::return_shared(wrapper);
+      test::return_shared(pool_storage); 
+    };
+    test::end(scenario);
+}  
 
   // Set up Functions
 

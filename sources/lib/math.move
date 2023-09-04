@@ -14,10 +14,10 @@ module interest_lsd::math {
     assert!(y != 0, ERROR_ZERO_DIVISION);
     (x * SCALAR ) / y
   }
-  
-  public fun mul_div_u128(x: u128, y: u128, z: u128): u128 {
+
+  public fun mul_div(x: u256, y: u256, z: u256): u256 {
     assert!(z != 0, ERROR_ZERO_DIVISION);
-    ((x as u256) * (y as u256) / (z as u256) as u128)
+    (x * y) / z
   }
 
   public fun scalar(): u256 {
