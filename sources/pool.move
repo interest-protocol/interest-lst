@@ -51,7 +51,7 @@ module interest_lsd::pool {
 
   struct ValidatorData has key, store {
     id: UID, // front end to grab and display data,
-    staking_pool_id: ID,
+    staking_pool_id: ID, // The ID of the Validator's {StakingPool}
     staked_sui_table: LinkedTable<u64, StakedSui>, // activation_epoch => StakedSui
     total_principal: u64 // The total amount of Sui deposited in this validator without the accruing rewards
   }
@@ -166,7 +166,7 @@ module interest_lsd::pool {
     ctx: &mut TxContext
   ): u64 {
     update_pool(wrapper, storage, ctx);
-    rebase::to_base(&storage.pool, sui_amount, true)
+    rebase::to_base(&storage.pool, sui_amount, false)
   }
 
   // @dev It returns the exchange rate from ISUI_YC to SUI
