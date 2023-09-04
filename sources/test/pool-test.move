@@ -331,6 +331,98 @@ module interest_lsd::pools_test {
   }
 
   #[test]
+  fun test_burn_isui_pc() {
+    let scenario = scenario();
+
+    let test = &mut scenario;
+
+    init_test(test);
+
+    let (alice, bob) = people(); 
+
+    // Add Rewards
+
+    mint_isui(test, MYSTEN_LABS, alice, 20);
+    mint_isui(test, COINBASE_CLOUD,  bob, 10);
+
+    // Active Staked Sui
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Pay Rewards
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Advance once more so our module registers in the next call
+    advance_epoch_with_reward_amounts(0, 100, test);
+
+    mint_isui(test, FIGMENT,  JOSE, 10);
+    mint_isui(test, MYSTEN_LABS, alice, 20);
+    mint_isui(test, COINBASE_CLOUD,  bob, 10);
+
+    advance_epoch_with_reward_amounts(0, 100, test);
+    advance_epoch_with_reward_amounts(0, 100, test);    
+    
+    // ISUI_PC is always 1:1 with Sui
+    // It gives no rewards
+    next_tx(test, alice); 
+    {
+      let pool_storage = test::take_shared<PoolStorage>(test);
+      let wrapper = test::take_shared<SuiSystemState>(test);
+      let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
+      let interest_sui_pc_storage = test::take_shared<InterestSuiPCStorage>(test);
+      let interest_sui_yc_storage = test::take_shared<InterestSuiYCStorage>(test);
+
+      let (coin_isui_pc, coin_isui_yc) = pool::mint_isui_derivatives(
+        &mut wrapper,
+        &mut pool_storage,
+        &mut interest_sui_storage,
+        &mut interest_sui_pc_storage,
+        &mut interest_sui_yc_storage,
+        mint<SUI>(10, 9, ctx(test)),
+        MYSTEN_LABS,
+        ctx(test)
+      );
+
+      burn(coin_isui_yc);
+
+      let (pool_rebase, _, _, old_total_principal, _, _) = pool::read_pool_storage(&pool_storage);
+
+      let validator_payload = vector[
+        pool::create_burn_validator_payload(COINBASE_CLOUD, 2, add_decimals(10, 9)),
+        pool::create_burn_validator_payload(COINBASE_CLOUD, 5, add_decimals(1, 9))
+      ];
+
+      let isui_pc_unstake_amount = add_decimals(10, 9);
+
+      let shares_burned = rebase::to_base(pool_rebase, isui_pc_unstake_amount, false);
+      let old_elastic = rebase::elastic(pool_rebase);
+      let old_base = rebase::base(pool_rebase);
+
+      assert_eq(burn(pool::burn_isui_pc(
+        &mut wrapper,
+        &mut pool_storage,
+        &mut interest_sui_pc_storage,
+        validator_payload,
+        coin_isui_pc,
+        MYSTEN_LABS,
+        ctx(test)
+      )), isui_pc_unstake_amount);
+
+      let (pool_rebase, _, _, total_principal, _, _) = pool::read_pool_storage(&pool_storage);
+
+      assert_eq(old_base, rebase::base(pool_rebase) + shares_burned);
+      assert_eq(old_elastic, rebase::elastic(pool_rebase) + isui_pc_unstake_amount);
+      // 3026830133 are the rewards re-staked
+      assert_eq(old_total_principal, total_principal + isui_pc_unstake_amount - 3026830133);
+
+      test::return_shared(interest_sui_yc_storage);
+      test::return_shared(interest_sui_storage);
+      test::return_shared(interest_sui_pc_storage);
+      test::return_shared(wrapper);
+      test::return_shared(pool_storage);
+    };
+
+    test::end(scenario); 
+  }
+
+  #[test]
   fun test_mint_isui_derivatives() {
     let scenario = scenario();
 
