@@ -28,7 +28,7 @@ module interest_lsd::fee_utils {
     total_principal: u256
   ): u256 {
     
-    // Avoid zero division as if principal >= 0 - the total_principal is also >= 0
+    // Avoid zero division as if the principal >= 0 - the total_principal is also >= 0
     // If the validator does not have any principal, there is no fee associated
     if (fee.base == 0 || principal == 0) return 0;
 

@@ -345,7 +345,8 @@ module interest_lsd::pool {
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
     // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
-    // We can only allow the MIN above his allowed stake amount to avoid griefing, a user could keep unstaking all StakedSui and prevent the module to accrue rewards
+    // The user withdraw 1 Sui Above what he wishes to withdraw to guarantee that we can re-stake the rewards
+    // If we allow more than 1 Sui, a user can grief the module and force a re-stake of all {StakedSui} preventing the module ot earn rewards
     assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, INVALID_UNSTAKE_AMOUNT);
 
     emit(BurnISui { sender: tx_context::sender(ctx), sui_amount: sui_value_to_return, isui_amount });
