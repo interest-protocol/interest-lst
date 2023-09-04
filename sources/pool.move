@@ -43,7 +43,7 @@ module interest_lsd::pool {
 
   // This struct compacts the data sent to burn_isui
   // We will remove the {principal} amount of StakedSui from the {validator_address} stored at staked_sui_table with the key {epoch}
-  struct BurnISuiValidatorPayload has drop, store {
+  struct BurnValidatorPayload has drop, store {
     epoch: u64,
     validator_address: address,
     principal: u64
@@ -243,7 +243,7 @@ module interest_lsd::pool {
     while (option::is_some(next_validator)) {
       // Save the validator address in memory. We first check that it exists above.
       let validator_address = *option::borrow(next_validator);
-      
+
       // Get the validator data
       let validator_data = linked_table::borrow_mut(&mut storage.validators_table, validator_address);
 
@@ -326,7 +326,7 @@ module interest_lsd::pool {
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     interest_sui_storage: &mut InterestSuiStorage,
-    validator_payload: vector<BurnISuiValidatorPayload>,
+    validator_payload: vector<BurnValidatorPayload>,
     asset: Coin<ISUI>,
     validator_address: address,
     ctx: &mut TxContext,
@@ -345,7 +345,7 @@ module interest_lsd::pool {
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
     // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
-    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, INVALID_UNSTAKE_AMOUNT);
+    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) >= sui_value_to_return, INVALID_UNSTAKE_AMOUNT);
 
     emit(BurnISui { sender: tx_context::sender(ctx), sui_amount: sui_value_to_return, isui_amount });
 
@@ -399,7 +399,7 @@ module interest_lsd::pool {
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     interest_sui_pc_storage: &mut InterestSuiPCStorage,
-    validator_payload: vector<BurnISuiValidatorPayload>,
+    validator_payload: vector<BurnValidatorPayload>,
     asset: Coin<ISUI_PC>,
     validator_address: address,
     ctx: &mut TxContext,
@@ -415,7 +415,7 @@ module interest_lsd::pool {
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
     // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
-    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, INVALID_UNSTAKE_AMOUNT);
+    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) >= sui_value_to_return, INVALID_UNSTAKE_AMOUNT);
 
     // We need to update the pool
     rebase::sub_elastic(&mut storage.pool, sui_value_to_return, false);
@@ -440,7 +440,7 @@ module interest_lsd::pool {
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     interest_sui_yc_storage: &mut InterestSuiYCStorage,
-    validator_payload: vector<BurnISuiValidatorPayload>,
+    validator_payload: vector<BurnValidatorPayload>,
     asset: Coin<ISUI_YC>,
     validator_address: address,
     ctx: &mut TxContext,
@@ -456,7 +456,7 @@ module interest_lsd::pool {
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
     // Sender must Unstake more than his principal to ensure that the leftover is above the threshold of 1 Sui
-    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_amount, INVALID_UNSTAKE_AMOUNT);
+    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) >= sui_amount, INVALID_UNSTAKE_AMOUNT);
 
     emit(BurnISuiYC { sui_amount, sender: tx_context::sender(ctx), isui_yc_amount });
 
@@ -600,7 +600,7 @@ module interest_lsd::pool {
   */
   fun remove_staked_sui(
       storage: &mut PoolStorage,
-      validator_payload: vector<BurnISuiValidatorPayload>, 
+      validator_payload: vector<BurnValidatorPayload>, 
       ctx: &mut TxContext
     ): (vector<StakedSui>, u64) {
     
@@ -685,6 +685,7 @@ module interest_lsd::pool {
     let left_over_amount = coin::value(&total_sui_coin);
 
     // Update the data
+    // Rewards will increase the principals
     validator_data.total_principal = validator_data.total_principal + left_over_amount;
     storage.total_principal = storage.total_principal + left_over_amount;
 
@@ -756,6 +757,21 @@ module interest_lsd::pool {
       }); 
   }
 
+  // @dev Utility function to create {BurnValidatorPayload} Object for other modules
+  /*
+  * @validator_address The validator to which we will unstake
+  * @epoch The action_epoch of the {StakedSui} we will unstake
+  * @principal How much of the {StakedSui} to unstake
+  * @return {BurnValidatorPayload} to use on {burn_isui}, {burn_isui_pc} and {burn_isui_yc}
+  */
+  public fun create_burn_validator_payload(validator_address: address, epoch: u64, principal: u64): BurnValidatorPayload {
+    BurnValidatorPayload {
+      validator_address,
+      epoch, 
+      principal
+    }
+  }
+
   #[test_only]
   public fun init_for_testing(ctx: &mut TxContext) {
     init(ctx);
@@ -779,14 +795,5 @@ module interest_lsd::pool {
       &data.staked_sui_table,
       data.total_principal
     )
-  }
-
-  #[test_only]
-  public fun create_burn_isui_validator_payload(validator_address: address, epoch: u64, principal: u64): BurnISuiValidatorPayload {
-    BurnISuiValidatorPayload {
-      validator_address,
-      epoch, 
-      principal
-    }
   }
 }

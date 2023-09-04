@@ -3,7 +3,7 @@ module interest_lsd::pools_test {
   use std::option;
 
   use sui::linked_table;
-  use sui::coin::{Self, burn_for_testing as burn};
+  use sui::coin::{Self, mint_for_testing, burn_for_testing as burn};
   use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
   use sui::test_utils::{assert_eq};
   use sui::sui::{SUI};
@@ -19,7 +19,7 @@ module interest_lsd::pools_test {
   use sui_system::staking_pool;
   
   use interest_lsd::pool::{Self, PoolStorage};
-  use interest_lsd::isui::{Self, InterestSuiStorage};
+  use interest_lsd::isui::{Self, ISUI, InterestSuiStorage};
   use interest_lsd::isui_pc;
   use interest_lsd::isui_yc;
   use interest_lsd::rebase;
@@ -166,6 +166,164 @@ module interest_lsd::pools_test {
       // Jose Deposit
       assert_eq(staking_pool::staked_sui_amount(jose_staked_sui), add_decimals(10, 9));
 
+      test::return_shared(pool_storage);
+    };
+
+    test::end(scenario); 
+  }
+
+  #[test]
+  fun test_mint_isui_multiple_stakes_multiple_validators() {
+   let scenario = scenario();
+
+   let test = &mut scenario;
+
+    init_test(test);
+
+    let (alice, bob) = people();
+
+    mint_isui(test, MYSTEN_LABS, alice, 20);
+    mint_isui(test, COINBASE_CLOUD,  bob, 10);
+
+    // Active Staked Sui
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Pay Rewards
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Advance once more so our module registers in the next call
+     advance_epoch_with_reward_amounts(0, 100, test);
+
+    mint_isui(test, FIGMENT,  JOSE, 10);
+    mint_isui(test, MYSTEN_LABS, alice, 20);
+    mint_isui(test, COINBASE_CLOUD,  bob, 10);
+
+    advance_epoch_with_reward_amounts(0, 100, test);
+    advance_epoch_with_reward_amounts(0, 100, test);
+
+    // Test that the validator data is updated correctly
+    next_tx(test, alice); 
+    {
+      let wrapper = test::take_shared<SuiSystemState>(test);
+      let pool_storage = test::take_shared<PoolStorage>(test);
+
+      pool::update_pool(&mut wrapper, &mut pool_storage, ctx(test));
+
+      let (pool_rebase, _, validator_data_table, total_principal, _, _) = pool::read_pool_storage(&pool_storage);
+
+      assert_eq(rebase::base(pool_rebase), 65093317280);
+      assert_eq(rebase::elastic(pool_rebase), 82583633555);
+      assert_eq(total_principal, add_decimals(70, 9));
+      // Three diff validators
+      assert_eq(linked_table::length(validator_data_table), 3);
+
+      // Mysten Labs Data
+      let (staked_sui_table,  validator_total_principal) = pool::read_validator_data(linked_table::borrow(validator_data_table, MYSTEN_LABS));
+      assert_eq(validator_total_principal, add_decimals(40, 9));
+      assert_eq(linked_table::length(staked_sui_table), 2);
+
+      // Coinbase Cloud Data
+      let (staked_sui_table,  validator_total_principal) = pool::read_validator_data(linked_table::borrow(validator_data_table, COINBASE_CLOUD));
+      assert_eq(validator_total_principal, add_decimals(20, 9));
+      assert_eq(linked_table::length(staked_sui_table), 2);
+
+      // Figment Data
+      let (staked_sui_table,  validator_total_principal) = pool::read_validator_data(linked_table::borrow(validator_data_table, FIGMENT));
+      assert_eq(validator_total_principal, add_decimals(10, 9));
+      assert_eq(linked_table::length(staked_sui_table), 1);
+
+      test::return_shared(wrapper);
+      test::return_shared(pool_storage);
+    };
+
+    test::end(scenario); 
+  }
+
+  #[test]
+  fun test_burn_isui() {
+   let scenario = scenario();
+
+   let test = &mut scenario;
+
+    init_test(test);
+
+    let (alice, bob) = people();
+
+    mint_isui(test, MYSTEN_LABS, alice, 20);
+    mint_isui(test, COINBASE_CLOUD,  bob, 10);
+
+    // Active Staked Sui
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Pay Rewards
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Advance once more so our module registers in the next call
+    advance_epoch_with_reward_amounts(0, 100, test);
+
+    mint_isui(test, FIGMENT,  JOSE, 10);
+    mint_isui(test, MYSTEN_LABS, alice, 20);
+    mint_isui(test, COINBASE_CLOUD,  bob, 10);
+
+    advance_epoch_with_reward_amounts(0, 100, test);
+    advance_epoch_with_reward_amounts(0, 100, test);
+
+    next_tx(test, alice);
+    {
+      let pool_storage = test::take_shared<PoolStorage>(test);
+      let wrapper = test::take_shared<SuiSystemState>(test);
+      let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
+
+      pool::update_pool(&mut wrapper, &mut pool_storage, ctx(test));
+
+      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
+
+      let validator_payload = vector[
+        pool::create_burn_validator_payload(COINBASE_CLOUD, 2, add_decimals(10, 9)),
+        pool::create_burn_validator_payload(COINBASE_CLOUD, 5, add_decimals(2, 9))
+      ];
+
+      let isui_unstake_amount = rebase::to_base(pool_rebase, add_decimals(10, 9), true);
+
+      let old_elastic = rebase::elastic(pool_rebase);
+      let old_base = rebase::base(pool_rebase);
+
+      // Unstakes the correct amount
+      assert_eq(
+        burn(
+        pool::burn_isui(
+          &mut wrapper, 
+          &mut pool_storage,
+          &mut interest_sui_storage,
+          validator_payload,
+          mint_for_testing<ISUI>(isui_unstake_amount, ctx(test)),
+          MYSTEN_LABS,
+          ctx(test)
+          )
+        ),
+      add_decimals(10, 9)
+      );
+
+      let (pool_rebase, _, validator_data_table, total_principal, _, _) = pool::read_pool_storage(&pool_storage);
+
+      // Pool is correctly updated after burn
+      assert_eq(rebase::elastic(pool_rebase), old_elastic - add_decimals(10, 9));
+      assert_eq(rebase::base(pool_rebase), old_base - isui_unstake_amount);
+
+      // Correctly updates the total principal
+      // it is 60 Sui + Rewards
+      assert_eq(total_principal, 63086353942);
+
+      // Coinbase Cloud Data
+      let (staked_sui_table,  validator_total_principal) = pool::read_validator_data(linked_table::borrow(validator_data_table, COINBASE_CLOUD));
+      assert_eq(validator_total_principal, add_decimals(8, 9));
+      // We removed One Staked Sui
+      assert_eq(linked_table::length(staked_sui_table), 1);
+
+      // Mysten Labs Data
+      let (staked_sui_table,  validator_total_principal) = pool::read_validator_data(linked_table::borrow(validator_data_table, MYSTEN_LABS));
+      // Principal + Rewards as we stake the left over here
+      assert_eq(validator_total_principal, 45086353942);
+      assert_eq(linked_table::length(staked_sui_table), 3);
+
+      test::return_shared(interest_sui_storage);
+      test::return_shared(wrapper);
       test::return_shared(pool_storage);
     };
 
