@@ -30,7 +30,7 @@ module interest_lsd::pool {
   // ** Constants
 
   // StakedSui objects cannot be split to below this amount.
-  const MIN_STAKING_THRESHOLD: u64 = 1_000_000_000; // 1 SUI
+  const MIN_STAKING_THRESHOLD: u64 = 1_000_000_000; // 1 
 
   // ** Errors
 
@@ -345,7 +345,8 @@ module interest_lsd::pool {
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
     // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
-    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) >= sui_value_to_return, INVALID_UNSTAKE_AMOUNT);
+    // We can only allow the MIN above his allowed stake amount to avoid griefing, a user could keep unstaking all StakedSui and prevent the module to accrue rewards
+    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, INVALID_UNSTAKE_AMOUNT);
 
     emit(BurnISui { sender: tx_context::sender(ctx), sui_amount: sui_value_to_return, isui_amount });
 
@@ -415,7 +416,7 @@ module interest_lsd::pool {
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
     // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
-    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) >= sui_value_to_return, INVALID_UNSTAKE_AMOUNT);
+    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, INVALID_UNSTAKE_AMOUNT);
 
     // We need to update the pool
     rebase::sub_elastic(&mut storage.pool, sui_value_to_return, false);
@@ -456,7 +457,7 @@ module interest_lsd::pool {
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
     // Sender must Unstake more than his principal to ensure that the leftover is above the threshold of 1 Sui
-    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) >= sui_amount, INVALID_UNSTAKE_AMOUNT);
+    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_amount, INVALID_UNSTAKE_AMOUNT);
 
     emit(BurnISuiYC { sui_amount, sender: tx_context::sender(ctx), isui_yc_amount });
 
