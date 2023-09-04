@@ -47,7 +47,7 @@ graph LR
 A[10 Sui] -- Principal --> B((iSui-PC))
 A -- Yield --> C((iSui-YC))
 B --> D[10 Sui]
-C --> E[Future Yield - e.g. 0.2 Sui]
+C --> E[Future Yield - e.g. 2 Sui]
 ```
 
 - iSui-PC (Interest Sui Principal Coin): It tracks the principal portion of a stake. This coin is always equal to Sui.
