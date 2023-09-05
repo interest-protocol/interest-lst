@@ -222,9 +222,8 @@ module interest_lsd::pool {
   ): u64 {
     // We find the amount of ISUI in Sui (exchange rate)
     // Then we multiply the desired Sui amount to the exchange rate
-    let value = rebase::base(&storage.pool) / 10;
-    let exchange_rate = get_exchange_rate_isui_yc_to_sui(wrapper, storage, value, ctx);
-    (((sui_amount as u256) * (value as u256) / (exchange_rate as u256)) as u64)
+    let exchange_rate = get_exchange_rate_isui_yc_to_sui(wrapper, storage, MIN_STAKING_THRESHOLD, ctx);
+    (((sui_amount as u256) / (exchange_rate as u256)) * (MIN_STAKING_THRESHOLD as u256) as u64)
   }
 
   // @dev This function costs a lot of gas and must be called before any interaction with Interest LSD because it updates the pool. The pool is needed to ensure all 3 Coins' exchange rate is accurate.

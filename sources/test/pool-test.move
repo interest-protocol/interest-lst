@@ -572,6 +572,54 @@ module interest_lsd::pools_test {
     test::end(scenario);
 }  
 
+   #[test]
+  fun test_get_exchange_rate_sui_to_isui_yc() {
+    let scenario = scenario();
+
+    let test = &mut scenario;
+
+    init_test(test);
+
+    let (alice, bob) = people(); 
+
+    mint_isui(test, MYSTEN_LABS, alice, 30);
+    mint_isui(test, COINBASE_CLOUD,  bob, 10);
+
+    // Active Staked Sui
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Pay Rewards
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Advance once more so our module registers in the next call
+    advance_epoch_with_reward_amounts(0, 100, test);
+
+    // Mint Derivative
+    next_tx(test, alice); 
+    {
+      let pool_storage = test::take_shared<PoolStorage>(test);
+      let wrapper = test::take_shared<SuiSystemState>(test);
+
+      let value = add_decimals(10, 9);
+
+      let sui_value = pool::get_exchange_rate_isui_yc_to_sui(
+        &mut wrapper, 
+        &mut pool_storage, 
+        value, 
+        ctx(test)
+      );
+
+      assert_eq(pool::get_exchange_rate_sui_to_isui_yc(
+        &mut wrapper, 
+        &mut pool_storage, 
+        sui_value, 
+        ctx(test)
+      ), value);
+
+      test::return_shared(wrapper);
+      test::return_shared(pool_storage); 
+    };
+    test::end(scenario);
+  }
+
   // Set up Functions
 
   fun init_test(test: &mut Scenario) {
