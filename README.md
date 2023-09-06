@@ -70,7 +70,7 @@ C --> E((2 Sui))
 
 ## Repo Structure
 
-- **pool.move:** It mints/burns the LSD Coins
+- **pool.move:** It mints/burns the LSD Assets
 
 - **admin.move:** It contains the logic to manage the AdminCap
 
