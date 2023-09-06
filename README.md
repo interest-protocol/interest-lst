@@ -97,6 +97,17 @@ The Interest LSD portfolio is managed by the **Rebase struct**. It is stored in 
 
 ## ISui Yield NFT
 
+```move
+
+  struct ISuiYield has key, store {
+    id: UID,
+    img_url: String,
+    principal: u64,
+    shares: u64
+  }
+
+```
+
 The ISuiYield struct is a composable NFT. Each NFT can be instantly redeemed to Sui. Therefore, they can be merged and split together. We can easily build an AMM by merging all ISuiYield into one and relying on the function join and split for all operations:
 
 Join:
@@ -108,17 +119,6 @@ Split:
 
 - Swap Sui for ISuiYield
 - Remove Liquidity
-
-```move
-
-  struct ISuiYield has key, store {
-    id: UID,
-    img_url: String,
-    principal: u64,
-    shares: u64
-  }
-
-```
 
 **Join**
 
