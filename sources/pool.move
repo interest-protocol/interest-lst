@@ -184,8 +184,6 @@ module interest_lsd::pool {
   ): u64 {
 
     // We update the pool to make sure the rewards are up to date
-    // Then find the total amount of Sui the {isui_yc_amount} would be entitled to if it was iSui as it follows the same minting logic
-    // Then we remove the principal component from it
     update_pool(wrapper, storage, ctx);
 
     quote_isui_yn_logic(storage, nft)
@@ -830,10 +828,13 @@ module interest_lsd::pool {
     storage: &mut PoolStorage, 
     nft: &ISuiYield,
   ): u64 {
+    // Find out how many shares and principal was assigned to this NFT
     let (principal, shares) = isui_yn::read_nft(nft);
 
+    // Convert the shares to Sui (principal + rewards)
     let shares_value = rebase::to_elastic(&storage.pool, shares, false);
 
+    // Remove the principal to find out how many rewards this NFT has accrued
     if (principal >= shares_value) {
       0
     } else {
