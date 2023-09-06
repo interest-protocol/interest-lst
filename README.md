@@ -92,7 +92,6 @@ The Interest LSD portfolio is managed by the **Rebase struct**. It is stored in 
 > Elastic: 1200
 >
 > 10 iSui is worth 12 Sui - *10 * 1200 / 1000*
-> The exchange rate iSui ==> SUI is 1.2
 >
 > 10 Sui is worth ~8.3 iSui - *10 * 1000 / 1200*
 
