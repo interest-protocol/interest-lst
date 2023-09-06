@@ -537,7 +537,7 @@ module interest_lsd::pool {
   ): ISuiYield {
     let sui_amount = quote_isui_yn(wrapper, storage, self, ctx);
     
-    assert!(split_amount != 0 || sui_amount > split_amount, INVALID_SPLIT_AMOUNT);
+    assert!(split_amount != 0 && sui_amount > split_amount && sui_amount != 0, INVALID_SPLIT_AMOUNT);
 
     let factor = (MIN_STAKING_THRESHOLD as u256);
 
@@ -555,8 +555,7 @@ module interest_lsd::pool {
     let (principal_1, shares_1) = isui_yn::read_nft(&new_nft);
 
     // Should pass
-    assert!(principal_0 + principal_1 == principal, INVALID_SPLIT_AMOUNT);
-    assert!(shares_0 + shares_1 == shares, INVALID_SPLIT_AMOUNT);
+    assert!(principal_0 + principal_1 == principal && shares_0 + shares_1 == shares, INVALID_SPLIT_AMOUNT);
 
     new_nft
   }
