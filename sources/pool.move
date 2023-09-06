@@ -23,8 +23,8 @@ module interest_lsd::pool {
   use interest_lsd::rebase::{Self, Rebase};
   use interest_lsd::isui::{Self, ISUI, InterestSuiStorage};
   use interest_lsd::isui_pc::{Self, ISUI_PC, InterestSuiPCStorage};
-  use interest_lsd::isui_yc::{Self, ISUI_YC, InterestSuiYCStorage};
   use interest_lsd::staking_pool_utils::{calc_staking_pool_rewards};
+  use interest_lsd::interest_lsd::isui_yn::{Self, InterestSuiYNStorage};
   use interest_lsd::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
   
   // ** Constants
