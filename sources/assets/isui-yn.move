@@ -92,7 +92,7 @@ module interest_lsd::isui_yn {
   * @param shares The iSUI assigned to this NFT
   * @return ISuiYield 
   */
-  public(friend) fun mint(storage: InterestSuiYNStorage, principal: u64, shares: u64, ctx: &mut TxContext): ISuiYield {
+  public(friend) fun mint(storage: &mut InterestSuiYNStorage, principal: u64, shares: u64, ctx: &mut TxContext): ISuiYield {
     let nft_id = object::new(ctx);
     emit(Mint { nft_id: *object::uid_as_inner(&nft_id), principal, shares , sender: tx_context::sender(ctx) });
     
@@ -120,7 +120,33 @@ module interest_lsd::isui_yn {
     );
     let ISuiYield {id, img_url: _, principal, shares} = nft;
     object::delete(id);
-    (shares, principal)
+    (principal, shares)
+  }
+
+  /**
+  * @dev It allows the friend package to create a Join function
+  * @param  nft The NFT to update
+  * @param principal The new principal
+  * @param shares The new shares
+  */
+  public(friend) fun update_nft(nft: &mut ISuiYield, principal: u64, shares: u64) {
+    nft.principal = principal;
+    nft.shares = shares;
+  }
+
+  /// === UID Access ===
+
+  /// ISuiYield UID to allow reading dynamic fields.
+  public fun uid(fren: &ISuiYield): &UID { &fren.id }
+
+  /// Expose mutable access to the ISuiYield `UID` to allow extensions.
+  public fun uid_mut(fren: &mut ISuiYield): &mut UID { &mut fren.id }
+
+  /**
+  * @dev It reads the shares and principal associated with an {ISuiYield} nft
+  */
+  public fun read_nft(nft: &ISuiYield):(u64, u64) {
+    (nft.principal, nft.shares)
   }
 
   /**
@@ -128,7 +154,7 @@ module interest_lsd::isui_yn {
   * @param The nft to transfer
   * @param recipient The address that will receive the Coin<ISUI_YN>
   */
-  public entry fun transfer(nft: ISuiYieldNFT, recipient: address, _: &mut TxContext) {
+  public entry fun transfer(nft: ISuiYield, recipient: address, _: &mut TxContext) {
     transfer::public_transfer(nft, recipient)
   }
 

@@ -1,7 +1,7 @@
 // This contract manages the minting/burning of iSUi Coins and staking/unstaking Sui in Validators
 // ISUI is a share of the total SUI principal + rewards this module owns
 // ISUI_PC is always 1 SUI as it represents the principal owned by this module
-// ISUI_YC is a share of the SUI Rewards owned by this module
+// ISuiYield is an NFT that tracks a custom reeward position
 module interest_lsd::pool { 
   use std::vector;
   use std::option;
@@ -19,12 +19,12 @@ module interest_lsd::pool {
   use sui_system::sui_system::{Self, SuiSystemState};
 
   use interest_lsd::admin::{AdminCap};
-  use interest_lsd::math::{fmul, fdiv, scalar};
   use interest_lsd::rebase::{Self, Rebase};
+  use interest_lsd::math::{fmul, fdiv, scalar};
   use interest_lsd::isui::{Self, ISUI, InterestSuiStorage};
   use interest_lsd::isui_pc::{Self, ISUI_PC, InterestSuiPCStorage};
   use interest_lsd::staking_pool_utils::{calc_staking_pool_rewards};
-  use interest_lsd::interest_lsd::isui_yn::{Self, InterestSuiYNStorage};
+  use interest_lsd::isui_yn::{Self, ISuiYield, InterestSuiYNStorage};
   use interest_lsd::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
   
   // ** Constants
@@ -37,7 +37,8 @@ module interest_lsd::pool {
   const INVALID_FEE: u64 = 0; // All values inside the Fees Struct must be equal or below 1e18 as it represents 100%
   const INVALID_STAKE_AMOUNT: u64 = 1; // Users need to stake more than 1 MIST as the sui_system will throw 0 value stakes
   const INVALID_UNSTAKE_AMOUNT: u64 = 2; // The sender tried to unstake more than he is allowed 
-  const INVALID_INPUT_AMOUNT: u64 = 3;
+  const INVALID_NFT_BURN_AMOUNT: u64 = 3; // We do not allow users to burn their ISuiYield for 0 rewards
+  const INVALID_SPLIT_AMOUNT: u64 = 4; 
 
   // ** Structs
 
@@ -89,8 +90,7 @@ module interest_lsd::pool {
   struct MintISuiDerivatives has copy, drop {
     sender: address,
     sui_amount: u64,
-    isui_pc_amount: u64,
-    isui_yc_amount: u64,
+    nft_id: ID,
     validator: address
   }
 
@@ -100,10 +100,10 @@ module interest_lsd::pool {
     isui_pc_amount: u64,    
   }
 
-  struct BurnISuiYC has copy, drop {
+  struct BurnISuiYN has copy, drop {
     sender: address,
-    sui_amount: u64,
-    isui_yc_amount: u64,    
+    nft_id: ID,
+    sui_amount: u64,   
   }
 
   // Emitted when the DAO updates the fee
@@ -137,9 +137,9 @@ module interest_lsd::pool {
 
   // @dev It returns the exchange rate from ISUI to SUI
   /*
-  * @wrapper The Sui System Shared Object
-  * @storage The Pool Storage Shared Object (this module)
-  * @isui_amount The amount of ISUI
+  * @param wrapper The Sui System Shared Object
+  * @param storage The Pool Storage Shared Object (this module)
+  * @param isui_amount The amount of ISUI
   * @return the exchange rate
   */
   public fun get_exchange_rate_isui_to_sui(
@@ -154,10 +154,10 @@ module interest_lsd::pool {
 
   // @dev It returns the exchange rate from SUI to ISUI
   /*
-  * @wrapper The Sui System Shared Object
-  * @storage The Pool Storage Shared Object (this module)
-  * @sui_amount The amount of SUI
-  * @return the exchange rate
+  * @param wrapper The Sui System Shared Object
+  * @param storage The Pool Storage Shared Object (this module)
+  * @param sui_amount The amount of SUI
+  * @param return the exchange rate
   */
   public fun get_exchange_rate_sui_to_isui(
     wrapper: &mut SuiSystemState,
@@ -169,61 +169,41 @@ module interest_lsd::pool {
     rebase::to_base(&storage.pool, sui_amount, false)
   }
 
-  // @dev It returns the exchange rate from ISUI_YC to SUI
+  // @dev It returns the Sui value of the {nft}
   /*
-  * @storage The Pool Storage Shared Object (this module)
-  * @isui_yc_amount The amount of ISUI_YC
+  * @param wrapper The Sui System Shared Object
+  * @param storage The Pool Storage Shared Object (this module)
+  * @param nft The ISuiYield
   * @return the exchange rate
   */
-  public fun get_exchange_rate_isui_yc_to_sui(
+  public fun quote_isui_yn(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage, 
-    isui_yc_amount: u64,
+    nft: &ISuiYield,
     ctx: &mut TxContext
   ): u64 {
-    // It does not make sense to quote more ISUI than it exists
-    // It will break the calculation assumptions
-    assert!(rebase::base(&storage.pool) >= isui_yc_amount, INVALID_INPUT_AMOUNT);
+
     // We update the pool to make sure the rewards are up to date
     // Then find the total amount of Sui the {isui_yc_amount} would be entitled to if it was iSui as it follows the same minting logic
     // Then we remove the principal component from it
     update_pool(wrapper, storage, ctx);
 
-    // Scale the values to 1e18 and u256
-    // We need to increase the precision to avoid miscalculations
-    let principal_reward = (rebase::to_elastic(&storage.pool, isui_yc_amount, false) as u256); // We do not scale this to 1e18 because we need to return a 1e9 number u64
-    let factor = (MIN_STAKING_THRESHOLD as u256);
-    let base = (rebase::base(&storage.pool) as u256) * factor;
-    let elastic = (rebase::elastic(&storage.pool) as u256) * factor;
-
-    // Find iSui => Sui exchange rate
-    // E.g. if it is 1.2
-    // We know at T0 it was 1
-    // So 1 is the principal and 0.2 is the reward
-    let exchange_rate = fdiv(fmul(scalar(), elastic), base);
-
-    // Find what percentage of the exchange rate is the reward
-    let percentage_reward = fdiv(exchange_rate - scalar(), exchange_rate);
-    // Multiply reward % * principal + reward value
-    (fmul(percentage_reward, principal_reward) as u64)
+    quote_isui_yn_logic(storage, nft)
   }
 
-  // @dev It returns the exchange rate from SUI to ISUI_YC
+  // @dev Utility function to create {BurnValidatorPayload} Object for other modules
   /*
-  * @storage The Pool Storage Shared Object (this module)
-  * @sui_amount The amount of Sui
-  * @return the exchange rate
+  * @param validator_address The validator to which we will unstake
+  * @param epoch The action_epoch of the {StakedSui} we will unstake
+  * @param principal How much of the {StakedSui} to unstake
+  * @return {BurnValidatorPayload} to use on {burn_isui}, {burn_isui_pc} and {burn_isui_yc}
   */
-  public fun get_exchange_rate_sui_to_isui_yc(
-    wrapper: &mut SuiSystemState,
-    storage: &mut PoolStorage, 
-    sui_amount: u64,
-    ctx: &mut TxContext
-  ): u64 {
-    // We find the amount of ISUI in Sui (exchange rate)
-    // Then we multiply the desired Sui amount to the exchange rate
-    let exchange_rate = get_exchange_rate_isui_yc_to_sui(wrapper, storage, MIN_STAKING_THRESHOLD, ctx);
-    (((sui_amount as u256) / (exchange_rate as u256)) * (MIN_STAKING_THRESHOLD as u256) as u64)
+  public fun create_burn_validator_payload(validator_address: address, epoch: u64, principal: u64): BurnValidatorPayload {
+    BurnValidatorPayload {
+      validator_address,
+      epoch, 
+      principal
+    }
   }
 
   // @dev This function costs a lot of gas and must be called before any interaction with Interest LSD because it updates the pool. The pool is needed to ensure all 3 Coins' exchange rate is accurate.
@@ -231,8 +211,8 @@ module interest_lsd::pool {
   // It will ONLY RUN ONCE per epoch
   // Dev Team will call as soon as a new epoch starts so the first user does not need to incur this cost
   /*
-  * @wrapper The Sui System Shared Object
-  * @storage The Pool Storage Shared Object (this module)
+  * @param wrapper The Sui System Shared Object
+  * @param storage The Pool Storage Shared Object (this module)
   */
   entry public fun update_pool(
     wrapper: &mut SuiSystemState,
@@ -301,11 +281,11 @@ module interest_lsd::pool {
 
   // @dev This function stakes Sui in a validator chosen by the sender and returns ISUI. 
   /*
-  * @wrapper The Sui System Shared Object
-  * @storage The Pool Storage Shared Object (this module)
-  * @interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
-  * @asset The Sui Coin, the sender wishes to stake
-  * @validator_address The Sui Coin will be staked in this validator
+  * @param wrapper The Sui System Shared Object
+  * @param storage The Pool Storage Shared Object (this module)
+  * @param interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
+  * @param asset The Sui Coin, the sender wishes to stake
+  * @param validator_address The Sui Coin will be staked in this validator
   * @return Coin<ISUI> in exchange for the Sui deposited
   */
   public fun mint_isui(
@@ -328,12 +308,12 @@ module interest_lsd::pool {
 
   // @dev This function burns ISUI and unstake Sui 
   /*
-  * @wrapper The Sui System Shared Object
-  * @storage The Pool Storage Shared Object (this module)
-  * @interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
-  * @validator_payload A vector containing the information about which StakedSui to unstake
-  * @asset The iSui Coin, the sender wishes to burn
-  * @validator_address The validator is to re-stake any remaining Sui if any
+  * @param wrapper The Sui System Shared Object
+  * @param storage The Pool Storage Shared Object (this module)
+  * @param interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
+  * @param validator_payload A vector containing the information about which StakedSui to unstake
+  * @param asset The iSui Coin, the sender wishes to burn
+  * @param validator_address The validator is to re-stake any remaining Sui if any
   * @return Coin<SUI> in exchange for the iSui burned
   */
   public fun burn_isui(
@@ -369,46 +349,57 @@ module interest_lsd::pool {
     unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_value_to_return, ctx)
   }
 
-  // @dev This function stakes Sui in a validator chosen by the sender and returns (ISUI_PC, ISUI_YC). 
+  // @dev This function stakes Sui in a validator chosen by the sender and returns (ISUI_PC, ISuiYield). 
   /*
-  * @wrapper The Sui System Shared Object
-  * @storage The Pool Storage Shared Object (this module)
-  * @interest_sui_storage The shared object of ISUI, it contains the treasury_cap. We need it to mint ISUI
-  * @interest_sui_pc_storage The shared object of ISUI_PC, it contains the treasury_cap. We need it to mint ISUI_PC
-  * @interest_sui_yc_storage The shared object of ISUI_YC, it contains the treasury_cap. We need it to mint ISUI_YC
-  * @asset The Sui Coin, the sender wishes to stake
-  * @validator_address The Sui Coin will be staked in this validator
-  * @return (COIN<ISUI_PC>, COIN<ISUI_YC>)
+  * @param wrapper The Sui System Shared Object
+  * @param storage The Pool Storage Shared Object (this module)
+  * @param interest_sui_storage The shared object of ISUI, it contains the treasury_cap. We need it to mint ISUI
+  * @param interest_sui_pc_storage The shared object of ISUI_PC, it contains the treasury_cap. We need it to mint ISUI_PC
+  * @param interest_sui_yc_storage The shared object of ISuiYield, it contains the treasury_cap. We need it to mint ISuiYield
+  * @param asset The Sui Coin, the sender wishes to stake
+  * @param validator_address The Sui Coin will be staked in this validator
+  * @return (COIN<ISUI_PC>, ISuiYield)
   */
   public fun mint_isui_derivatives(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     interest_sui_storage: &mut InterestSuiStorage,
     interest_sui_pc_storage: &mut InterestSuiPCStorage,
-    interest_sui_yc_storage: &mut InterestSuiYCStorage,
+    interest_sui_yn_storage: &mut InterestSuiYNStorage,
     asset: Coin<SUI>,
     validator_address: address,
     ctx: &mut TxContext,
-  ):(Coin<ISUI_PC>, Coin<ISUI_YC>) {
+  ):(Coin<ISUI_PC>, ISuiYield) {
     let sui_amount = coin::value(&asset);
-    let isui_yc_amount = mint_isui_logic(wrapper, storage, interest_sui_storage, asset, validator_address, ctx);
 
-    emit(MintISuiDerivatives { sender: tx_context::sender(ctx), isui_pc_amount: sui_amount, isui_yc_amount, sui_amount, validator: validator_address });
+    let nft = isui_yn::mint(
+      interest_sui_yn_storage, 
+      sui_amount,
+      mint_isui_logic(wrapper, storage, interest_sui_storage, asset, validator_address, ctx), 
+      ctx
+    );
+
+    emit(MintISuiDerivatives { 
+      sender: tx_context::sender(ctx), 
+      sui_amount, 
+      nft_id: object::id(&nft), 
+      validator: validator_address 
+    });
 
     (
       isui_pc::mint(interest_sui_pc_storage, sui_amount, ctx),
-      isui_yc::mint(interest_sui_yc_storage, isui_yc_amount, ctx)
+      nft
     ) 
   } 
 
   // @dev This function burns ISUI_PC in exchange for SUI at 1:1 rate
   /*
-  * @wrapper The Sui System Shared Object
-  * @storage The Pool Storage Shared Object (this module)
-  * @interest_sui_pc_storage The shared object of ISUI_PC, it contains the treasury_cap. We need it to burn ISUI_PC
-  * @validator_payload A vector containing the information about which StakedSui to unstake
-  * @asset The ISUI_PC Coin, the sender wishes to burn
-  * @validator_address The validator to re stake any remaining Sui if any
+  * @param wrapper The Sui System Shared Object
+  * @param storage The Pool Storage Shared Object (this module)
+  * @param interest_sui_pc_storage The shared object of ISUI_PC, it contains the treasury_cap. We need it to burn ISUI_PC
+  * @param validator_payload A vector containing the information about which StakedSui to unstake
+  * @param asset The ISUI_PC Coin, the sender wishes to burn
+  * @param validator_address The validator to re stake any remaining Sui if any
   * @return Coin<SUI> in exchange for the ISUI_PC burned
   */
   public fun burn_isui_pc(
@@ -442,29 +433,29 @@ module interest_lsd::pool {
     unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_value_to_return, ctx)
   }
 
-  // @dev This function burns ISUI_YC in exchange for SUI. ISUI_YC grows as the yield of this pool grows
+  // @dev This function burns ISuiYield nft in exchange for SUI. ISuiYield nft grows as the yield of this pool grows
   /*
-  * @wrapper The Sui System Shared Object
-  * @storage The Pool Storage Shared Object (this module)
-  * @interest_sui_yc_storage The shared object of ISUI_YC, it contains the treasury_cap. We need it to burn ISUI_YC
-  * @validator_payload A vector containing the information about which StakedSui to unstake
-  * @asset The ISUI_YC Coin, the sender wishes to burn
-  * @validator_address The validator to re stake any remaining Sui if any
+  * @param wrapper The Sui System Shared Object
+  * @param storage The Pool Storage Shared Object (this module)
+  * @param validator_payload A vector containing the information about which StakedSui to unstake
+  * @param nft The ISuiYield to burn in exchange for rewards
+  * @param validator_address The validator to re stake any remaining Sui if any
   * @return Coin<SUI> in exchange for the ISUI_PC burned
   */
-  public fun burn_isui_yc(
+  public fun burn_isui_yn(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    interest_sui_yc_storage: &mut InterestSuiYCStorage,
     validator_payload: vector<BurnValidatorPayload>,
-    asset: Coin<ISUI_YC>,
+    nft: ISuiYield,
     validator_address: address,
     ctx: &mut TxContext,
   ): Coin<SUI> {
     
-    // Burn the {asset} and figure out how much Sui is worth
-    let isui_yc_amount = isui_yc::burn(interest_sui_yc_storage, asset, ctx);
-    let sui_amount = get_exchange_rate_isui_yc_to_sui(wrapper, storage, isui_yc_amount, ctx);
+    // This function updates the pool and returns the sui value of an NFT
+    let sui_amount = quote_isui_yn(wrapper, storage, &nft, ctx);
+
+    // It does not make sense to burn for 0 rewards
+    assert!(sui_amount != 0, INVALID_NFT_BURN_AMOUNT);
 
     // We need to update the pool
     rebase::sub_elastic(&mut storage.pool, sui_amount, false);
@@ -474,10 +465,65 @@ module interest_lsd::pool {
     // Sender must Unstake more than his principal to ensure that the leftover is above the threshold of 1 Sui
     assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_amount, INVALID_UNSTAKE_AMOUNT);
 
-    emit(BurnISuiYC { sui_amount, sender: tx_context::sender(ctx), isui_yc_amount });
+    emit(BurnISuiYN { nft_id: object::id(&nft), sui_amount, sender: tx_context::sender(ctx) });
+
+    // Burn the NFT
+    isui_yn::burn(nft, ctx);
 
     // Unstake Sui
     unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_amount, ctx)
+  }
+
+  // ** iSuiYield NFT Utility Functions - can build a AMM with it
+
+  // Consumes both NFTs and merges them
+  /*
+  * @param self The NFT to update
+  * @param n The NFT that will be merged into the self
+  */
+  public entry fun join(self: &mut ISuiYield, n: ISuiYield, ctx: &mut TxContext) {
+    let (principal_0, shares_0) = isui_yn::burn(n, ctx);
+    let (principal_1, shares_1) = isui_yn::read_nft(self);
+    isui_yn::update_nft(self, principal_0 + principal_1, shares_0 + shares_1)
+  }
+
+  // Consumes both NFTs and merges them
+  /*
+  * @param self The NFT to update
+  * @param n The NFT that will be merged into the self
+  */
+  public fun split(
+    wrapper: &mut SuiSystemState,
+    storage: &mut PoolStorage, 
+    interest_sui_yn_storage: &mut InterestSuiYNStorage,
+    self: &mut ISuiYield, 
+    split_amount: u64,
+    ctx: &mut TxContext
+  ): ISuiYield {
+    let sui_amount = quote_isui_yn(wrapper, storage, self, ctx);
+    
+    assert!(split_amount != 0 || split_amount >= sui_amount, INVALID_SPLIT_AMOUNT);
+
+    let factor = (MIN_STAKING_THRESHOLD as u256);
+
+    let split_percentage = fdiv((split_amount as u256) * factor, (sui_amount as u256) * factor); 
+
+    let (principal, shares) = isui_yn::read_nft(self);
+
+    let new_principal = (fmul((principal as u256), split_percentage) as u64);
+    let new_shares = (fmul((shares as u256), split_percentage) as u64);
+
+    let new_nft = isui_yn::mint(interest_sui_yn_storage, new_principal, new_shares, ctx);
+    isui_yn::update_nft(self, principal - new_principal, shares - new_shares);
+
+    let (principal_0, shares_0) = isui_yn::read_nft(self);
+    let (principal_1, shares_1) = isui_yn::read_nft(&new_nft);
+
+    // Should pass
+    assert!(principal_0 + principal_1 == principal, INVALID_SPLIT_AMOUNT);
+    assert!(shares_0 + shares_1 == shares, INVALID_SPLIT_AMOUNT);
+
+    new_nft
   }
 
   // ** Admin Functions
@@ -773,18 +819,25 @@ module interest_lsd::pool {
       }); 
   }
 
-  // @dev Utility function to create {BurnValidatorPayload} Object for other modules
+  // @dev It returns the Sui value of the {nft}. it does not update the pool so careful!
   /*
-  * @validator_address The validator to which we will unstake
-  * @epoch The action_epoch of the {StakedSui} we will unstake
-  * @principal How much of the {StakedSui} to unstake
-  * @return {BurnValidatorPayload} to use on {burn_isui}, {burn_isui_pc} and {burn_isui_yc}
+  * @param wrapper The Sui System Shared Object
+  * @param storage The Pool Storage Shared Object (this module)
+  * @param nft The ISuiYield
+  * @return u64 the exchange rate
   */
-  public fun create_burn_validator_payload(validator_address: address, epoch: u64, principal: u64): BurnValidatorPayload {
-    BurnValidatorPayload {
-      validator_address,
-      epoch, 
-      principal
+  fun quote_isui_yn_logic(
+    storage: &mut PoolStorage, 
+    nft: &ISuiYield,
+  ): u64 {
+    let (principal, shares) = isui_yn::read_nft(nft);
+
+    let shares_value = rebase::to_elastic(&storage.pool, shares, false);
+
+    if (principal >= shares_value) {
+      0
+    } else {
+      shares_value - principal
     }
   }
 
