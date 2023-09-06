@@ -17,7 +17,8 @@ module interest_lsd::isui_yn {
 
   // ** Structs
 
-  struct ISuiYieldNFT has key, store {
+  // NFT
+  struct ISuiYield has key, store {
     id: UID,
     img_url: String,
     principal: u64,
@@ -30,7 +31,7 @@ module interest_lsd::isui_yn {
   // Treasury Cap Wrapper
   struct InterestSuiYNStorage has key {
     id: UID,
-    display: Display<ISuiYieldNFT>,
+    display: Display<ISuiYield>,
     img_url: String
   }
 
@@ -69,7 +70,7 @@ module interest_lsd::isui_yn {
 
       let publisher = package::claim(witness, ctx);
 
-      let display = display::new_with_fields<ISuiYieldNFT>(&publisher, keys, values, ctx);
+      let display = display::new_with_fields<ISuiYield>(&publisher, keys, values, ctx);
       display::update_version(&mut display);
 
       transfer::share_object(
@@ -89,13 +90,13 @@ module interest_lsd::isui_yn {
   * @param storage The InterestSuiYNStorage
   * @param principal The iSUI_PC minted in conjunction with this NFT
   * @param shares The iSUI assigned to this NFT
-  * @return ISuiYieldNFT 
+  * @return ISuiYield 
   */
-  public(friend) fun mint(storage: InterestSuiYNStorage, principal: u64, shares: u64, ctx: &mut TxContext): ISuiYieldNFT {
+  public(friend) fun mint(storage: InterestSuiYNStorage, principal: u64, shares: u64, ctx: &mut TxContext): ISuiYield {
     let nft_id = object::new(ctx);
     emit(Mint { nft_id: *object::uid_as_inner(&nft_id), principal, shares , sender: tx_context::sender(ctx) });
     
-    ISuiYieldNFT {
+    ISuiYield {
       id: nft_id,
       img_url: storage.img_url,
       principal,
@@ -108,7 +109,7 @@ module interest_lsd::isui_yn {
   * @param nft The NFT to burn
   * @return (shares, principal)
   */
-  public(friend) fun burn(nft: ISuiYieldNFT, ctx: &mut TxContext): (u64, u64) {
+  public(friend) fun burn(nft: ISuiYield, ctx: &mut TxContext): (u64, u64) {
     emit(
       Burn { 
       nft_id: *object::uid_as_inner(&nft.id), 
@@ -117,7 +118,7 @@ module interest_lsd::isui_yn {
       sender: tx_context::sender(ctx) 
       }
     );
-    let ISuiYieldNFT {id, img_url: _, principal, shares} = nft;
+    let ISuiYield {id, img_url: _, principal, shares} = nft;
     object::delete(id);
     (shares, principal)
   }

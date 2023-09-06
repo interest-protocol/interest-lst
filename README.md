@@ -34,8 +34,8 @@ Interest Liquid Staking Derivative allows users to stake and unstake Sui in thei
 
 ```mermaid
 graph LR
-A[10 Sui] --> B((iSui))
-B -- Principal + Yield --> C[12 Sui]
+A((10 Sui)) --> B((iSui))
+B -- Principal + Yield --> C((12 Sui))
 ```
 
 - iSui (Interest Sui): It tracks the pool's principal and rewards. Therefore, its value is always higher than Sui.
@@ -44,15 +44,15 @@ B -- Principal + Yield --> C[12 Sui]
 
 ```mermaid
 graph LR
-A[10 Sui] -- Principal --> B((iSui-PC))
-A -- Yield --> C((iSui-YC))
-B --> D[10 Sui]
-C --> E[2 Sui]
+A((10 Sui)) -- Principal --> B((iSui-PC))
+A -- Yield --> C[iSui-YN]
+B --> D((10 Sui))
+C --> E((2 Sui))
 ```
 
 - iSui-PC (Interest Sui Principal Coin): It tracks the principal portion of a stake. This coin is always equal to Sui.
 
-- iSui-YC (Interest Sui Yield Coin): It tracks the rewards portion of a stake. This coin grows over time.
+- iSui-YN (Interest Sui Yield NFT): It tracks the rewards portion of a stake. This NFT Sui value grows over time.
 
 > Selling any of these coins, means selling the entire position. Coins
 > do not require any other object to mint/burn. Therefore, they are
@@ -79,6 +79,21 @@ C --> E[2 Sui]
 - **lib:** It contains utility modules to support the {pool.move} module
 
 - **coins:** It contains the Coins that {pool.move} mint and burn
+
+## Technical Overview
+
+The Interest LSD portfolio is managed by the **Rebase struct**. It is stored in the **PoolStorage** shared object under **pool**.
+
+- **base** It represents the shares of the portfolio (ISUI)
+- **elastic** It represents the assets held by the portfolio (SUI)
+
+> Interest LSD Portfolio:
+> Base: 1000
+> Elastic: 1200
+>
+> This means each 10 iSui is worth 12 Sui - Math: 10 _ 1200 / 1000
+> The exchange rate iSui ==> SUI is 1.2
+> If a user deposits 10 Sui he will get ~8.3 iSui - Math 10 _ 1000 / 1200
 
 ## Contact Us
 
