@@ -187,4 +187,21 @@ module interest_lsd::isui_yn {
   public fun init_for_testing(ctx: &mut TxContext) {
     init(ISUI_YN {}, ctx);
   }
+
+  #[test_only]
+  /// Mint nfts of any type for (obviously!) testing purposes only
+  public fun mint_for_testing(principal: u64, shares: u64, ctx: &mut TxContext): ISuiYield {
+      ISuiYield {
+        id: object::new(ctx),
+        img_url: utf8(b""),
+        principal,
+        shares
+    }
+  }
+
+  #[test_only]
+  public fun burn_for_testing(nft: ISuiYield) {
+    let ISuiYield {id, img_url: _, principal: _, shares: _} = nft;
+    object::delete(id);
+  }
 }
