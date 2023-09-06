@@ -474,7 +474,7 @@ module interest_lsd::pool {
 
   // ** iSuiYield NFT Utility Functions - can build a AMM with it
 
-  // Consumes both NFTs and merges them
+  // It merges the second NFT with the first one.
   /*
   * @param self The NFT to update
   * @param n The NFT that will be merged into the self
@@ -485,7 +485,7 @@ module interest_lsd::pool {
     isui_yn::update_nft(self, principal_0 + principal_1, shares_0 + shares_1)
   }
 
-  // Consumes both NFTs and merges them
+  // Creates a new NFT with the split_amount of Sui Rewards
   /*
   * @param self The NFT to update
   * @param n The NFT that will be merged into the self
@@ -500,7 +500,7 @@ module interest_lsd::pool {
   ): ISuiYield {
     let sui_amount = quote_isui_yn(wrapper, storage, self, ctx);
     
-    assert!(split_amount != 0 || split_amount >= sui_amount, INVALID_SPLIT_AMOUNT);
+    assert!(split_amount != 0 || sui_amount > split_amount, INVALID_SPLIT_AMOUNT);
 
     let factor = (MIN_STAKING_THRESHOLD as u256);
 
