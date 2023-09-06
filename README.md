@@ -112,12 +112,12 @@ The ISuiYield struct is a composable NFT. Each NFT can be instantly redeemed to 
 
 Join:
 
-- Swap in ISuiYield for Sui
+- Swap in ISuiYield for WETH
 - Add Liquidity
 
 Split:
 
-- Swap Sui for ISuiYield
+- Swap WETH for ISuiYield
 - Remove Liquidity
 
 **Join**
