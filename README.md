@@ -54,8 +54,8 @@ C --> E((2 Sui))
 
 - iSui-YN (Interest Sui Yield NFT): It tracks the rewards portion of a stake. This NFT Sui value grows over time.
 
-> Selling any of these coins, means selling the entire position. Coins
-> do not require any other object to mint/burn. Therefore, they are
+> Selling any of these assets, means selling the entire position. They
+> do not require any other object to mint/burn and are the module does not keep track of addresses. Therefore, they are
 > composable with DeFi.
 
 ## Core Values
@@ -84,16 +84,17 @@ C --> E((2 Sui))
 
 The Interest LSD portfolio is managed by the **Rebase struct**. It is stored in the **PoolStorage** shared object under **pool**.
 
-- **base** It represents the shares of the portfolio (ISUI)
-- **elastic** It represents the assets held by the portfolio (SUI)
+- **base** It represents the shares of the portfolio (iSui)
+- **elastic** It represents the assets held by the portfolio (Sui)
 
 > Interest LSD Portfolio:
 > Base: 1000
 > Elastic: 1200
 >
-> This means each 10 iSui is worth 12 Sui - Math: 10 _ 1200 / 1000
+> 10 iSui is worth 12 Sui - _10 _ 1200 / 1000\*
 > The exchange rate iSui ==> SUI is 1.2
-> If a user deposits 10 Sui he will get ~8.3 iSui - Math 10 _ 1000 / 1200
+>
+> If a user deposits 10 Sui he will get ~8.3 iSui - _10 _ 1000 / 1200\*
 
 ## Contact Us
 
