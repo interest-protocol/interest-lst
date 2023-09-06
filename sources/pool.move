@@ -11,6 +11,7 @@ module interest_lsd::pool {
   use sui::sui::{SUI};
   use sui::event::{emit};
   use sui::coin::{Self, Coin};
+  use sui::vec_set::{Self, VecSet};
   use sui::object::{Self, UID, ID};
   use sui::tx_context::{Self, TxContext};
   use sui::linked_table::{Self, LinkedTable};
@@ -69,7 +70,8 @@ module interest_lsd::pool {
     validators_table: LinkedTable<address, ValidatorData>, // We need a linked table to iterate through all validators once every epoch to ensure all pool data is accurate
     total_principal: u64, // Total amount of StakedSui principal deposited in Interest LSD Package
     fee: Fee, // Holds the data to calculate the stake fee
-    dao_coin: Coin<ISUI> // Fees collected by the protocol in ISUI
+    dao_coin: Coin<ISUI>, // Fees collected by the protocol in ISUI
+    whitelist_validators: VecSet<address>
   }
 
   // ** Events
@@ -120,6 +122,14 @@ module interest_lsd::pool {
     amount: u64
   }
 
+  struct AddWhitelist has copy, drop {
+    validator: address
+  }
+
+  struct RemoveWhitelist has copy, drop {
+    validator: address
+  }
+
   fun init(ctx: &mut TxContext) {
     // Share the PoolStorage Object with the Sui network
     transfer::share_object(
@@ -130,7 +140,8 @@ module interest_lsd::pool {
         validators_table: linked_table::new(ctx),
         total_principal: 0,
         fee: new_fee(),
-        dao_coin: coin::zero<ISUI>(ctx)
+        dao_coin: coin::zero<ISUI>(ctx),
+        whitelist_validators: vec_set::empty()
       }
     );
   }
@@ -296,7 +307,19 @@ module interest_lsd::pool {
   ): Coin<ISUI> {
     let sui_amount = coin::value(&asset);
     
-    let shares_to_mint = mint_isui_logic(wrapper, storage, interest_sui_storage, asset, validator_address, ctx);
+    let shares = mint_isui_logic(wrapper, storage, interest_sui_storage, asset, validator_address, ctx);
+
+    let shares_to_mint = if (is_whitelisted(storage, validator_address)) {
+      shares
+    } else {
+      charge_isui_mint(
+        storage, 
+        interest_sui_storage, 
+        linked_table::borrow(&storage.validators_table, validator_address).total_principal, 
+        shares, 
+        ctx
+      )
+    };
 
     emit(MintISui { validator: validator_address, sender: tx_context::sender(ctx), sui_amount, isui_amount: shares_to_mint });
 
@@ -383,6 +406,18 @@ module interest_lsd::pool {
       nft_id: object::id(&nft), 
       validator: validator_address 
     });
+
+    let sui_amount = if (is_whitelisted(storage, validator_address)) { 
+      sui_amount 
+    } else {
+      charge_isui_pc_mint(
+        storage, 
+        interest_sui_storage, 
+        linked_table::borrow(&storage.validators_table, validator_address).total_principal, 
+        sui_amount, 
+        ctx        
+      )
+    };
 
     (
       isui_pc::mint(interest_sui_pc_storage, sui_amount, ctx),
@@ -524,15 +559,53 @@ module interest_lsd::pool {
     new_nft
   }
 
+  // ** Functions to handle Whitelist validators
+
+  // Checks if a validator is whitelisted (pays no fee)
+  /*
+  * @param storage The Pool Storage Shared Object (this module)
+  * @param validator The address of the validator
+  * @return bool true if it is whitelisted
+  */
+  public fun is_whitelisted(storage: &PoolStorage, validator: address): bool {
+    vec_set::contains(&storage.whitelist_validators, &validator)
+  }
+
+  // Whitelists a validator to pay no fee
+  /*
+  * @param _ The Admin Cap
+  * @param storage The Pool Storage Shared Object (this module)
+  * @param validator The address of the validator
+  */
+  public entry fun add_whitelist(_: &AdminCap, storage: &mut PoolStorage, validator: address) {
+    if (is_whitelisted(storage, validator)) return;
+
+    vec_set::insert(&mut storage.whitelist_validators, validator);
+    emit(AddWhitelist { validator });
+  }
+
+  // Removes a validator from the whitelist
+  /*
+  * @param _ The Admin Cap
+  * @param storage The Pool Storage Shared Object (this module)
+  * @param validator The address of the validator
+  */
+  public entry fun remove_whitelist(_: &AdminCap, storage: &mut PoolStorage, validator: address) {
+    if (!is_whitelisted(storage, validator)) return;
+
+    vec_set::remove(&mut storage.whitelist_validators, &validator);
+    emit(RemoveWhitelist { validator });
+  }
+
   // ** Admin Functions
 
   // @dev This function safely updates the fees. It will throw if you pass values higher than 1e18.  
   /*
-  * @_: The AdminCap
-  * @storage: The Pool Storage Shared Object (this module)
-  * @base: The new base
-  * @kink: The new kink
-  * @jump The new jump
+  * @param _: The AdminCap
+  * @param storage: The Pool Storage Shared Object (this module)
+  * @param base: The new base
+  * @param kink: The new kink
+  * @param jump The new jump
   */
   entry public fun update_fee(
     _: &AdminCap,
@@ -554,9 +627,9 @@ module interest_lsd::pool {
 
   // @dev This function allows the DAO to withdraw fees.
   /*
-  * @_: The AdminCap
-  * @storage: The Pool Storage Shared Object (this module)
-  * @amount: The value of fees to withdraw
+  * @param _: The AdminCap
+  * @param storage: The Pool Storage Shared Object (this module)
+  * @param amount: The value of fees to withdraw
   * @return the fees in Coin<ISUI>
   */
   public fun withdraw_fees(
@@ -577,11 +650,11 @@ module interest_lsd::pool {
 
   // @dev This function stakes Sui in a validator chosen by the sender and returns ISUI. 
   /*
-  * @wrapper The Sui System Shared Object
-  * @storage The Pool Storage Shared Object (this module)
-  * @interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
-  * @asset The Sui Coin, the sender wishes to stake
-  * @validator_address The Sui Coin will be staked in this validator
+  * @param wrapper The Sui System Shared Object
+  * @param storage The Pool Storage Shared Object (this module)
+  * @param interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
+  * @param asset The Sui Coin, the sender wishes to stake
+  * @param validator_address The Sui Coin will be staked in this validator
   * @return Coin<ISUI> in exchange for the Sui deposited
   */
   fun mint_isui_logic(
@@ -622,18 +695,13 @@ module interest_lsd::pool {
 
     // Update the Sui Pool 
     // We round down to give the edge to the protocol
-    let shares = rebase::add_elastic(&mut storage.pool, stake_value, false);
-
-    // Charge the admin fee if it is turned on
-    // It will mint the ISUI because we want the total supply of ISUI to reflect the shares in the pool to ensure the exchange rate is correct
-    // It returns the shares - dao fee
-    charge_isui_mint(storage, interest_sui_storage, validator_data.total_principal, shares, ctx)
+    rebase::add_elastic(&mut storage.pool, stake_value, false)    
   }
 
   // @dev This function stores StakedSui with the same {activation_epoch} on a {LinkedTable}
   /*
-  * @validator_data: The Struct Data for the validator where we will deposit the Sui
-  * @staked_sui: The StakedSui Object to store
+  * @param validator_data: The Struct Data for the validator where we will deposit the Sui
+  * @param staked_sui: The StakedSui Object to store
   */
   fun store_staked_sui(validator_data: &mut ValidatorData, staked_sui: StakedSui) {
       let activation_epoch = staking_pool::stake_activation_epoch(&staked_sui);
@@ -654,8 +722,8 @@ module interest_lsd::pool {
 
   // @dev This function safely removes Staked Sui from our storage
   /*
-  * @storage The Pool Storage Shared Object (this module)
-  * @validator_payload A vector containing the information about which StakedSui to unstake
+  * @param storage The Pool Storage Shared Object (this module)
+  * @param validator_payload A vector containing the information about which StakedSui to unstake
   * @return (Vector of Staked Sui, total principal of Staked Sui Removed)
   */
   fun remove_staked_sui(
@@ -707,11 +775,11 @@ module interest_lsd::pool {
 
   // @dev This function unstakes StakedSui from the validators
   /*
-  * @wrapper The Sui System Shared Object
-  * @storage The Pool Storage Shared Object (this module)
-  * @staked_sui_vector The vector of StakedSui to unstake
-  * @validator_address The validator is to re-stake any remaining Sui if any
-  * @sui_value_to_return The desired amount of Sui to unstake
+  * @param wrapper The Sui System Shared Object
+  * @param storage The Pool Storage Shared Object (this module)
+  * @param staked_sui_vector The vector of StakedSui to unstake
+  * @param validator_address The validator is to re-stake any remaining Sui if any
+  * @param sui_value_to_return The desired amount of Sui to unstake
   * @return Coin<SUI> The unstaked Sui
   */
   fun unstake_staked_sui(
@@ -760,10 +828,10 @@ module interest_lsd::pool {
 
   // If there is a fee, it mints iSUi for the Admin
   /*
-  * @storage: The Pool Storage Shared Object (this module)
-  * @interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
-  * @validator_principal The amount of Sui principal deposited to the validator
-  * @shares The amount of iSui being minted
+  * @param storage: The Pool Storage Shared Object (this module)
+  * @param interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
+  * @param validator_principal The amount of Sui principal deposited to the validator
+  * @param shares The amount of iSui being minted
   * @return the amount of ISUI to mint to the sender
   */
   fun charge_isui_mint(
@@ -791,6 +859,46 @@ module interest_lsd::pool {
     coin::join(&mut storage.dao_coin, isui::mint(interest_sui_storage, fee_amount, ctx));
     // Return the shares amount to mint to the sender
     shares - fee_amount
+  }
+
+    // If there is a fee, it mints iSUi for the Admin
+  /*
+  * @storage: The Pool Storage Shared Object (this module)
+  * @interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
+  * @validator_principal The amount of Sui principal deposited to the validator
+  * @amount The amount of iSui-PC being minted
+  * @return the amount of ISUI to mint to the sender
+  */
+  fun charge_isui_pc_mint(
+    storage: &mut PoolStorage,
+    interest_sui_storage: &mut InterestSuiStorage,
+    validator_principal: u64,
+    amount: u64,
+    ctx: &mut TxContext
+    ): u64 {
+    
+    // Find the fee % based on the validator dominance and fee parameters.  
+    let fee = calculate_fee_percentage(
+      &storage.fee,
+      (validator_principal as u256),
+      (storage.total_principal as u256)
+    );
+
+    // If the fee is zero, there is nothing else to do
+    if (fee == 0) return amount;
+
+    // Calculate fee
+    let fee_amount = (fmul((amount as u256), fee) as u64);
+
+    // Mint the ISUI for the DAO. We need to make sure the total supply of ISUI is consistent with the pool shares
+    coin::join(&mut storage.dao_coin, isui::mint(
+      interest_sui_storage, 
+      rebase::to_base(&storage.pool, fee_amount, false), 
+      ctx
+    ));
+
+    // Return the shares amount to mint to the sender
+    amount - fee_amount
   }
 
   // @dev Adds a Validator to the linked_list
