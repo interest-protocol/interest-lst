@@ -62,11 +62,11 @@ C --> E((2 Sui))
 
 - **Decentralized:** Users can deposit/withdraw from any validator
 
-- **Non-custodial:** The admin does not have any access to the funds. It uses a Coin accounting system to keep track of deposits/rewards
+- **Non-custodial:** The admin does not have any access to the funds. It uses a Coin + NFT accounting system to keep track of deposits/rewards
 
 - **Fair:** The deposit fee increases as a validator gets a higher stake compared to others. It incentivizes users to deposit in other validators.
 
-- **Flexible:** Users have granular control over their deposit via the 3 Coin options.
+- **Flexible:** Users have granular control over their deposit via the 3 Asset options.
 
 ## Repo Structure
 
