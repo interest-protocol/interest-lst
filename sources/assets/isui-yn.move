@@ -137,10 +137,10 @@ module interest_lsd::isui_yn {
   /// === UID Access ===
 
   /// ISuiYield UID to allow reading dynamic fields.
-  public fun uid(fren: &ISuiYield): &UID { &fren.id }
+  public fun uid(nft: &ISuiYield): &UID { &nft.id }
 
   /// Expose mutable access to the ISuiYield `UID` to allow extensions.
-  public fun uid_mut(fren: &mut ISuiYield): &mut UID { &mut fren.id }
+  public fun uid_mut(nft: &mut ISuiYield): &mut UID { &mut nft.id }
 
   /**
   * @dev It reads the shares and principal associated with an {ISuiYield} nft
