@@ -281,7 +281,7 @@ module interest_lsd::pool {
       // Point the next_validator to the next one
       next_validator = linked_table::next(&storage.validators_table, validator_address);
     };
- 
+
     // We update the total Sui (principal + rewards) 
     rebase::set_elastic(&mut storage.pool, total_rewards + storage.total_principal);
     // Update the last_epoch
@@ -307,7 +307,8 @@ module interest_lsd::pool {
   ): Coin<ISUI> {
     let sui_amount = coin::value(&asset);
     
-    let shares = mint_isui_logic(wrapper, storage, interest_sui_storage, asset, validator_address, ctx);
+    let shares = mint_isui_logic(wrapper, storage, asset, validator_address, ctx);
+    let total_principal = linked_table::borrow(&storage.validators_table, validator_address).total_principal;
 
     let shares_to_mint = if (is_whitelisted(storage, validator_address)) {
       shares
@@ -315,7 +316,7 @@ module interest_lsd::pool {
       charge_isui_mint(
         storage, 
         interest_sui_storage, 
-        linked_table::borrow(&storage.validators_table, validator_address).total_principal, 
+        total_principal, 
         shares, 
         ctx
       )
@@ -396,7 +397,7 @@ module interest_lsd::pool {
     let nft = isui_yn::mint(
       interest_sui_yn_storage, 
       sui_amount,
-      mint_isui_logic(wrapper, storage, interest_sui_storage, asset, validator_address, ctx), 
+      mint_isui_logic(wrapper, storage, asset, validator_address, ctx), 
       ctx
     );
 
@@ -407,13 +408,15 @@ module interest_lsd::pool {
       validator: validator_address 
     });
 
+    let total_principal = linked_table::borrow(&storage.validators_table, validator_address).total_principal;
+
     let sui_amount = if (is_whitelisted(storage, validator_address)) { 
       sui_amount 
     } else {
       charge_isui_pc_mint(
         storage, 
         interest_sui_storage, 
-        linked_table::borrow(&storage.validators_table, validator_address).total_principal, 
+        total_principal, 
         sui_amount, 
         ctx        
       )
@@ -660,7 +663,6 @@ module interest_lsd::pool {
   fun mint_isui_logic(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    interest_sui_storage: &mut InterestSuiStorage,
     asset: Coin<SUI>,
     validator_address: address,
     ctx: &mut TxContext,    

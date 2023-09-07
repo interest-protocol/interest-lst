@@ -28,7 +28,7 @@ module interest_lsd::admin {
       );
   }
 
- /**
+  /**
   * @dev It gives the admin rights to the recipient. 
   * @param admin_cap The AdminCap that will be transferred
   * @recipient the new admin address

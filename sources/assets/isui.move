@@ -116,7 +116,7 @@ module interest_lsd::isui {
     public entry fun update_symbol(
         _: &AdminCap, storage: &InterestSuiStorage, metadata: &mut CoinMetadata<ISUI>, symbol: ascii::String
     ) {
-       coin::update_symbol(&storage.treasury_cap, metadata, symbol)
+      coin::update_symbol(&storage.treasury_cap, metadata, symbol)
     }
 
     /// Update the description of the coin in `CoinMetadata`

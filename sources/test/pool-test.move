@@ -120,7 +120,7 @@ module interest_lsd::pools_test {
 
   #[test]
   fun test_mint_isui_multiple_stakes_one_validator() {
-   let scenario = scenario();
+    let scenario = scenario();
 
     let test = &mut scenario;
 
@@ -174,9 +174,9 @@ module interest_lsd::pools_test {
 
   #[test]
   fun test_mint_isui_multiple_stakes_multiple_validators() {
-   let scenario = scenario();
+    let scenario = scenario();
 
-   let test = &mut scenario;
+    let test = &mut scenario;
 
     init_test(test);
 
@@ -190,7 +190,7 @@ module interest_lsd::pools_test {
     // Pay Rewards
     advance_epoch_with_reward_amounts(0, 100, test);
     // Advance once more so our module registers in the next call
-     advance_epoch_with_reward_amounts(0, 100, test);
+    advance_epoch_with_reward_amounts(0, 100, test);
 
     mint_isui(test, FIGMENT,  JOSE, 10);
     mint_isui(test, MYSTEN_LABS, alice, 20);
@@ -239,9 +239,9 @@ module interest_lsd::pools_test {
 
   #[test]
   fun test_burn_isui() {
-   let scenario = scenario();
+    let scenario = scenario();
 
-   let test = &mut scenario;
+    let test = &mut scenario;
 
     init_test(test);
 
@@ -480,9 +480,9 @@ module interest_lsd::pools_test {
       test::return_shared(pool_storage);
     };
     test::end(scenario);
- }
+  }
 
-   #[test]
+  #[test]
   fun test_burn_isui_yc() {
     let scenario = scenario();
 
@@ -543,7 +543,7 @@ module interest_lsd::pools_test {
     test::end(scenario);
 }  
 
-   #[test]
+  #[test]
   fun test_quote_isui_yn() {
     let scenario = scenario();
 
