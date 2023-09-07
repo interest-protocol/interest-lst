@@ -1,7 +1,6 @@
 /// This module provide an incentive mechanism to encourage users to improve decentralization
 /// by getting informed on validators and rating them
 /// The validator which gets the most points during a period will be whitelisted removing fees for stakers
-/// Users will be able to redeem points for rewards
 
 module interest_lsd::review {
   use std::vector;
@@ -9,13 +8,11 @@ module interest_lsd::review {
 
   use sui::transfer;
   use sui::event::{emit};
-  use sui::coin::{Self, Coin};
   use sui::object::{Self, UID, ID};
   use sui::tx_context::{Self, TxContext};
   use sui::table::{Self, Table};
 
   use interest_lsd::isui_yn::{Self, ISuiYield};
-  use interest_lsd::isui::ISUI;
   use interest_lsd::admin::AdminCap;
 
   const ECannotReviewWithNft: u64 = 0;
@@ -24,11 +21,13 @@ module interest_lsd::review {
 
   struct Review has store, drop {
     stars: u64, // 100, 200, 300, 400, 500 -> [0,5] with 2 decimals 
-    comment: String, // max 140 characters
+    comment: String, // max 140 
+    power:  u64 // Power is given by NFT principal * stars
   }
 
   struct Validator has store {
     average_stars: u64,
+    average_power: u64,
     review_numbers: u64,
     reviews: Table<address, Review>, // user address
   }
@@ -36,6 +35,7 @@ module interest_lsd::review {
   struct TopValidator has store, copy, drop {
     validator_address: address,
     average_stars: u64,
+    average_power: u64
   }
 
   // ** Shared
@@ -44,14 +44,12 @@ module interest_lsd::review {
     id: UID,
     total_stars: u64,
     total_reviews: u64,
-    total_points: u64,
     cooldown_epochs: u64, // the number of epoch for which the nft cannot be used to review
     epoch_review_for_nft: Table<ID, u64>, // the epoch at which the nft was used to review
     validators_reviews: Table<address, Validator>, // validator address
     top_number: u64, // how many validators will be whitelisted
     top_threshold: TopValidator, // the lowest validator's rating in the top 
-    top_validators: vector<TopValidator>,
-    rewards: Coin<ISUI> // transferred from & to pool dao_coin
+    top_validators: vector<TopValidator>
   }
 
   // ** Events
@@ -69,14 +67,12 @@ module interest_lsd::review {
       id: object::new(ctx),
       total_stars: 0,
       total_reviews: 0,
-      total_points: 0,
       cooldown_epochs: 0,
       epoch_review_for_nft: table::new(ctx),
       validators_reviews: table::new(ctx),
       top_number: 0,
-      top_threshold: TopValidator {validator_address: @0x0, average_stars: 0},
+      top_threshold: TopValidator {validator_address: @0x0, average_stars: 0, average_power: 0},
       top_validators: vector::empty(),
-      rewards: coin::zero<ISUI>(ctx),
     })
   }
 
@@ -106,8 +102,10 @@ module interest_lsd::review {
     let last_epoch = table::borrow(&reviews.epoch_review_for_nft, nft_id);
 
     assert!(current_epoch > *last_epoch + reviews.cooldown_epochs, ECannotReviewWithNft);
+
+    let (power, _) = isui_yn::read_nft(nft);
     
-    let review = create_review(stars, comment);
+    let review = create_review(stars, power, comment);
     update_validators(reviews, review.stars, validator_address);
 
     let new_epoch = table::borrow_mut(&mut reviews.epoch_review_for_nft, nft_id);
@@ -145,8 +143,10 @@ module interest_lsd::review {
     let last_epoch = table::borrow(&reviews.epoch_review_for_nft, nft_id);
 
     assert!(current_epoch > *last_epoch + reviews.cooldown_epochs, ECannotReviewWithNft);
+
+    let (power, _) = isui_yn::read_nft(nft);
     
-    let review = create_review(stars, comment);
+    let review = create_review(stars, power, comment);
     update_validators(reviews, review.stars, validator_address);
 
     let new_epoch = table::borrow_mut(&mut reviews.epoch_review_for_nft, nft_id);
@@ -170,8 +170,6 @@ module interest_lsd::review {
   // public fun remove(ctx: &mut TxContext) {}
 
   // ** Top
-
-  // ** Rewards
 
   // ** (Admin only) Set Parameters 
 
@@ -234,13 +232,13 @@ module interest_lsd::review {
   * @param comment: a string of maximum 140 characters
   * @return the review
   */
-  fun create_review(stars: u64, comment: String): Review {
+  fun create_review(stars: u64, power: u64, comment: String): Review {
     // verify stars = [0,5] and comment length <= 140
     assert!(stars <= 5, EWrongStarNumber);
     assert!(string::length(&comment) <= 140, ECommentTooLong);
 
     // return review
-    Review { stars: stars * 100, comment }
+    Review { stars: stars * 100, comment, power }
   }
 
   // @dev This updates the top validators vector and the validator related data in both top list and reviews
@@ -258,7 +256,7 @@ module interest_lsd::review {
 
     // modify top
     let top = reviews.top_validators;
-    let prev_key = TopValidator {validator_address, average_stars: validator.average_stars};
+    let prev_key = TopValidator {validator_address, average_stars: validator.average_stars, average_power: 0};
     let top_len = vector::length(&reviews.top_validators);
     let threshold = reviews.top_threshold;
 
@@ -269,13 +267,13 @@ module interest_lsd::review {
       top_v.average_stars = average_stars;
     } else if (top_len < reviews.top_number) {
       // if the list isn't full we add it
-      vector::push_back(&mut reviews.top_validators, TopValidator { validator_address, average_stars });
+      vector::push_back(&mut reviews.top_validators, TopValidator { validator_address, average_stars, average_power: 0 });
     } else if (average_stars > threshold.average_stars) {
       // if the new is higher than threshold we remove the lowest validator and add new
       // we also have to find the new threshold
       let i = 0;
       let to_remove: u64 = 0;
-      let new_threshold = TopValidator { validator_address: @0x0, average_stars: 500 };
+      let new_threshold = TopValidator { validator_address: @0x0, average_stars: 500, average_power: 0 };
       while (i < top_len) {
         let top_v = vector::borrow(&top, i);
         if (top_v == &threshold) { to_remove = i };
