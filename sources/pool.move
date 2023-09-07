@@ -35,11 +35,11 @@ module interest_lsd::pool {
 
   // ** Errors
 
-  const INVALID_FEE: u64 = 0; // All values inside the Fees Struct must be equal or below 1e18 as it represents 100%
-  const INVALID_STAKE_AMOUNT: u64 = 1; // Users need to stake more than 1 MIST as the sui_system will throw 0 value stakes
-  const INVALID_UNSTAKE_AMOUNT: u64 = 2; // The sender tried to unstake more than he is allowed 
-  const INVALID_NFT_BURN_AMOUNT: u64 = 3; // We do not allow users to burn their ISuiYield for 0 rewards
-  const INVALID_SPLIT_AMOUNT: u64 = 4; 
+  const EInvalidFee: u64 = 0; // All values inside the Fees Struct must be equal or below 1e18 as it represents 100%
+  const EInvalidStakeAmount: u64 = 1; // Users need to stake more than 1 MIST as the sui_system will throw 0 value stakes
+  const EInvalidUnstakeAmount: u64 = 2; // The sender tried to unstake more than he is allowed 
+  const EInvalidNFTBurnAmount: u64 = 3; // We do not allow users to burn their ISuiYield for 0 rewards
+  const EInvalidSplitAmount: u64 = 4; 
 
   // ** Structs
 
@@ -363,7 +363,7 @@ module interest_lsd::pool {
     // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
     // The user withdraw 1 Sui Above what he wishes to withdraw to guarantee that we can re-stake the rewards
     // If we allow more than 1 Sui, a user can grief the module and force a re-stake of all {StakedSui} preventing the module ot earn rewards
-    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, INVALID_UNSTAKE_AMOUNT);
+    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, EInvalidUnstakeAmount);
 
     emit(BurnISui { sender: tx_context::sender(ctx), sui_amount: sui_value_to_return, isui_amount });
 
@@ -407,8 +407,6 @@ module interest_lsd::pool {
       nft_id: object::id(&nft), 
       validator: validator_address 
     });
-
-    let total_principal = linked_table::borrow(&storage.validators_table, validator_address).total_principal;
 
     let sui_amount = if (is_whitelisted(storage, validator_address)) { 
       sui_amount 
@@ -459,7 +457,7 @@ module interest_lsd::pool {
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
     // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
-    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, INVALID_UNSTAKE_AMOUNT);
+    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, EInvalidUnstakeAmount);
 
     // We need to update the pool
     rebase::sub_elastic(&mut storage.pool, sui_value_to_return, false);
@@ -492,7 +490,7 @@ module interest_lsd::pool {
     let sui_amount = quote_isui_yn(wrapper, storage, &nft, ctx);
 
     // It does not make sense to burn for 0 rewards
-    assert!(sui_amount != 0, INVALID_NFT_BURN_AMOUNT);
+    assert!(sui_amount != 0, EInvalidNFTBurnAmount);
 
     // We need to update the pool
     rebase::sub_elastic(&mut storage.pool, sui_amount, false);
@@ -500,7 +498,7 @@ module interest_lsd::pool {
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
     // Sender must Unstake more than his principal to ensure that the leftover is above the threshold of 1 Sui
-    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_amount, INVALID_UNSTAKE_AMOUNT);
+    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_amount, EInvalidUnstakeAmount);
 
     emit(BurnISuiYN { nft_id: object::id(&nft), sui_amount, sender: tx_context::sender(ctx) });
 
@@ -539,7 +537,7 @@ module interest_lsd::pool {
   ): ISuiYield {
     let sui_amount = quote_isui_yn(wrapper, storage, self, ctx);
     
-    assert!(split_amount != 0 && sui_amount > split_amount && sui_amount != 0, INVALID_SPLIT_AMOUNT);
+    assert!(split_amount != 0 && sui_amount > split_amount && sui_amount != 0, EInvalidSplitAmount);
 
     let factor = (MIN_STAKING_THRESHOLD as u256);
 
@@ -557,7 +555,7 @@ module interest_lsd::pool {
     let (principal_1, shares_1) = isui_yn::read_nft(&new_nft);
 
     // Should pass
-    assert!(principal_0 + principal_1 == principal && shares_0 + shares_1 == shares, INVALID_SPLIT_AMOUNT);
+    assert!(principal_0 + principal_1 == principal && shares_0 + shares_1 == shares, EInvalidSplitAmount);
 
     new_nft
   }
@@ -619,7 +617,7 @@ module interest_lsd::pool {
   ) {
     let max = scalar();
     // scalar represents 100% - the protocol does not allow a fee higher than that.
-    assert!(max >= base && max >= kink && max >= jump, INVALID_FEE);
+    assert!(max >= base && max >= kink && max >= jump, EInvalidFee);
 
     // Update the fee values
     set_fee(&mut storage.fee, base, kink, jump);
@@ -671,7 +669,7 @@ module interest_lsd::pool {
     let stake_value = coin::value(&asset);
 
     // Will save gas since the sui_system will throw
-    assert!(stake_value >= MIN_STAKING_THRESHOLD, INVALID_STAKE_AMOUNT);
+    assert!(stake_value >= MIN_STAKING_THRESHOLD, EInvalidUnstakeAmount);
     
     // Need to update the entire state of Sui/Sui Rewards once every epoch
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost

@@ -15,7 +15,7 @@ module interest_lsd::admin {
     admin: address
   }
 
-  const ERROR_NO_ZERO_ADDRESS: u64 = 0;
+  const ENoZeroAddress: u64 = 0;
 
   fun init(ctx: &mut TxContext) {
 
@@ -37,7 +37,7 @@ module interest_lsd::admin {
   *
   */
   entry public fun transfer_admin(admin_cap: AdminCap, recipient: address) {
-    assert!(recipient != @0x0, ERROR_NO_ZERO_ADDRESS);
+    assert!(recipient != @0x0, ENoZeroAddress);
     transfer::transfer(admin_cap, recipient);
 
     emit(NewAdmin {
