@@ -70,7 +70,7 @@ C --> E((2 Sui))
 
 ## Repo Structure
 
-- **pool.move:** It mints/burns the LSD Coins
+- **pool.move:** It mints/burns the LSD Assets
 
 - **admin.move:** It contains the logic to manage the AdminCap
 
@@ -80,7 +80,7 @@ C --> E((2 Sui))
 
 - **coins:** It contains the Coins that {pool.move} mint and burn
 
-## Technical Overview
+## Portfolio Logic
 
 The Interest LSD portfolio is managed by the **Rebase struct**. It is stored in the **PoolStorage** shared object under **pool**.
 
@@ -94,6 +94,55 @@ The Interest LSD portfolio is managed by the **Rebase struct**. It is stored in 
 > 10 iSui is worth 12 Sui - _10 \* 1200 / 1000_
 >
 > 10 Sui is worth ~8.3 iSui - _10 \* 1000 / 1200_
+
+## ISui Yield NFT
+
+```move
+
+  struct ISuiYield has key, store {
+    id: UID,
+    img_url: String,
+    principal: u64,
+    shares: u64
+  }
+
+```
+
+The ISuiYield struct is a composable NFT. Each NFT can be instantly redeemed to Sui. Therefore, they can be merged and split together. We can easily build an AMM by merging all ISuiYield into one and relying on the function join and split for all operations:
+
+Join:
+
+- Swap in ISuiYield for WETH
+- Add Liquidity
+
+Split:
+
+- Swap WETH for ISuiYield
+- Remove Liquidity
+
+**Join**
+
+```mermaid
+
+graph LR
+
+A[NFT - 10 Sui] --> C
+
+B[NFT - 2 Sui] --> C
+C[NFT - 12 Sui]
+```
+
+**Split**
+
+```mermaid
+
+graph LR
+
+A[NFT - 10 Sui]
+
+A --> B[NFT - 8 Sui]
+A --> C[NFT - 2 Sui]
+```
 
 ## Contact Us
 

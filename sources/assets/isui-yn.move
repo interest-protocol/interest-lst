@@ -28,7 +28,7 @@ module interest_lsd::isui_yn {
   // OTW to create the Interest Sui LSD
   struct ISUI_YN has drop {}
 
-  // Treasury Cap Wrapper
+  // Display Wrapper + img_url controller
   struct InterestSuiYNStorage has key {
     id: UID,
     display: Display<ISuiYield>,

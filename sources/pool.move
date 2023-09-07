@@ -308,15 +308,15 @@ module interest_lsd::pool {
     let sui_amount = coin::value(&asset);
     
     let shares = mint_isui_logic(wrapper, storage, asset, validator_address, ctx);
-    let total_principal = linked_table::borrow(&storage.validators_table, validator_address).total_principal;
 
     let shares_to_mint = if (is_whitelisted(storage, validator_address)) {
       shares
     } else {
+      let validator_principal = linked_table::borrow(&storage.validators_table, validator_address).total_principal;
       charge_isui_mint(
         storage, 
         interest_sui_storage, 
-        total_principal, 
+        validator_principal, 
         shares, 
         ctx
       )
@@ -397,7 +397,7 @@ module interest_lsd::pool {
     let nft = isui_yn::mint(
       interest_sui_yn_storage, 
       sui_amount,
-      mint_isui_logic(wrapper, storage, asset, validator_address, ctx), 
+      mint_isui_logic(wrapper, storage,asset, validator_address, ctx), 
       ctx
     );
 
@@ -413,10 +413,11 @@ module interest_lsd::pool {
     let sui_amount = if (is_whitelisted(storage, validator_address)) { 
       sui_amount 
     } else {
+      let validator_principal = linked_table::borrow(&storage.validators_table, validator_address).total_principal;
       charge_isui_pc_mint(
         storage, 
         interest_sui_storage, 
-        total_principal, 
+        validator_principal, 
         sui_amount, 
         ctx        
       )
@@ -538,7 +539,7 @@ module interest_lsd::pool {
   ): ISuiYield {
     let sui_amount = quote_isui_yn(wrapper, storage, self, ctx);
     
-    assert!(split_amount != 0 || sui_amount > split_amount, INVALID_SPLIT_AMOUNT);
+    assert!(split_amount != 0 && sui_amount > split_amount && sui_amount != 0, INVALID_SPLIT_AMOUNT);
 
     let factor = (MIN_STAKING_THRESHOLD as u256);
 
@@ -556,8 +557,7 @@ module interest_lsd::pool {
     let (principal_1, shares_1) = isui_yn::read_nft(&new_nft);
 
     // Should pass
-    assert!(principal_0 + principal_1 == principal, INVALID_SPLIT_AMOUNT);
-    assert!(shares_0 + shares_1 == shares, INVALID_SPLIT_AMOUNT);
+    assert!(principal_0 + principal_1 == principal && shares_0 + shares_1 == shares, INVALID_SPLIT_AMOUNT);
 
     new_nft
   }
@@ -845,17 +845,10 @@ module interest_lsd::pool {
     ): u64 {
     
     // Find the fee % based on the validator dominance and fee parameters.  
-    let fee = calculate_fee_percentage(
-      &storage.fee,
-      (validator_principal as u256),
-      (storage.total_principal as u256)
-    );
+    let fee_amount = calc_fee(storage, validator_principal, shares);
 
     // If the fee is zero, there is nothing else to do
-    if (fee == 0) return shares;
-
-    // Calculate fee
-    let fee_amount = (fmul((shares as u256), fee) as u64);
+    if (fee_amount == 0) return shares;
 
     // Mint the ISUI for the DAO. We need to make sure the total supply of ISUI is consistent with the pool shares
     coin::join(&mut storage.dao_coin, isui::mint(interest_sui_storage, fee_amount, ctx));
@@ -880,17 +873,10 @@ module interest_lsd::pool {
     ): u64 {
     
     // Find the fee % based on the validator dominance and fee parameters.  
-    let fee = calculate_fee_percentage(
-      &storage.fee,
-      (validator_principal as u256),
-      (storage.total_principal as u256)
-    );
+    let fee_amount = calc_fee(storage, validator_principal, amount);
 
     // If the fee is zero, there is nothing else to do
-    if (fee == 0) return amount;
-
-    // Calculate fee
-    let fee_amount = (fmul((amount as u256), fee) as u64);
+    if (fee_amount == 0) return amount;
 
     // Mint the ISUI for the DAO. We need to make sure the total supply of ISUI is consistent with the pool shares
     coin::join(&mut storage.dao_coin, isui::mint(
@@ -901,6 +887,29 @@ module interest_lsd::pool {
 
     // Return the shares amount to mint to the sender
     amount - fee_amount
+  }
+
+  // Core fee calculation logic
+  /*
+  * @storage: The Pool Storage Shared Object (this module)
+  * @validator_principal The amount of Sui principal deposited to the validator
+  * @amount The amount being minted
+  * @return u64 The fee amount
+  */
+  fun calc_fee(
+    storage: &mut PoolStorage,
+    validator_principal: u64,
+    amount: u64,
+  ): u64 {
+    // Find the fee % based on the validator dominance and fee parameters.  
+    let fee = calculate_fee_percentage(
+      &storage.fee,
+      (validator_principal as u256),
+      (storage.total_principal as u256)
+    );
+
+    // Calculate fee
+    (fmul((amount as u256), fee) as u64)
   }
 
   // @dev Adds a Validator to the linked_list
