@@ -3,7 +3,7 @@
 /// The validator which gets the most points during a period will be whitelisted removing fees for stakers
 /// Users will be able to redeem points for rewards
 
-module interest_lsd::points {
+module interest_lsd::review {
   use std::vector;
   use std::string::{Self, String};
 
@@ -21,8 +21,6 @@ module interest_lsd::points {
   const ECannotReviewWithNft: u64 = 0;
   const EWrongStarNumber: u64 = 1;
   const ECommentTooLong: u64 = 2;
-
-  const BILLION: u64 = 1_000_000_000;
 
   struct Review has store, drop {
     stars: u64, // 100, 200, 300, 400, 500 -> [0,5] with 2 decimals 
