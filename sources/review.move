@@ -104,7 +104,7 @@ module interest_lsd::review {
 
     assert!(current_epoch > *last_epoch + reviews.cooldown_epochs, ECannotReviewWithNft);
 
-    let (power, _) = isui_yn::read_nft(nft);
+    let (power, _) = sui_yield::read(nft);
     
     let review = create_review(stars, power, comment);
     update_validators(reviews, review.stars, validator_address);
@@ -145,7 +145,7 @@ module interest_lsd::review {
 
     assert!(current_epoch > *last_epoch + reviews.cooldown_epochs, ECannotReviewWithNft);
 
-    let (power, _) = isui_yn::read_nft(nft);
+    let (power, _) = sui_yield::read(nft);
     
     let review = create_review(stars, power, comment);
     update_validators(reviews, review.stars, validator_address);

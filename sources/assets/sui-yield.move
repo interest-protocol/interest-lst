@@ -38,14 +38,14 @@ module interest_lsd::sui_yield {
   // ** Events
 
   struct Mint has copy, drop {
-    nft_id: ID,
+    sui_yield_id: ID,
     shares: u64,
     principal: u64,
     sender: address
   }
 
   struct Burn has copy, drop {
-    nft_id: ID,
+    sui_yield_id: ID,
     shares: u64,
     principal: u64,
     sender: address
@@ -91,11 +91,11 @@ module interest_lsd::sui_yield {
   * @return SuiYield
   */
   public(friend) fun mint(principal: u64, shares: u64, ctx: &mut TxContext): SuiYield {
-    let nft_id = object::new(ctx);
-    emit(Mint { nft_id: *object::uid_as_inner(&nft_id), principal, shares , sender: tx_context::sender(ctx) });
+    let id = object::new(ctx);
+    emit(Mint { sui_yield_id: *object::uid_as_inner(&id), principal, shares , sender: tx_context::sender(ctx) });
     
     SuiYield {
-      id: nft_id,
+      id,
       principal,
       shares,
       is_clean: true
@@ -110,7 +110,7 @@ module interest_lsd::sui_yield {
   public(friend) fun burn(nft: SuiYield, ctx: &mut TxContext): (u64, u64) {
     emit(
       Burn { 
-      nft_id: *object::uid_as_inner(&nft.id), 
+      sui_yield_id: *object::uid_as_inner(&nft.id), 
       principal: nft.principal, 
       shares: nft.shares , 
       sender: tx_context::sender(ctx) 
