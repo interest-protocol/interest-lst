@@ -44,15 +44,15 @@ B -- Principal + Yield --> C((12 Sui))
 
 ```mermaid
 graph LR
-A((10 Sui)) -- Principal --> B((iSui-PC))
-A -- Yield --> C[iSui-YN]
+A((10 Sui)) -- Principal --> B((iStaked Sui))
+A -- Yield --> C[SuiYield]
 B --> D((10 Sui))
 C --> E((2 Sui))
 ```
 
-- iSui-PC (Interest Sui Principal Coin): It tracks the principal portion of a stake. This coin is always equal to Sui.
+- SSUI (Interest Staked Sui Coin): It tracks the principal of a Native Staked Sui Object. This coin is always equal to Sui.
 
-- iSui-YN (Interest Sui Yield NFT): It tracks the rewards portion of a stake. This NFT Sui value grows over time.
+- SuiYield: It is a fungible yield bearing asset that tracks the yield portion of a Native Staked Sui Object.
 
 > Selling any of these assets, means selling the entire position. They
 > do not require any other object to mint/burn and are the module does not keep track of addresses. Therefore, they are
@@ -95,29 +95,29 @@ The Interest LSD portfolio is managed by the **Rebase struct**. It is stored in 
 >
 > 10 Sui is worth ~8.3 iSui - _10 \* 1000 / 1200_
 
-## ISui Yield NFT
+## Sui Yield
 
 ```move
 
-  struct ISuiYield has key, store {
+  struct SuiYield has key, store {
     id: UID,
-    img_url: String,
     principal: u64,
-    shares: u64
+    shares: u64,
+    is_clean: bool
   }
 
 ```
 
-The ISuiYield struct is a composable NFT. Each NFT can be instantly redeemed to Sui. Therefore, they can be merged and split together. We can easily build an AMM by merging all ISuiYield into one and relying on the function join and split for all operations:
+The SuiYield is a fungible asset. It can be redeemed to Sui, therefore, it can be merged and split. We can easily build an AMM by merging all SuiYield into one and relying on the function join and split for all other operations:
 
 Join:
 
-- Swap in ISuiYield for WETH
+- Swap in SuiYield for WETH
 - Add Liquidity
 
 Split:
 
-- Swap WETH for ISuiYield
+- Swap WETH for SuiYield
 - Remove Liquidity
 
 **Join**
@@ -126,10 +126,10 @@ Split:
 
 graph LR
 
-A[NFT - 10 Sui] --> C
+A[SuiYield - 10 Sui] --> C
 
-B[NFT - 2 Sui] --> C
-C[NFT - 12 Sui]
+B[SuiYield - 2 Sui] --> C
+C[SuiYield - 12 Sui]
 ```
 
 **Split**
@@ -138,11 +138,16 @@ C[NFT - 12 Sui]
 
 graph LR
 
-A[NFT - 10 Sui]
+A[SuiYield - 10 Sui]
 
-A --> B[NFT - 8 Sui]
-A --> C[NFT - 2 Sui]
+A --> B[SuiYield - 8 Sui]
+A --> C[SuiYield - 2 Sui]
 ```
+
+## Authors
+
+- [JMVC](https://twitter.com/josemvcerqueira)
+- [Thouny](https://twitter.com/BL0CKRUNNER)
 
 ## Contact Us
 
