@@ -528,7 +528,7 @@ module interest_lsd::pool {
   * @param split_amount The Sui amount to be assigned to the new NFT
   * @return SuiYield with the remaining amount
   */
-  public fun split_nft(
+  public fun split_sui_yield(
     storage: &mut PoolStorage, 
     self: &mut SuiYield, 
     split_amount: u64,
