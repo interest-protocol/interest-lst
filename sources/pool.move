@@ -1,3 +1,4 @@
+// @Authors - JMVC <> Thouny
 // This contract manages the minting/burning of iSUi Coins and staking/unstaking Sui in Validators
 // ISUI is a share of the total SUI principal + rewards this module owns
 // ISUI_PC is always 1 SUI as it represents the principal owned by this module
