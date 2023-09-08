@@ -130,7 +130,7 @@ module interest_lsd::isui_yn {
       sender: tx_context::sender(ctx) 
       }
     );
-    let ISuiYield {id, img_url: _, principal, shares,  is_frozen} = nft;
+    let ISuiYield {id, img_url: _, principal, shares,  is_frozen: _} = nft;
     object::delete(id);
     (principal, shares)
   }
@@ -164,7 +164,7 @@ module interest_lsd::isui_yn {
   /// ** Freeze Mechanism
   
   // @dev It allows a holder to freeze it's NFT. Other modules can check if the NFT is frozen to prevent it from being burned
-  // freeze is a restricted name
+  // freeze is a restricted function name
   /*
   * @param nft The NFT that will be frozen
   */
