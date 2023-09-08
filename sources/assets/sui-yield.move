@@ -22,7 +22,7 @@ module interest_lsd::sui_yield {
     id: UID,
     principal: u64,
     shares: u64,
-      /// ** Clean Mechanism. When is_clean is false, this NFT might have a rewards saved in a dynamic field. It is a UX mechanism to instruct developers to verify with the user if they want to first check their rewards before burning/joining/splitting. It is not enforced in any way.
+    /// ** Clean Mechanism. When is_clean is false, this NFT might have a rewards saved in a dynamic field. It is a UX mechanism to instruct developers to verify with the user if they want to first check their rewards before burning/joining/splitting. It is not enforced in any way.
     is_clean: bool
   }
 
