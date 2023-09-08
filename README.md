@@ -44,7 +44,7 @@ B -- Principal + Yield --> C((12 Sui))
 
 ```mermaid
 graph LR
-A((10 Sui)) -- Principal --> B((iStaked Sui))
+A((10 Sui)) -- Principal --> B((isSui))
 A -- Yield --> C[SuiYield]
 B --> D((10 Sui))
 C --> E((2 Sui))
