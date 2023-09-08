@@ -22,6 +22,7 @@ module interest_lsd::sui_yield {
     id: UID,
     principal: u64,
     shares: u64,
+      /// ** Clean Mechanism. When is_clean is false, this NFT might have a rewards saved in a dynamic field. It is a UX mechanism to instruct developers to verify with the user if they want to first check their rewards before burning/joining/splitting. It is not enforced in any way.
     is_clean: bool
   }
 
@@ -60,8 +61,8 @@ module interest_lsd::sui_yield {
       ];
 
       let values = vector[
-        utf8(b"iSui Yield NFT"),
-        utf8(b"iSUI-YN"),
+        utf8(b"Sui Yield"),
+        utf8(b"SUIY"),
         utf8(b"This NFT accrues Sui rewards from Interest LSD"),
         utf8(b"https://www.interestprotocol.com"),
         utf8(b"ipfs://TODO"),
@@ -85,9 +86,9 @@ module interest_lsd::sui_yield {
   /**
   * @dev Only friend packages can mint SUI_YIELD
   * @param storage The InterestSuiYNStorage
-  * @param principal The iSUI_PC minted in conjunction with this NFT
+  * @param principal The SUI_YIELD minted in conjunction with this NFT
   * @param shares The iSUI assigned to this NFT
-  * @return ISuiYield 
+  * @return SuiYield
   */
   public(friend) fun mint(principal: u64, shares: u64, ctx: &mut TxContext): SuiYield {
     let nft_id = object::new(ctx);
@@ -133,10 +134,10 @@ module interest_lsd::sui_yield {
 
   /// ** UID Access 
 
-  /// ISuiYield UID to allow reading dynamic fields.
+  /// SuiYield UID to allow reading dynamic fields.
   public fun uid(nft: &SuiYield): &UID { &nft.id }
 
-  /// Expose mutable access to the ISuiYield `UID` to allow extensions.
+  /// Expose mutable access to the SuiYield `UID` to allow extensions.
   public fun uid_mut(nft: &mut SuiYield): &mut UID { 
     // If anyone ever calls this function, we assume it has a dynamic field.
     nft.is_clean = false;
@@ -144,20 +145,10 @@ module interest_lsd::sui_yield {
   }
 
   /**
-  * @dev It reads the shares and principal associated with an {ISuiYield} nft
+  * @dev It reads the shares and principal associated with an {SuiYield} nft
   */
   public fun read(nft: &SuiYield):(u64, u64) {
     (nft.principal, nft.shares)
-  }
-
-  /// ** Clean Mechanism. When is_clean is false, this NFT might have a rewards saved in a dynamic field. It is a UX mechanism to instruct developers to verify with the user if they want to first check their rewards before burning/joining/splitting. It is not enforced in any way.
-
-  // @dev It allows any caller to check if an NFT is clean
-  /*
-  * @param nft The NFT in question
-  */
-  public fun is_clean(nft: &SuiYield): bool {
-    nft.is_clean
   }
 
   /**
