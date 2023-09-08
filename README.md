@@ -50,7 +50,7 @@ B --> D((10 Sui))
 C --> E((2 Sui))
 ```
 
-- SSUI (Interest Staked Sui Coin): It tracks the principal of a Native Staked Sui Object. This coin is always equal to Sui.
+- isSUI (Interest Staked Sui Coin): It tracks the principal of a Native Staked Sui Object. This coin is always equal to Sui.
 
 - SuiYield: It is a fungible yield bearing asset that tracks the yield portion of a Native Staked Sui Object.
 
