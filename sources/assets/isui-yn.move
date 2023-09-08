@@ -22,7 +22,8 @@ module interest_lsd::isui_yn {
     id: UID,
     img_url: String,
     principal: u64,
-    shares: u64
+    shares: u64,
+    is_frozen: bool
   }
 
   // OTW to create the Interest Sui LSD
@@ -48,6 +49,16 @@ module interest_lsd::isui_yn {
     nft_id: ID,
     shares: u64,
     principal: u64,
+    sender: address
+  }
+
+  struct Freeze has copy, drop {
+    nft_id: ID,
+    sender: address
+  }
+
+  struct Unfreeze has copy, drop {
+    nft_id: ID,
     sender: address
   }
 
@@ -100,7 +111,8 @@ module interest_lsd::isui_yn {
       id: nft_id,
       img_url: storage.img_url,
       principal,
-      shares
+      shares,
+      is_frozen: false
     }
   }
 
@@ -118,7 +130,7 @@ module interest_lsd::isui_yn {
       sender: tx_context::sender(ctx) 
       }
     );
-    let ISuiYield {id, img_url: _, principal, shares} = nft;
+    let ISuiYield {id, img_url: _, principal, shares,  is_frozen: _} = nft;
     object::delete(id);
     (principal, shares)
   }
@@ -134,7 +146,7 @@ module interest_lsd::isui_yn {
     nft.shares = shares;
   }
 
-  /// === UID Access ===
+  /// ** UID Access 
 
   /// ISuiYield UID to allow reading dynamic fields.
   public fun uid(nft: &ISuiYield): &UID { &nft.id }
@@ -147,6 +159,35 @@ module interest_lsd::isui_yn {
   */
   public fun read_nft(nft: &ISuiYield):(u64, u64) {
     (nft.principal, nft.shares)
+  }
+
+  /// ** Freeze Mechanism
+  
+  // @dev It allows a holder to freeze it's NFT. Other modules can check if the NFT is frozen to prevent it from being burned
+  // freeze is a restricted function name
+  /*
+  * @param nft The NFT that will be frozen
+  */
+  public fun freeze_nft(nft: &mut ISuiYield, ctx: &mut TxContext) {
+    nft.is_frozen = true;
+    emit(Freeze { nft_id: *object::uid_as_inner(&nft.id), sender: tx_context::sender(ctx) });
+  }
+
+  // @dev It allows a holder to unfreeze its NFT.
+  /*
+  * @param nft The NFT that will be unfrozen
+  */
+  public fun unfreeze(nft: &mut ISuiYield, ctx: &mut TxContext) {
+    nft.is_frozen = false;
+    emit(Unfreeze { nft_id: *object::uid_as_inner(&nft.id), sender: tx_context::sender(ctx) });
+  }
+
+  // @dev It allows any caller to check if the NFT is frozen
+  /*
+  * @param nft The NFT in question
+  */
+  public fun is_frozen(nft: &ISuiYield): bool {
+    nft.is_frozen
   }
 
   /**
@@ -195,13 +236,14 @@ module interest_lsd::isui_yn {
         id: object::new(ctx),
         img_url: utf8(b""),
         principal,
-        shares
+        shares,
+        is_frozen: false
     }
   }
 
   #[test_only]
   public fun burn_for_testing(nft: ISuiYield) {
-    let ISuiYield {id, img_url: _, principal: _, shares: _} = nft;
+    let ISuiYield {id, img_url: _, principal: _, shares: _, is_frozen: _} = nft;
     object::delete(id);
   }
 }

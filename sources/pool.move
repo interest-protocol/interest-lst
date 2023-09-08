@@ -41,6 +41,9 @@ module interest_lsd::pool {
   const EInvalidUnstakeAmount: u64 = 2; // The sender tried to unstake more than he is allowed 
   const EInvalidNFTBurnAmount: u64 = 3; // We do not allow users to burn their ISuiYield for 0 rewards
   const EInvalidSplitAmount: u64 = 4; 
+  const ECanNotBurnFrozenNFT: u64 = 5; // Users are not allowed to accidently burn their NFTs.
+  const ECanNotJoinFrozenNFT: u64 = 6; // Users are not allowed to accidently join their NFTs.
+  const ECanNotSplitFrozenNFT: u64 = 7; // Users are not allowed to accidently split their NFTs.
 
   // ** Structs
 
@@ -486,6 +489,7 @@ module interest_lsd::pool {
     validator_address: address,
     ctx: &mut TxContext,
   ): Coin<SUI> {
+    assert!(!isui_yn::is_frozen(&nft), ECanNotBurnFrozenNFT);
     
     // This function updates the pool and returns the sui value of an NFT
     let sui_amount = quote_isui_yn(wrapper, storage, &nft, ctx);
@@ -517,7 +521,8 @@ module interest_lsd::pool {
   * @param self The NFT to update
   * @param n The NFT that will be merged into the self
   */
-  public entry fun join(self: &mut ISuiYield, n: ISuiYield, ctx: &mut TxContext) {
+  public entry fun join_nft(self: &mut ISuiYield, n: ISuiYield, ctx: &mut TxContext) {
+    assert!(!isui_yn::is_frozen(self) && !isui_yn::is_frozen(&n), ECanNotJoinFrozenNFT);
     let (principal_0, shares_0) = isui_yn::burn(n, ctx);
     let (principal_1, shares_1) = isui_yn::read_nft(self);
     isui_yn::update_nft(self, principal_0 + principal_1, shares_0 + shares_1)
@@ -528,7 +533,7 @@ module interest_lsd::pool {
   * @param self The NFT to update
   * @param n The NFT that will be merged into the self
   */
-  public fun split(
+  public fun split_nft(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage, 
     interest_sui_yn_storage: &mut InterestSuiYNStorage,
@@ -536,6 +541,7 @@ module interest_lsd::pool {
     split_amount: u64,
     ctx: &mut TxContext
   ): ISuiYield {
+    assert!(!isui_yn::is_frozen(self), ECanNotSplitFrozenNFT);
     let sui_amount = quote_isui_yn(wrapper, storage, self, ctx);
     
     assert!(split_amount != 0 && sui_amount > split_amount && sui_amount != 0, EInvalidSplitAmount);
