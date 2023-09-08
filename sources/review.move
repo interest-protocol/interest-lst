@@ -14,7 +14,7 @@ module interest_lsd::review {
   use sui::tx_context::{Self, TxContext};
   use sui::table::{Self, Table};
 
-  use interest_lsd::isui_yn::{Self, ISuiYield};
+  use interest_lsd::sui_yield::{Self, SuiYield};
   use interest_lsd::isui::ISUI;
   use interest_lsd::admin::AdminCap;
 
@@ -94,7 +94,7 @@ module interest_lsd::review {
   */
   public fun create(
     reviews: &mut Reviews, 
-    nft: &mut ISuiYield, 
+    nft: &mut SuiYield, 
     stars: u64,
     comment: String,
     validator_address: address,
@@ -102,7 +102,7 @@ module interest_lsd::review {
   ) {
     // verify that nft isn't being cooled down
     let current_epoch = tx_context::epoch(ctx);
-    let nft_id = object::uid_to_inner(isui_yn::uid(nft));
+    let nft_id = object::uid_to_inner(sui_yield::uid(nft));
     let last_epoch = table::borrow(&reviews.epoch_review_for_nft, nft_id);
 
     assert!(current_epoch > *last_epoch + reviews.cooldown_epochs, ECannotReviewWithNft);
@@ -133,7 +133,7 @@ module interest_lsd::review {
   */
   public fun update(
     reviews: &mut Reviews, 
-    nft: &mut ISuiYield, 
+    nft: &mut SuiYield, 
     stars: u64,
     comment: String,
     validator_address: address,
@@ -141,7 +141,7 @@ module interest_lsd::review {
   ) {
     // verify that nft isn't being cooled down
     let current_epoch = tx_context::epoch(ctx);
-    let nft_id = object::uid_to_inner(isui_yn::uid(nft));
+    let nft_id = object::uid_to_inner(sui_yield::uid(nft));
     let last_epoch = table::borrow(&reviews.epoch_review_for_nft, nft_id);
 
     assert!(current_epoch > *last_epoch + reviews.cooldown_epochs, ECannotReviewWithNft);
