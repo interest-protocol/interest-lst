@@ -520,6 +520,7 @@ module interest_lsd::pool {
   * @param n The NFT that will be merged into the self
   */
   public entry fun join(self: &mut ISuiYield, n: ISuiYield, ctx: &mut TxContext) {
+    assert!(!isui_yn::is_frozen(self) && !isui_yn::is_frozen(&n), ECanNotBurnFrozenNFT);
     let (principal_0, shares_0) = isui_yn::burn(n, ctx);
     let (principal_1, shares_1) = isui_yn::read_nft(self);
     isui_yn::update_nft(self, principal_0 + principal_1, shares_0 + shares_1)
@@ -530,7 +531,7 @@ module interest_lsd::pool {
   * @param self The NFT to update
   * @param n The NFT that will be merged into the self
   */
-  public fun split(
+  public fun split_nft(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage, 
     interest_sui_yn_storage: &mut InterestSuiYNStorage,
@@ -538,6 +539,7 @@ module interest_lsd::pool {
     split_amount: u64,
     ctx: &mut TxContext
   ): ISuiYield {
+    assert!(!isui_yn::is_frozen(self), ECanNotBurnFrozenNFT);
     let sui_amount = quote_isui_yn(wrapper, storage, self, ctx);
     
     assert!(split_amount != 0 && sui_amount > split_amount && sui_amount != 0, EInvalidSplitAmount);
