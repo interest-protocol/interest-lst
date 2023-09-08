@@ -41,6 +41,7 @@ module interest_lsd::pool {
   const EInvalidUnstakeAmount: u64 = 2; // The sender tried to unstake more than he is allowed 
   const EInvalidNFTBurnAmount: u64 = 3; // We do not allow users to burn their ISuiYield for 0 rewards
   const EInvalidSplitAmount: u64 = 4; 
+  const ECanNotBurnFrozenNFT: u64 = 5; // Users are not allowed to accidently burn their NFTs.
 
   // ** Structs
 
@@ -486,6 +487,7 @@ module interest_lsd::pool {
     validator_address: address,
     ctx: &mut TxContext,
   ): Coin<SUI> {
+    assert!(!isui_yn::is_frozen(&nft), ECanNotBurnFrozenNFT);
     
     // This function updates the pool and returns the sui value of an NFT
     let sui_amount = quote_isui_yn(wrapper, storage, &nft, ctx);
