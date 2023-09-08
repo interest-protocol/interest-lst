@@ -20,7 +20,7 @@ module interest_lsd::pools_test {
   
   use interest_lsd::pool::{Self, PoolStorage};
   use interest_lsd::isui::{Self, ISUI, InterestSuiStorage};
-  use interest_lsd::isui_pc::{Self, InterestSuiPCStorage};
+  use interest_lsd::interest_staked_sui::{Self, InterestStakedSuiStorage};
   use interest_lsd::isui_yn::{Self, mint_for_testing as mint_nft, burn_for_testing as burn_nft, InterestSuiYNStorage};
   use interest_lsd::rebase;
   use interest_lsd::fee_utils::{read_fee};
@@ -366,14 +366,14 @@ module interest_lsd::pools_test {
       let pool_storage = test::take_shared<PoolStorage>(test);
       let wrapper = test::take_shared<SuiSystemState>(test);
       let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
-      let interest_sui_pc_storage = test::take_shared<InterestSuiPCStorage>(test);
+      let interest_staked_sui_storage = test::take_shared<InterestStakedSuiStorage>(test);
       let interest_sui_yn_storage = test::take_shared<InterestSuiYNStorage>(test);
 
       let (coin_isui_pc, nft) = pool::mint_isui_derivatives(
         &mut wrapper,
         &mut pool_storage,
         &mut interest_sui_storage,
-        &mut interest_sui_pc_storage,
+        &mut interest_staked_sui_storage,
         &mut interest_sui_yn_storage,
         mint<SUI>(10, 9, ctx(test)),
         MYSTEN_LABS,
@@ -395,10 +395,10 @@ module interest_lsd::pools_test {
       let old_elastic = rebase::elastic(pool_rebase);
       let old_base = rebase::base(pool_rebase);
 
-      assert_eq(burn(pool::burn_isui_pc(
+      assert_eq(burn(pool::burn_interest_staked_sui(
         &mut wrapper,
         &mut pool_storage,
-        &mut interest_sui_pc_storage,
+        &mut interest_staked_sui_storage,
         validator_payload,
         coin_isui_pc,
         MYSTEN_LABS,
@@ -414,7 +414,7 @@ module interest_lsd::pools_test {
 
       test::return_shared(interest_sui_yn_storage);
       test::return_shared(interest_sui_storage);
-      test::return_shared(interest_sui_pc_storage);
+      test::return_shared(interest_staked_sui_storage);
       test::return_shared(wrapper);
       test::return_shared(pool_storage);
     };
@@ -438,14 +438,14 @@ module interest_lsd::pools_test {
       let pool_storage = test::take_shared<PoolStorage>(test);
       let wrapper = test::take_shared<SuiSystemState>(test);
       let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
-      let interest_sui_pc_storage = test::take_shared<InterestSuiPCStorage>(test);
+      let interest_staked_sui_storage = test::take_shared<InterestStakedSuiStorage>(test);
       let interest_sui_yn_storage = test::take_shared<InterestSuiYNStorage>(test);
 
       let (coin_isui_pc, nft) = pool::mint_isui_derivatives(
         &mut wrapper,
         &mut pool_storage,
         &mut interest_sui_storage,
-        &mut interest_sui_pc_storage,
+        &mut interest_staked_sui_storage,
         &mut interest_sui_yn_storage,
         mint<SUI>(10, 9, ctx(test)),
         MYSTEN_LABS,
@@ -474,7 +474,7 @@ module interest_lsd::pools_test {
       burn_nft(nft);
       
       test::return_shared(interest_sui_yn_storage);
-      test::return_shared(interest_sui_pc_storage);
+      test::return_shared(interest_staked_sui_storage);
       test::return_shared(interest_sui_storage);
       test::return_shared(wrapper);
       test::return_shared(pool_storage);
@@ -598,7 +598,7 @@ module interest_lsd::pools_test {
     {
       pool::init_for_testing(ctx(test));
       isui::init_for_testing(ctx(test));
-      isui_pc::init_for_testing(ctx(test));
+      interest_staked_sui::init_for_testing(ctx(test));
       isui_yn::init_for_testing(ctx(test));
     };
     advance_epoch(test);

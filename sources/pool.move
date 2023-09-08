@@ -1,7 +1,7 @@
 // @Authors - JMVC <> Thouny
 // This contract manages the minting/burning of iSUi Coins and staking/unstaking Sui in Validators
 // ISUI is a share of the total SUI principal + rewards this module owns
-// ISUI_PC is always 1 SUI as it represents the principal owned by this module
+// INTEREST_STAKED_SUI is always 1 SUI as it represents the principal owned by this module
 // ISuiYield is an NFT that tracks a custom reeward position
 module interest_lsd::pool { 
   use std::vector;
@@ -24,9 +24,9 @@ module interest_lsd::pool {
   use interest_lsd::rebase::{Self, Rebase};
   use interest_lsd::math::{fmul, fdiv, scalar};
   use interest_lsd::isui::{Self, ISUI, InterestSuiStorage};
-  use interest_lsd::isui_pc::{Self, ISUI_PC, InterestSuiPCStorage};
   use interest_lsd::staking_pool_utils::{calc_staking_pool_rewards};
   use interest_lsd::isui_yn::{Self, ISuiYield, InterestSuiYNStorage};
+  use interest_lsd::interest_staked_sui::{Self, INTEREST_STAKED_SUI, InterestStakedSuiStorage};
   use interest_lsd::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
   
   // ** Constants
@@ -100,10 +100,10 @@ module interest_lsd::pool {
     validator: address
   }
 
-  struct BurnISuiPC has copy, drop {
+  struct BurnInterestStakedSui has copy, drop {
     sender: address,
     sui_amount: u64,
-    isui_pc_amount: u64,    
+    i_staked_sui_amount: u64,    
   }
 
   struct BurnISuiYN has copy, drop {
@@ -209,7 +209,7 @@ module interest_lsd::pool {
   * @param validator_address The validator to which we will unstake
   * @param epoch The action_epoch of the {StakedSui} we will unstake
   * @param principal How much of the {StakedSui} to unstake
-  * @return {BurnValidatorPayload} to use on {burn_isui}, {burn_isui_pc} and {burn_isui_yc}
+  * @return {BurnValidatorPayload} to use on {burn_isui}, {burn_interest_staked_sui} and {burn_isui_yc}
   */
   public fun create_burn_validator_payload(validator_address: address, epoch: u64, principal: u64): BurnValidatorPayload {
     BurnValidatorPayload {
@@ -375,27 +375,27 @@ module interest_lsd::pool {
     unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_value_to_return, ctx)
   }
 
-  // @dev This function stakes Sui in a validator chosen by the sender and returns (ISUI_PC, ISuiYield). 
+  // @dev This function stakes Sui in a validator chosen by the sender and returns (INTEREST_STAKED_SUI, ISuiYield). 
   /*
   * @param wrapper The Sui System Shared Object
   * @param storage The Pool Storage Shared Object (this module)
   * @param interest_sui_storage The shared object of ISUI, it contains the treasury_cap. We need it to mint ISUI
-  * @param interest_sui_pc_storage The shared object of ISUI_PC, it contains the treasury_cap. We need it to mint ISUI_PC
+  * @param interest_staked_sui_storage The shared object of INTEREST_STAKED_SUI, it contains the treasury_cap. We need it to mint INTEREST_STAKED_SUI
   * @param interest_sui_yc_storage The shared object of ISuiYield, it contains the treasury_cap. We need it to mint ISuiYield
   * @param asset The Sui Coin, the sender wishes to stake
   * @param validator_address The Sui Coin will be staked in this validator
-  * @return (COIN<ISUI_PC>, ISuiYield)
+  * @return (COIN<INTEREST_STAKED_SUI>, ISuiYield)
   */
   public fun mint_isui_derivatives(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     interest_sui_storage: &mut InterestSuiStorage,
-    interest_sui_pc_storage: &mut InterestSuiPCStorage,
+    interest_staked_sui_storage: &mut InterestStakedSuiStorage,
     interest_sui_yn_storage: &mut InterestSuiYNStorage,
     asset: Coin<SUI>,
     validator_address: address,
     ctx: &mut TxContext,
-  ):(Coin<ISUI_PC>, ISuiYield) {
+  ):(Coin<INTEREST_STAKED_SUI>, ISuiYield) {
     let sui_amount = coin::value(&asset);
 
     let nft = isui_yn::mint(
@@ -416,7 +416,7 @@ module interest_lsd::pool {
       sui_amount 
     } else {
       let validator_principal = linked_table::borrow(&storage.validators_table, validator_address).total_principal;
-      charge_isui_pc_mint(
+      charge_interest_staked_sui_mint(
         storage, 
         interest_sui_storage, 
         validator_principal, 
@@ -426,27 +426,27 @@ module interest_lsd::pool {
     };
 
     (
-      isui_pc::mint(interest_sui_pc_storage, sui_amount, ctx),
+      interest_staked_sui::mint(interest_staked_sui_storage, sui_amount, ctx),
       nft
     ) 
   } 
 
-  // @dev This function burns ISUI_PC in exchange for SUI at 1:1 rate
+  // @dev This function burns INTEREST_STAKED_SUI in exchange for SUI at 1:1 rate
   /*
   * @param wrapper The Sui System Shared Object
   * @param storage The Pool Storage Shared Object (this module)
-  * @param interest_sui_pc_storage The shared object of ISUI_PC, it contains the treasury_cap. We need it to burn ISUI_PC
+  * @param interest_staked_sui_storage The shared object of INTEREST_STAKED_SUI, it contains the treasury_cap. We need it to burn INTEREST_STAKED_SUI
   * @param validator_payload A vector containing the information about which StakedSui to unstake
-  * @param asset The ISUI_PC Coin, the sender wishes to burn
+  * @param asset The INTEREST_STAKED_SUI, the sender wishes to burn
   * @param validator_address The validator to re stake any remaining Sui if any
-  * @return Coin<SUI> in exchange for the ISUI_PC burned
+  * @return Coin<SUI> in exchange for the INTEREST_STAKED_SUI burned
   */
-  public fun burn_isui_pc(
+  public fun burn_interest_staked_sui(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    interest_sui_pc_storage: &mut InterestSuiPCStorage,
+    interest_staked_sui_storage: &mut InterestStakedSuiStorage,
     validator_payload: vector<BurnValidatorPayload>,
-    asset: Coin<ISUI_PC>,
+    asset: Coin<INTEREST_STAKED_SUI>,
     validator_address: address,
     ctx: &mut TxContext,
   ): Coin<SUI> {
@@ -454,9 +454,9 @@ module interest_lsd::pool {
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
     update_pool(wrapper, storage, ctx);
 
-    // 1 ISUI_PC is always 1 SUI
-    // Burn the ISUI_PC
-    let sui_value_to_return = isui_pc::burn(interest_sui_pc_storage, asset, ctx);
+    // 1 INTEREST_STAKED_SUI is always 1 SUI
+    // Burn the INTEREST_STAKED_SUI
+    let sui_value_to_return = interest_staked_sui::burn(interest_staked_sui_storage, asset, ctx);
 
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
@@ -466,7 +466,7 @@ module interest_lsd::pool {
     // We need to update the pool
     rebase::sub_elastic(&mut storage.pool, sui_value_to_return, false);
 
-    emit(BurnISuiPC { sui_amount: sui_value_to_return, sender: tx_context::sender(ctx), isui_pc_amount: sui_value_to_return });
+    emit(BurnInterestStakedSui { sui_amount: sui_value_to_return, sender: tx_context::sender(ctx), i_staked_sui_amount: sui_value_to_return });
 
     // Unstake Sui
     unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_value_to_return, ctx)
@@ -479,7 +479,7 @@ module interest_lsd::pool {
   * @param validator_payload A vector containing the information about which StakedSui to unstake
   * @param nft The ISuiYield to burn in exchange for rewards
   * @param validator_address The validator to re stake any remaining Sui if any
-  * @return Coin<SUI> in exchange for the ISUI_PC burned
+  * @return Coin<SUI> in exchange for the NFT burned
   */
   public fun burn_isui_yn(
     wrapper: &mut SuiSystemState,
@@ -866,10 +866,10 @@ module interest_lsd::pool {
   * @storage: The Pool Storage Shared Object (this module)
   * @interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
   * @validator_principal The amount of Sui principal deposited to the validator
-  * @amount The amount of iSui-PC being minted
+  * @amount The amount of Interest Sui Staked Amount being minted
   * @return the amount of ISUI to mint to the sender
   */
-  fun charge_isui_pc_mint(
+  fun charge_interest_staked_sui_mint(
     storage: &mut PoolStorage,
     interest_sui_storage: &mut InterestSuiStorage,
     validator_principal: u64,
