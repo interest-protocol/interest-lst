@@ -45,7 +45,7 @@ module interest_lsd::interest_staked_sui {
       let (treasury_cap, metadata) = coin::create_currency<INTEREST_STAKED_SUI>(
             witness, 
             9,
-            b"SSUI",
+            b"isSUI",
             b"Interest Staked Sui",
             b"This coin is pegged to Sui.",
             option::none(),
