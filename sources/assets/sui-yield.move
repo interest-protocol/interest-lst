@@ -1,6 +1,6 @@
-// Sui Liquid Staking Yield NFT
+// Sui Yield is a Yield Bearing Fungible Asset  
 // It accrues rewards from Interest LSD Pool
-module interest_lsd::isui_yn {
+module interest_lsd::sui_yield {
   use std::string::{utf8, String};
 
   use sui::package;
@@ -18,21 +18,21 @@ module interest_lsd::isui_yn {
   // ** Structs
 
   // NFT
-  struct ISuiYield has key, store {
+  struct SuiYield has key, store {
     id: UID,
-    img_url: String,
     principal: u64,
-    shares: u64
+    shares: u64,
+    /// ** Clean Mechanism. When is_clean is false, this NFT might have a rewards saved in a dynamic field. It is a UX mechanism to instruct developers to verify with the user if they want to first check their rewards before burning/joining/splitting. It is not enforced in any way.
+    is_clean: bool
   }
 
-  // OTW to create the Interest Sui LSD
-  struct ISUI_YN has drop {}
+  // OTW to create the Sui Yield
+  struct SUI_YIELD has drop {}
 
-  // Display Wrapper + img_url controller
-  struct InterestSuiYNStorage has key {
+  // Display Wrapper
+  struct SuiYieldStorage has key {
     id: UID,
-    display: Display<ISuiYield>,
-    img_url: String
+    display: Display<SuiYield>
   }
 
   // ** Events
@@ -51,7 +51,7 @@ module interest_lsd::isui_yn {
     sender: address
   }
 
-  fun init(witness: ISUI_YN, ctx: &mut TxContext) {
+  fun init(witness: SUI_YIELD, ctx: &mut TxContext) {
       let keys = vector[
         utf8(b"name"),
         utf8(b"symbol"),
@@ -61,24 +61,22 @@ module interest_lsd::isui_yn {
       ];
 
       let values = vector[
-        utf8(b"iSui Yield NFT"),
-        utf8(b"iSUI-YN"),
+        utf8(b"Sui Yield"),
+        utf8(b"SUIY"),
         utf8(b"This NFT accrues Sui rewards from Interest LSD"),
         utf8(b"https://www.interestprotocol.com"),
-        utf8(b"ipfs://{img_url}"),
+        utf8(b"ipfs://TODO"),
       ];
 
       let publisher = package::claim(witness, ctx);
 
-      let display = display::new_with_fields<ISuiYield>(&publisher, keys, values, ctx);
+      let display = display::new_with_fields<SuiYield>(&publisher, keys, values, ctx);
       display::update_version(&mut display);
 
       transfer::share_object(
-        InterestSuiYNStorage {
+        SuiYieldStorage {
           id: object::new(ctx),
           display,
-          // TODO Update
-          img_url: utf8(b"")
         }
       );
 
@@ -86,30 +84,30 @@ module interest_lsd::isui_yn {
   }
 
   /**
-  * @dev Only friend packages can mint ISUI_YN
+  * @dev Only friend packages can mint SUI_YIELD
   * @param storage The InterestSuiYNStorage
-  * @param principal The iSUI_PC minted in conjunction with this NFT
+  * @param principal The SUI_YIELD minted in conjunction with this NFT
   * @param shares The iSUI assigned to this NFT
-  * @return ISuiYield 
+  * @return SuiYield
   */
-  public(friend) fun mint(storage: &mut InterestSuiYNStorage, principal: u64, shares: u64, ctx: &mut TxContext): ISuiYield {
+  public(friend) fun mint(principal: u64, shares: u64, ctx: &mut TxContext): SuiYield {
     let nft_id = object::new(ctx);
     emit(Mint { nft_id: *object::uid_as_inner(&nft_id), principal, shares , sender: tx_context::sender(ctx) });
     
-    ISuiYield {
+    SuiYield {
       id: nft_id,
-      img_url: storage.img_url,
       principal,
-      shares
+      shares,
+      is_clean: true
     }
   }
 
   /**
-  * @dev Only friend packages can burn ISUI_YN
+  * @dev Only friend packages can burn SUI_YIELD
   * @param nft The NFT to burn
   * @return (shares, principal)
   */
-  public(friend) fun burn(nft: ISuiYield, ctx: &mut TxContext): (u64, u64) {
+  public(friend) fun burn(nft: SuiYield, ctx: &mut TxContext): (u64, u64) {
     emit(
       Burn { 
       nft_id: *object::uid_as_inner(&nft.id), 
@@ -118,7 +116,7 @@ module interest_lsd::isui_yn {
       sender: tx_context::sender(ctx) 
       }
     );
-    let ISuiYield {id, img_url: _, principal, shares} = nft;
+    let SuiYield {id, principal, shares,  is_clean: _} = nft;
     object::delete(id);
     (principal, shares)
   }
@@ -129,55 +127,54 @@ module interest_lsd::isui_yn {
   * @param principal The new principal
   * @param shares The new shares
   */
-  public(friend) fun update_nft(nft: &mut ISuiYield, principal: u64, shares: u64) {
+  public(friend) fun update(nft: &mut SuiYield, principal: u64, shares: u64) {
     nft.principal = principal;
     nft.shares = shares;
   }
 
-  /// === UID Access ===
+  /// ** UID Access 
 
-  /// ISuiYield UID to allow reading dynamic fields.
-  public fun uid(fren: &ISuiYield): &UID { &fren.id }
+  /// SuiYield UID to allow reading dynamic fields.
+  public fun uid(nft: &SuiYield): &UID { &nft.id }
 
-  /// Expose mutable access to the ISuiYield `UID` to allow extensions.
-  public fun uid_mut(fren: &mut ISuiYield): &mut UID { &mut fren.id }
+  /// Expose mutable access to the SuiYield `UID` to allow extensions.
+  public fun uid_mut(nft: &mut SuiYield): &mut UID { 
+    // If anyone ever calls this function, we assume it has a dynamic field.
+    nft.is_clean = false;
+    &mut nft.id 
+  }
 
   /**
-  * @dev It reads the shares and principal associated with an {ISuiYield} nft
+  * @dev It reads the shares and principal associated with an {SuiYield} nft
   */
-  public fun read_nft(nft: &ISuiYield):(u64, u64) {
+  public fun read(nft: &SuiYield):(u64, u64) {
     (nft.principal, nft.shares)
   }
 
   /**
-  * @dev Utility function to transfer Coin<ISUI_YN>
+  * @dev Utility function to transfer Coin<SUI_YIELD>
   * @param The nft to transfer
-  * @param recipient The address that will receive the Coin<ISUI_YN>
+  * @param recipient The address that will receive the Coin<SUI_YIELD>
   */
-  public entry fun transfer(nft: ISuiYield, recipient: address, _: &mut TxContext) {
+  public entry fun transfer(nft: SuiYield, recipient: address, _: &mut TxContext) {
     transfer::public_transfer(nft, recipient)
   }
 
   // ** Admin Functions - The admin can only update the Metadata
 
-  /// Update img_url for new created NFTs
-  public entry fun update_img_url(_: &AdminCap, storage: &mut InterestSuiYNStorage, img_url: String) {
-    storage.img_url = img_url;
-  }
-
-  public entry fun display_add_multiple(_: &AdminCap, storage: &mut InterestSuiYNStorage, keys: vector<String>, values: vector<String>) {
+  public entry fun display_add_multiple(_: &AdminCap, storage: &mut SuiYieldStorage, keys: vector<String>, values: vector<String>) {
     display::add_multiple(&mut storage.display, keys, values);
   }
 
-  public entry fun display_edit(_: &AdminCap, storage: &mut InterestSuiYNStorage, key: String, value: String) {
+  public entry fun display_edit(_: &AdminCap, storage: &mut SuiYieldStorage, key: String, value: String) {
     display::edit(&mut storage.display, key, value);
   }
 
-  public entry fun display_remove(_: &AdminCap, storage: &mut InterestSuiYNStorage, key: String) {
+  public entry fun display_remove(_: &AdminCap, storage: &mut SuiYieldStorage, key: String) {
     display::remove(&mut storage.display, key);
   }
 
-  public entry fun display_update_version(_: &AdminCap, storage: &mut InterestSuiYNStorage) {
+  public entry fun display_update_version(_: &AdminCap, storage: &mut SuiYieldStorage) {
     display::update_version(&mut storage.display);
   }
 
@@ -185,23 +182,23 @@ module interest_lsd::isui_yn {
 
   #[test_only]
   public fun init_for_testing(ctx: &mut TxContext) {
-    init(ISUI_YN {}, ctx);
+    init(SUI_YIELD {}, ctx);
   }
 
   #[test_only]
   /// Mint nfts of any type for (obviously!) testing purposes only
-  public fun mint_for_testing(principal: u64, shares: u64, ctx: &mut TxContext): ISuiYield {
-      ISuiYield {
+  public fun mint_for_testing(principal: u64, shares: u64, ctx: &mut TxContext): SuiYield {
+      SuiYield {
         id: object::new(ctx),
-        img_url: utf8(b""),
         principal,
-        shares
+        shares,
+        is_clean: true
     }
   }
 
   #[test_only]
-  public fun burn_for_testing(nft: ISuiYield) {
-    let ISuiYield {id, img_url: _, principal: _, shares: _} = nft;
+  public fun burn_for_testing(nft: SuiYield) {
+    let SuiYield {id, principal: _, shares: _, is_clean: _} = nft;
     object::delete(id);
   }
 }
