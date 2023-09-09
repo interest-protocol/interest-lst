@@ -30,13 +30,14 @@ module interest_lsd::semi_fungible_asset {
     data: D
   }
 
-  struct Metadata<phantom T> has key, store {
+  struct AssetMetadata<phantom T> has key, store {
     id: UID,
     decimals: u8,
     name: String,
     symbol: ascii::String,
     description: String,
-    icon_url: Option<Url>
+    icon_url: Option<Url>,
+    slot_description: String,
   }
 
   struct TreasuryCap<phantom T> has key, store {
@@ -78,9 +79,10 @@ module interest_lsd::semi_fungible_asset {
     symbol: vector<u8>,
     name: vector<u8>,
     description: vector<u8>,
+    slot_description: vector<u8>,
     icon_url: Option<Url>,
     ctx: &mut TxContext 
-  ): (TreasuryCap<T>, Metadata<T>) {
+  ): (TreasuryCap<T>, AssetMetadata<T>) {
     assert!(is_one_time_witness(&witness), EBadWitness);
     
     (
@@ -89,13 +91,14 @@ module interest_lsd::semi_fungible_asset {
         total_supply: table::new(ctx),
         slots: vec_set::empty()
       },  
-      Metadata
+      AssetMetadata
         {
           id: object::new(ctx),
           decimals,
           name: utf8(name),
           symbol: ascii::string(symbol),
           description: utf8(description),
+          slot_description: utf8(slot_description),
           icon_url
         }
     )    
@@ -146,64 +149,72 @@ module interest_lsd::semi_fungible_asset {
     (slot, value)
   }
 
-  // === Update Asset Metadata ===
+  // === Update Asset AssetMetadata ===
 
-    /// Update name of the coin in `CoinMetadata`
     public entry fun update_name<T>(
-        _: &TreasuryCap<T>, metadata: &mut Metadata<T>, name: String
+        _: &TreasuryCap<T>, metadata: &mut AssetMetadata<T>, name: String
     ) {
         metadata.name = name;
     }
 
-    /// Update the symbol of the coin in `CoinMetadata`
     public entry fun update_symbol<T>(
-        _: &TreasuryCap<T>, metadata: &mut Metadata<T>, symbol: ascii::String
+        _: &TreasuryCap<T>, metadata: &mut AssetMetadata<T>, symbol: ascii::String
     ) {
         metadata.symbol = symbol;
     }
 
-    /// Update the description of the coin in `CoinMetadata`
     public entry fun update_description<T>(
-        _: &TreasuryCap<T>, metadata: &mut Metadata<T>, description: String
+        _: &TreasuryCap<T>, metadata: &mut AssetMetadata<T>, description: String
     ) {
         metadata.description = description;
     }
 
-    /// Update the url of the coin in `CoinMetadata`
+    public entry fun update_slot_description<T>(
+        _: &TreasuryCap<T>, metadata: &mut AssetMetadata<T>, slot_description: String
+    ) {
+        metadata.slot_description = slot_description;
+    }
+
     public entry fun update_icon_url<T>(
-        _: &TreasuryCap<T>, metadata: &mut Metadata<T>, url: ascii::String
+        _: &TreasuryCap<T>, metadata: &mut AssetMetadata<T>, url: ascii::String
     ) {
         metadata.icon_url = option::some(url::new_unsafe(url));
     }
 
-    // === Get coin metadata fields for on-chain consumption ===
+    // === Get Asset metadata fields for on-chain consumption ===
 
     public fun get_decimals<T>(
-        metadata: &Metadata<T>
+        metadata: &AssetMetadata<T>
     ): u8 {
         metadata.decimals
     }
 
     public fun get_name<T>(
-        metadata: &Metadata<T>
+        metadata: &AssetMetadata<T>
     ): String {
         metadata.name
     }
 
     public fun get_symbol<T>(
-        metadata: &Metadata<T>
+        metadata: &AssetMetadata<T>
     ): ascii::String {
         metadata.symbol
     }
 
     public fun get_description<T>(
-        metadata: &Metadata<T>
+        metadata: &AssetMetadata<T>
     ): String {
         metadata.description
     }
 
+    public fun get_slot_description<T>(
+        metadata: &AssetMetadata<T>
+    ): String {
+        metadata.slot_description
+    }
+
     public fun get_icon_url<T>(
-        metadata: &Metadata<T>
+        metadata: &AssetMetadata<T>
     ): Option<Url> {
         metadata.icon_url
     }
@@ -229,6 +240,6 @@ module interest_lsd::semi_fungible_asset {
 
   #[test_only]
   public fun burn_for_testing<T, D: store + drop>(asset: &mut SemiFungibleAsset<T, D>, value: u64) {
-    asset.value = asset.value - value;
+    asset.value = asset.value -  value;
   }
 }
