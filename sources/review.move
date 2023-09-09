@@ -20,6 +20,7 @@ module interest_lsd::review {
   const EWrongStarNumber: u64 = 1;
   const ECommentTooLong: u64 = 2;
   const EAlreadyReviewed: u64 = 3;
+  const ENotReviewed: u64 = 4;
 
   struct Review has store, drop {
     vote: bool,
@@ -109,7 +110,7 @@ module interest_lsd::review {
     // get validator to update his stats
     let validator = table::borrow_mut(&mut reviews.validators, validator_address);
     // check that the user didn't review it already
-    assert!(table::contains(&validator.reviews, tx_context::sender(ctx)), EAlreadyReviewed);
+    assert!(!table::contains(&validator.reviews, tx_context::sender(ctx)), EAlreadyReviewed);
     // store the previous reputation of the validator
     let prev_validator_reputation = validator.reputation;
     let reputation = get_reputation(nft);
@@ -122,8 +123,8 @@ module interest_lsd::review {
 
     table::add(&mut validator.reviews, tx_context::sender(ctx), create_review(vote, comment));
     
-    // update top validators and 
-    update_validators(reviews, prev_validator_reputation, validator_address);
+    // update top validators 
+    update_top_validators(reviews, prev_validator_reputation, validator_address);
 
     emit(Reviewed { author: tx_context::sender(ctx), validator: validator_address, vote, reputation, comment });
   }
@@ -181,22 +182,49 @@ module interest_lsd::review {
       reputation = reputation * 2;
       reviews.total_reputation = calculate_new_reputation(vote, reputation, reviews.total_reputation);
       validator.reputation = calculate_new_reputation(vote, reputation, prev_validator_reputation);
-      // update top validators & validator reputation
-      update_validators(reviews, prev_validator_reputation, validator_address);
+      // update top validators 
+      update_top_validators(reviews, prev_validator_reputation, validator_address);
     };
 
     emit(Reviewed { author: tx_context::sender(ctx), validator: validator_address, vote, reputation, comment });
   }
   
-  // @dev 
+  // @dev remove a review previously made without checking nft cooldown
   /*
-  * @param 
-  * @return 
+  * @param reviews: reviews storage
+  * @param nft: SuiYield nft to get principal
+  * @param validator_address: which review to delete (1 review max per validator)
   */
   
-  // public fun remove(ctx: &mut TxContext) {}
+  public fun remove(
+    reviews: &mut Reviews, 
+    nft: &mut SuiYield, 
+    validator_address: address,
+    ctx: &mut TxContext
+  ) {
+    // get validator to update his stats
+    let validator = table::borrow_mut(&mut reviews.validators, validator_address);
+    // check that the user didn't review it already
+    assert!(table::contains(&validator.reviews, tx_context::sender(ctx)), ENotReviewed);
+    // store the previous reputation of the validator
+    let prev_validator_reputation = validator.reputation;
+    let reputation = get_reputation(nft);
+    // save the previous vote before deleting the review 
+    let prev_review = table::borrow(&validator.reviews, tx_context::sender(ctx));
+    let prev_vote = prev_review.vote;
 
-  // ** Top
+    // update stats (opposite of create)
+    if (prev_vote) { validator.upvotes = validator.upvotes - 1 } else { validator.downvotes = validator.downvotes + 1 };
+    reviews.total_reputation = calculate_new_reputation(!prev_vote, reputation, reviews.total_reputation);
+    validator.reputation = calculate_new_reputation(!prev_vote, reputation, prev_validator_reputation);
+    reviews.total_reviews = reviews.total_reviews - 1;
+
+    // remove the review
+    table::remove(&mut validator.reviews, tx_context::sender(ctx));
+
+    // update top validators 
+    update_top_validators(reviews, prev_validator_reputation, validator_address);
+  }
 
   // ** (Admin only) Set Parameters 
 
@@ -271,7 +299,7 @@ module interest_lsd::review {
   * @param vote: up/down vote
   * @param validator_address: the validator we want to update (the one getting reviewed)
   */
-  fun update_validators(reviews: &mut Reviews, prev_reputation: u64, validator_address: address) {
+  fun update_top_validators(reviews: &mut Reviews, prev_reputation: u64, validator_address: address) {
     // calculate new reputation for validator
     let validator = table::borrow_mut(&mut reviews.validators, validator_address);
     let new_reputation = validator.reputation;
