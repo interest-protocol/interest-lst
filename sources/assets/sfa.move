@@ -6,8 +6,8 @@
 */
 module interest_lsd::semi_fungible_asset {
   use std::ascii;
-  use std::string::{String, utf8};
   use std::option::{Self, Option};
+  use std::string::{String, utf8};
 
   use sui::url::{Self, Url};
   use sui::object::{Self, UID};
@@ -142,7 +142,7 @@ module interest_lsd::semi_fungible_asset {
   }
 
   public fun destroy_zero<T>(asset: SemiFungibleAsset<T>) {
-    let SemiFungibleAsset { id, slot , value  } = asset;
+    let SemiFungibleAsset { id, slot: _ , value  } = asset;
     assert!(value == 0, EAssetHasValue);
     object::delete(id);
   }

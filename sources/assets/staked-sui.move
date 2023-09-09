@@ -3,13 +3,13 @@
 module interest_lsd::staked_sui {
   use std::ascii;
   use std::option;
-  use std::string::{String};
+  use std::string::String;
 
   use sui::transfer;
   use sui::object::{Self, UID};
-  use sui::tx_context::{TxContext};
+  use sui::tx_context::TxContext;
 
-  use interest_lsd::admin::{AdminCap};
+  use interest_lsd::admin::AdminCap;
   use interest_lsd::semi_fungible_asset::{Self as sfa, SFATreasuryCap, SemiFungibleAsset, SFAMetadata};
   
   // ** Only module that can mint/burn/create/mutate this SFA
@@ -25,16 +25,14 @@ module interest_lsd::staked_sui {
     treasury_cap: SFATreasuryCap<STAKED_SUI>
   }
 
-  // ** Events
-
   fun init(witness: STAKED_SUI, ctx: &mut TxContext) {
     let (treasury_cap, metadata) = sfa::create_sfa(
       witness,
       9,
       b"isSUI",
       b"Interest Staked Sui",
-      b"It represents a Native Staked Sui in the Interest LSD pool", 
-      b"The slot is the maturity epoch of this asset",
+      b"It represents the principal of Native Staked Sui in the Interest LSD pool", 
+      b"The slot is the maturity epoch of this asset.",
       option::none(),
       ctx
     );

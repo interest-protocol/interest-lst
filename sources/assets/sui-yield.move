@@ -1,16 +1,17 @@
-// Sui Yield is a Yield Bearing Semi Fungible Asset  
-// It accrues rewards from Interest LSD Pool
+// Sui Yield is a Wrapped SFA with extra information about the yield
+// Reward paid is the rewards paid to date
+// Principal was the original principal to create the yield
 module interest_lsd::sui_yield {
   use std::ascii;
   use std::option;
-  use std::string::{String};
+  use std::string::String;
 
   use sui::transfer;
-  use sui::event::{emit};
-  use sui::object::{Self, UID, ID};
-  use sui::tx_context::{Self, TxContext};
+  use sui::object::{Self, UID};
+  use sui::tx_context::TxContext;
 
-  use interest_lsd::admin::{AdminCap};
+  use interest_lsd::math::{fdiv, fmul};
+  use interest_lsd::admin::AdminCap;
   use interest_lsd::semi_fungible_asset::{Self as sfa, SFATreasuryCap, SemiFungibleAsset, SFAMetadata};
   
   // ** Only module that can mint/burn/create/mutate this SFA
@@ -22,15 +23,12 @@ module interest_lsd::sui_yield {
   // ** Structs
 
   // SFA Data
-  struct SuiYieldData has store, drop {
-    principal: u64,
-    rewards_paid: u64
-  }
 
-  struct WrappedSFA has key, store {
+  struct SuiYieldSFA has key, store {
     id: UID,
     sfa: SemiFungibleAsset<SUI_YIELD>,
-    data: SuiYieldData
+    principal: u64,
+    rewards_paid: u64
   }
 
   struct SuiYieldStorage has key {
@@ -40,21 +38,13 @@ module interest_lsd::sui_yield {
 
   // ** Events
 
-  struct TransferValue has drop, copy {
-    from_id: ID,
-    to_id: ID,
-    value: u64,
-    sender: address,
-    slot: u256
-  }
-
   fun init(witness: SUI_YIELD, ctx: &mut TxContext) {
     let (treasury_cap, metadata) = sfa::create_sfa(
       witness,
       9,
       b"iSUIY",
       b"Interest Sui Yield",
-      b"It represents the Yield portion of a Native Staked Sui in the Interest LSD pool", 
+      b"It represents the yield of Native Staked Sui in the Interest LSD pool.", 
       b"The slot is the maturity epoch of this asset",
       option::none(),
       ctx
@@ -75,54 +65,84 @@ module interest_lsd::sui_yield {
     sfa::total_supply_in_slot(&storage.treasury_cap, slot)
   }
 
-  public fun value(self: &WrappedSFA): u64 {
-    sfa::value(self)
+  public fun value(asset: &SuiYieldSFA): u64 {
+    sfa::value(&asset.sfa)
   }
 
-  public fun slot(self: &SemiFungibleAsset<SUI_YIELD, SuiYieldData>): u256 {
-    sfa::slot(self)
+  public fun slot(asset: &SuiYieldSFA): u256 {
+    sfa::slot(&asset.sfa)
   }
 
-  public fun transfer_value(
-    from: &mut SemiFungibleAsset<SUI_YIELD, SuiYieldData>, 
-    to: &mut SemiFungibleAsset<SUI_YIELD, SuiYieldData>, 
-    value: u64,
-    ctx: &mut TxContext
-  ) {
-    sfa::transfer_value(from, to, value);
-    emit(
-      TransferValue {
-        from_id: object::id(from),
-        to_id: object::id(to),
-        slot: sfa::slot(from),
-        value,
-        sender: tx_context::sender(ctx)
-      }
-    );
+  public fun join(
+    self: &mut SuiYieldSFA,
+    asset: SuiYieldSFA,     
+    ) {
+    let SuiYieldSFA { sfa: a, id, principal, rewards_paid } = asset;
+    object::delete(id);
+    sfa::join(&mut self.sfa, a);
+    self.principal = self.principal + principal;
+    self.rewards_paid = self.rewards_paid + rewards_paid;
   }
 
-  public fun zero(storage: &mut SuiYieldStorage, slot: u256, ctx: &mut TxContext): SemiFungibleAsset<SUI_YIELD, SuiYieldData> {
-    sfa::zero(&mut storage.treasury_cap, slot, SuiYieldData { principal: 0, rewards_paid: 0}, ctx)
+  public fun split(
+    asset: &mut SuiYieldSFA,
+    split_amount: u64,
+    ctx: &mut TxContext     
+  ): SuiYieldSFA {
+    let v = (value(asset) as u256);
+    let a = sfa::split(&mut asset.sfa, split_amount, ctx);
+    // 1e18
+    let split_percentage = fdiv((split_amount as u256), v);
+    let split_principal = (fmul(split_percentage, (asset.principal as u256)) as u64);
+    let split_rewards_paid = (fmul(split_percentage, (asset.rewards_paid as u256)) as u64);
+    let x = SuiYieldSFA {
+      id: object::new(ctx),
+      sfa: a,
+      principal: split_principal,
+      rewards_paid: split_rewards_paid
+    };
+
+    asset.principal = asset.principal - split_principal;
+    asset.rewards_paid = asset.rewards_paid - split_rewards_paid;
+    x
   }
 
-  public fun read_data(asset: &SemiFungibleAsset<SUI_YIELD, SuiYieldData>): (u64, u64) {
-    let data = sfa::borrow_data(asset);
-    (data.principal, data.rewards_paid)
+  public fun zero(storage: &mut SuiYieldStorage, slot: u256, ctx: &mut TxContext): SuiYieldSFA {
+    SuiYieldSFA {
+      id: object::new(ctx),
+      sfa: sfa::zero(&mut storage.treasury_cap, slot, ctx),
+      principal: 0, 
+      rewards_paid: 0
+    }
   }
 
-  public fun is_zero(asset: &SemiFungibleAsset<SUI_YIELD, SuiYieldData>): bool {
-    sfa::is_zero(asset)
+  public fun read_principal(asset: &SuiYieldSFA): u64 {
+    asset.principal
   }
 
-  public fun destroy_zero(asset: SemiFungibleAsset<SUI_YIELD, SuiYieldData>) {
-    sfa::destroy_zero(asset);
+  public fun read_reward_paid(asset: &SuiYieldSFA): u64 {
+    asset.rewards_paid
   }
 
-  public fun burn(storage: &mut SuiYieldStorage, asset: &mut SemiFungibleAsset<SUI_YIELD, SuiYieldData>, value: u64) {
-    sfa::burn(&mut storage.treasury_cap, asset, value);
+  public fun read_data(asset: &SuiYieldSFA): (u64, u64, u64) {
+    (value(asset), asset.principal, asset.rewards_paid)
+  }
+
+  public fun is_zero(asset: &SuiYieldSFA): bool {
+    sfa::is_zero(&asset.sfa)
+  }
+
+  public fun destroy_zero(asset: SuiYieldSFA) {
+    let SuiYieldSFA {sfa: a, id, rewards_paid: _, principal: _} = asset;
+    sfa::destroy_zero(a);
+    object::delete(id);
+  }
+
+  public fun burn(storage: &mut SuiYieldStorage, asset: &mut SuiYieldSFA, value: u64) {
+    sfa::burn(&mut storage.treasury_cap,&mut asset.sfa, value);
   } 
 
-  public fun burn_destroy(storage: &mut SuiYieldStorage, asset: SemiFungibleAsset<SUI_YIELD, SuiYieldData>): u64 {
+  public fun burn_destroy(storage: &mut SuiYieldStorage, asset: SuiYieldSFA): u64 {
     let value = value(&asset);
     burn(storage, &mut asset, value);
     destroy_zero(asset);
@@ -138,22 +158,26 @@ module interest_lsd::sui_yield {
     principal: u64, 
     rewards_paid: u64, 
     ctx: &mut TxContext
-  ): SemiFungibleAsset<SUI_YIELD,SuiYieldData> {
-    sfa::new(&mut storage.treasury_cap, slot, value, SuiYieldData {principal, rewards_paid }, ctx)
+  ): SuiYieldSFA {
+    SuiYieldSFA {
+      id: object::new(ctx),
+      sfa: sfa::new(&mut storage.treasury_cap, slot, value, ctx),
+      principal,
+      rewards_paid 
+    }
   } 
 
-  public(friend) fun mint(storage: &mut SuiYieldStorage, asset: &mut SemiFungibleAsset<SUI_YIELD, SuiYieldData>, value: u64) {
-    sfa::mint(&mut storage.treasury_cap, asset, value);
+  public(friend) fun mint(storage: &mut SuiYieldStorage, asset: &mut SuiYieldSFA, value: u64) {
+    sfa::mint(&mut storage.treasury_cap, &mut asset.sfa, value);
   }   
 
   public(friend) fun update_data(
-    asset: &mut SemiFungibleAsset<SUI_YIELD, SuiYieldData>,
+    asset: &mut SuiYieldSFA,
     principal: u64, 
     rewards_paid: u64,     
     ) {
-    let data = sfa::borrow_mut_data(asset);
-    data.principal = principal;
-    data.rewards_paid = rewards_paid;
+    asset.principal = principal;
+    asset.rewards_paid = rewards_paid;
   }
 
   // === ADMIN ONLY Functions ===
