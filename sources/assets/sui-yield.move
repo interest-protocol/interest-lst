@@ -1,4 +1,4 @@
-// Sui Yield is a Yield Bearing Fungible Asset  
+// Sui Yield is a Yield Bearing Semi Fungible Asset  
 // It accrues rewards from Interest LSD Pool
 module interest_lsd::sui_yield {
   use std::ascii;
@@ -42,19 +42,13 @@ module interest_lsd::sui_yield {
     slot: u256
   }
 
-  struct DestroySuiYield has drop, copy {
-    asset_id: ID,
-    slot: u256,
-    sender: address
-  }
-
   fun init(witness: SUI_YIELD, ctx: &mut TxContext) {
     let (treasury_cap, metadata) = sfa::create_sfa(
       witness,
       9,
-      b"SUIY",
-      b"SuiYield",
-      b"It represents the Yield portion of a Interest Sui position", 
+      b"iSUIY",
+      b"Interest Sui Yield",
+      b"It represents the Yield portion of a Native Staked Sui in the Interest LSD pool", 
       b"The slot is the maturity epoch of this asset",
       option::none(),
       ctx
@@ -114,16 +108,20 @@ module interest_lsd::sui_yield {
     sfa::is_zero(asset)
   }
 
-  public fun destroy_zero(asset: SemiFungibleAsset<SUI_YIELD, SuiYieldData>, ctx: &mut TxContext): (u256, u64) {
-    emit(
-      DestroySuiYield {
-        asset_id: object::id(&asset),
-        slot: slot(&asset),
-        sender: tx_context::sender(ctx)
-      }
-    );
-    sfa::destroy_zero(asset)
+  public fun destroy_zero(asset: SemiFungibleAsset<SUI_YIELD, SuiYieldData>) {
+    sfa::destroy_zero(asset);
   }
+
+  public fun burn(storage: &mut SuiYieldStorage, asset: &mut SemiFungibleAsset<SUI_YIELD, SuiYieldData>, value: u64) {
+    sfa::burn(&mut storage.treasury_cap, asset, value);
+  } 
+
+  public fun burn_destroy(storage: &mut SuiYieldStorage, asset: SemiFungibleAsset<SUI_YIELD, SuiYieldData>): u64 {
+    let value = value(&asset);
+    burn(storage, &mut asset, value);
+    destroy_zero(asset);
+    value
+  } 
 
   // === FRIEND ONLY Functions ===
 
@@ -140,11 +138,7 @@ module interest_lsd::sui_yield {
 
   public(friend) fun mint(storage: &mut SuiYieldStorage, asset: &mut SemiFungibleAsset<SUI_YIELD, SuiYieldData>, value: u64) {
     sfa::mint(&mut storage.treasury_cap, asset, value);
-  }  
-
-  public(friend) fun burn(storage: &mut SuiYieldStorage, asset: &mut SemiFungibleAsset<SUI_YIELD, SuiYieldData>, value: u64) {
-    sfa::burn(&mut storage.treasury_cap, asset, value);
-  }  
+  }   
 
   public(friend) fun update_data(
     asset: &mut SemiFungibleAsset<SUI_YIELD, SuiYieldData>,

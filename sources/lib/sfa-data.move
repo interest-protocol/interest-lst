@@ -151,11 +151,10 @@ module interest_lsd::semi_fungible_asset_with_data {
     asset.value == 0
   }
 
-  public fun destroy_zero<T, D: store + drop>(asset: SemiFungibleAsset<T, D>): (u256, u64) {
+  public fun destroy_zero<T, D: store + drop>(asset: SemiFungibleAsset<T, D>) {
     let SemiFungibleAsset { id, data: _, slot , value  } = asset;
     assert!(value == 0, EAssetHasValue);
     object::delete(id);
-    (slot, value)
   }
 
   // === Update Asset SFAMetadata ===
