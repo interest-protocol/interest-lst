@@ -11,7 +11,7 @@ module interest_lsd::sui_yield {
   use sui::tx_context::{Self, TxContext};
 
   use interest_lsd::admin::{AdminCap};
-  use interest_lsd::semi_fungible_asset::{Self as sfa, SFATreasuryCap, SemiFungibleAsset, SFAMetadata};
+  use interest_lsd::semi_fungible_asset_with_data::{Self as sfa, SFATreasuryCap, SemiFungibleAsset, SFAMetadata};
   
   // ** Only module that can mint/burn/create/mutate this SFA
   friend interest_lsd::pool;
