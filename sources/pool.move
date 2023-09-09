@@ -548,7 +548,7 @@ module interest_lsd::pool {
     validator_address: address,
     ctx: &mut TxContext,
   ): Coin<SUI> {
-    assert!((sui_principal::slot(&asset) as u64) > tx_context::epoch(ctx), ETooEarly);
+    assert!(tx_context::epoch(ctx) > (sui_principal::slot(&asset) as u64), ETooEarly);
 
     // Need to update the entire state of Sui/Sui Rewards once every epoch
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
@@ -595,6 +595,9 @@ module interest_lsd::pool {
     // Destroy both assets
     // Calculate how much Sui they are worth
     let sui_amount = quote_sui_yield(wrapper, storage, &sfa_yield, maturity, ctx);
+
+    // Consider yield paid
+    sui_yield::add_rewards_paid(&mut sfa_yield, sui_amount);
 
     // We need to update the pool
     rebase::sub_elastic(&mut storage.pool, sui_amount, false);
