@@ -135,6 +135,7 @@ module interest_lsd::semi_fungible_asset {
     &asset.data
   }
 
+  // Make sure D is an object so third party modules cannot access its properties even if they borrow_mut
   public fun borrow_mut_data<T, D: store + drop>(asset: &mut SemiFungibleAsset<T, D>): &mut D {
     &mut asset.data
   }
