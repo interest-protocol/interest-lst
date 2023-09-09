@@ -3,7 +3,6 @@
 * Title - Semi Fungible Asset
 *
 * Each Asset is fungible within the same slot and non-fungible accross slots
-* Users can transfer value within assets with the same slot
 */
 module interest_lsd::semi_fungible_asset {
   use std::ascii;
@@ -55,11 +54,22 @@ module interest_lsd::semi_fungible_asset {
   public fun slot<T>(self: &SemiFungibleAsset<T>): u256 {
     self.slot
   }
+  
+  public entry fun join<T>(self: &mut SemiFungibleAsset<T>, a: SemiFungibleAsset<T>) {
+    let SemiFungibleAsset { id, value, slot } = a;
+    assert!(self.slot == slot, EIncompatibleSlots);
+    object::delete(id);
+    self.value = self.value + value
+  }
 
-  public fun transfer_value<T>(from: &mut SemiFungibleAsset<T>, to: &mut SemiFungibleAsset<T>, value: u64) {
-    assert!(from.slot == to.slot, EIncompatibleSlots);
-    from.value = from.value - value;
-    to.value = to.value + value;
+  public fun split<T>(self: &mut SemiFungibleAsset<T>, split_amount: u64, ctx: &mut TxContext): SemiFungibleAsset<T> {
+    // This will throw if it underflows
+    self.value = self.value - split_amount;
+    SemiFungibleAsset {
+      id: object::new(ctx),
+      value: split_amount,
+      slot: self.slot
+    }
   }
 
   public fun zero<T>(cap: &mut SFATreasuryCap<T>, slot: u256, ctx: &mut TxContext): SemiFungibleAsset<T> {

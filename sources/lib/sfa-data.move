@@ -3,6 +3,9 @@
 * Title - Semi Fungible Asset With Data
 *
 * It adds a Data field to SFA to allow modules to imbued more data
+* It does not support Join nor Split because we need to persist the Custom Data
+* It has a custom {transfer_value} to make up for the lack of {join} and {split}
+* A SFA must have 0 value to be destroyed. If it has a value of 0, we assume the data is irrelevant
 */
 module interest_lsd::semi_fungible_asset_with_data {
   use std::ascii;
@@ -25,7 +28,7 @@ module interest_lsd::semi_fungible_asset_with_data {
     id: UID, // Makes it into an NFT
     slot: u256, // Provides fungibility between the NFTs
     value: u64, // Value the NFT holds
-    data: D
+    data: D // Extra data to increase module's functionality. It can keep track of rewards collected etc...
   }
 
   struct SFAMetadata<phantom T> has key, store {
@@ -56,6 +59,12 @@ module interest_lsd::semi_fungible_asset_with_data {
     self.slot
   }
 
+  /**
+  * Users should avoid calling transfer value directly.  
+  * As it can lead to destruction of value
+  * For example if this value can be rebased with the data field or the data field keeps track of rewards using value field.  
+  * It is best to let the dApp module clean the data and then call transfer_value
+  */
   public fun transfer_value<T, D: store + drop>(from: &mut SemiFungibleAsset<T, D>, to: &mut SemiFungibleAsset<T, D>, value: u64) {
     assert!(from.slot == to.slot, EIncompatibleSlots);
     from.value = from.value - value;
