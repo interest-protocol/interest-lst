@@ -11,7 +11,7 @@ module interest_lsd::sui_yield {
   use sui::tx_context::{Self, TxContext};
 
   use interest_lsd::admin::{AdminCap};
-  use interest_lsd::semi_fungible_asset_with_data::{Self as sfa, SFATreasuryCap, SemiFungibleAsset, SFAMetadata};
+  use interest_lsd::semi_fungible_asset::{Self as sfa, SFATreasuryCap, SemiFungibleAsset, SFAMetadata};
   
   // ** Only module that can mint/burn/create/mutate this SFA
   friend interest_lsd::pool;
@@ -25,6 +25,12 @@ module interest_lsd::sui_yield {
   struct SuiYieldData has store, drop {
     principal: u64,
     rewards_paid: u64
+  }
+
+  struct WrappedSFA has key, store {
+    id: UID,
+    sfa: SemiFungibleAsset<SUI_YIELD>,
+    data: SuiYieldData
   }
 
   struct SuiYieldStorage has key {
@@ -69,7 +75,7 @@ module interest_lsd::sui_yield {
     sfa::total_supply_in_slot(&storage.treasury_cap, slot)
   }
 
-  public fun value(self: &SemiFungibleAsset<SUI_YIELD, SuiYieldData>): u64 {
+  public fun value(self: &WrappedSFA): u64 {
     sfa::value(self)
   }
 

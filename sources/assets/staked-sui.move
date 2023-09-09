@@ -6,9 +6,8 @@ module interest_lsd::staked_sui {
   use std::string::{String};
 
   use sui::transfer;
-  use sui::event::{emit};
-  use sui::object::{Self, UID, ID};
-  use sui::tx_context::{Self, TxContext};
+  use sui::object::{Self, UID};
+  use sui::tx_context::{TxContext};
 
   use interest_lsd::admin::{AdminCap};
   use interest_lsd::semi_fungible_asset::{Self as sfa, SFATreasuryCap, SemiFungibleAsset, SFAMetadata};
