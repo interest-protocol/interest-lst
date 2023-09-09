@@ -30,7 +30,7 @@ module interest_lsd::semi_fungible_asset {
     data: D
   }
 
-  struct AssetMetadata<phantom T> has key, store {
+  struct SFAMetadata<phantom T> has key, store {
     id: UID,
     decimals: u8,
     name: String,
@@ -40,13 +40,13 @@ module interest_lsd::semi_fungible_asset {
     slot_description: String,
   }
 
-  struct TreasuryCap<phantom T> has key, store {
+  struct SFATreasuryCap<phantom T> has key, store {
     id: UID,
     total_supply: Table<u256, u64>,
     slots: VecSet<u256>
   }
 
-  public fun total_supply_in_slot<T>(cap: &TreasuryCap<T>, slot: u256): u64 {
+  public fun total_supply_in_slot<T>(cap: &SFATreasuryCap<T>, slot: u256): u64 {
     *table::borrow(&cap.total_supply, slot)
   }
 
@@ -64,7 +64,8 @@ module interest_lsd::semi_fungible_asset {
     to.value = to.value + value;
   }
 
-  public fun zero<T, D: store + drop>(slot: u256, data: D, ctx: &mut TxContext): SemiFungibleAsset<T, D> {
+  public fun zero<T, D: store + drop>(cap: &mut SFATreasuryCap<T>, slot: u256, data: D, ctx: &mut TxContext): SemiFungibleAsset<T, D> {
+    if (!vec_set::contains(&cap.slots, &slot)) vec_set::insert(&mut cap.slots, slot);
     SemiFungibleAsset {
       id: object::new(ctx),
       slot,
@@ -73,7 +74,7 @@ module interest_lsd::semi_fungible_asset {
     }
   }
 
-  public fun create_asset<T: drop>(
+  public fun create_sfa<T: drop>(
     witness: T,
     decimals: u8,
     symbol: vector<u8>,
@@ -82,16 +83,16 @@ module interest_lsd::semi_fungible_asset {
     slot_description: vector<u8>,
     icon_url: Option<Url>,
     ctx: &mut TxContext 
-  ): (TreasuryCap<T>, AssetMetadata<T>) {
+  ): (SFATreasuryCap<T>, SFAMetadata<T>) {
     assert!(is_one_time_witness(&witness), EBadWitness);
     
     (
-      TreasuryCap {
+      SFATreasuryCap {
         id: object::new(ctx),
         total_supply: table::new(ctx),
         slots: vec_set::empty()
       },  
-      AssetMetadata
+      SFAMetadata
         {
           id: object::new(ctx),
           decimals,
@@ -104,7 +105,7 @@ module interest_lsd::semi_fungible_asset {
     )    
   }
 
-  public fun new<T, D: store + drop>(cap: &mut TreasuryCap<T>, slot: u256, value: u64, data: D, ctx: &mut TxContext): SemiFungibleAsset<T, D> {
+  public fun new<T, D: store + drop>(cap: &mut SFATreasuryCap<T>, slot: u256, value: u64, data: D, ctx: &mut TxContext): SemiFungibleAsset<T, D> {
     if (!vec_set::contains(&cap.slots, &slot)) vec_set::insert(&mut cap.slots, slot);
 
     let supply = table::borrow_mut(&mut cap.total_supply, slot);
@@ -118,13 +119,13 @@ module interest_lsd::semi_fungible_asset {
     }
   } 
 
-  public fun mint<T, D: store + drop>(cap: &mut TreasuryCap<T>, asset: &mut SemiFungibleAsset<T, D>, value: u64) {
+  public fun mint<T, D: store + drop>(cap: &mut SFATreasuryCap<T>, asset: &mut SemiFungibleAsset<T, D>, value: u64) {
     let supply = table::borrow_mut(&mut cap.total_supply, asset.slot);
     *supply = *supply + value;
     asset.value = asset.value + value;
   }
 
-  public fun burn<T, D: store + drop>(cap: &mut TreasuryCap<T>, asset: &mut SemiFungibleAsset<T, D>, value: u64) {
+  public fun burn<T, D: store + drop>(cap: &mut SFATreasuryCap<T>, asset: &mut SemiFungibleAsset<T, D>, value: u64) {
     let supply = table::borrow_mut(&mut cap.total_supply, asset.slot);
     *supply = *supply - value;
     asset.value = asset.value - value;
@@ -134,7 +135,7 @@ module interest_lsd::semi_fungible_asset {
     &asset.data
   }
 
-  public fun borrow_mut_data<T, D: store + drop>(asset: &mut SemiFungibleAsset<T, D>): &mut D {
+  public fun borrow_mut_data<T, D: store + drop>(_: &SFATreasuryCap<T>, asset: &mut SemiFungibleAsset<T, D>): &mut D {
     &mut asset.data
   }
 
@@ -149,34 +150,34 @@ module interest_lsd::semi_fungible_asset {
     (slot, value)
   }
 
-  // === Update Asset AssetMetadata ===
+  // === Update Asset SFAMetadata ===
 
     public entry fun update_name<T>(
-        _: &TreasuryCap<T>, metadata: &mut AssetMetadata<T>, name: String
+        _: &SFATreasuryCap<T>, metadata: &mut SFAMetadata<T>, name: String
     ) {
         metadata.name = name;
     }
 
     public entry fun update_symbol<T>(
-        _: &TreasuryCap<T>, metadata: &mut AssetMetadata<T>, symbol: ascii::String
+        _: &SFATreasuryCap<T>, metadata: &mut SFAMetadata<T>, symbol: ascii::String
     ) {
         metadata.symbol = symbol;
     }
 
     public entry fun update_description<T>(
-        _: &TreasuryCap<T>, metadata: &mut AssetMetadata<T>, description: String
+        _: &SFATreasuryCap<T>, metadata: &mut SFAMetadata<T>, description: String
     ) {
         metadata.description = description;
     }
 
     public entry fun update_slot_description<T>(
-        _: &TreasuryCap<T>, metadata: &mut AssetMetadata<T>, slot_description: String
+        _: &SFATreasuryCap<T>, metadata: &mut SFAMetadata<T>, slot_description: String
     ) {
         metadata.slot_description = slot_description;
     }
 
     public entry fun update_icon_url<T>(
-        _: &TreasuryCap<T>, metadata: &mut AssetMetadata<T>, url: ascii::String
+        _: &SFATreasuryCap<T>, metadata: &mut SFAMetadata<T>, url: ascii::String
     ) {
         metadata.icon_url = option::some(url::new_unsafe(url));
     }
@@ -184,37 +185,37 @@ module interest_lsd::semi_fungible_asset {
     // === Get Asset metadata fields for on-chain consumption ===
 
     public fun get_decimals<T>(
-        metadata: &AssetMetadata<T>
+        metadata: &SFAMetadata<T>
     ): u8 {
         metadata.decimals
     }
 
     public fun get_name<T>(
-        metadata: &AssetMetadata<T>
+        metadata: &SFAMetadata<T>
     ): String {
         metadata.name
     }
 
     public fun get_symbol<T>(
-        metadata: &AssetMetadata<T>
+        metadata: &SFAMetadata<T>
     ): ascii::String {
         metadata.symbol
     }
 
     public fun get_description<T>(
-        metadata: &AssetMetadata<T>
+        metadata: &SFAMetadata<T>
     ): String {
         metadata.description
     }
 
     public fun get_slot_description<T>(
-        metadata: &AssetMetadata<T>
+        metadata: &SFAMetadata<T>
     ): String {
         metadata.slot_description
     }
 
     public fun get_icon_url<T>(
-        metadata: &AssetMetadata<T>
+        metadata: &SFAMetadata<T>
     ): Option<Url> {
         metadata.icon_url
     }

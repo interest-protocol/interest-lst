@@ -1,204 +1,191 @@
 // Sui Yield is a Yield Bearing Fungible Asset  
 // It accrues rewards from Interest LSD Pool
 module interest_lsd::sui_yield {
-  use std::string::{utf8, String};
+  use std::ascii;
+  use std::option;
+  use std::string::{String};
 
-  use sui::package;
   use sui::transfer;
   use sui::event::{emit};
   use sui::object::{Self, UID, ID};
-  use sui::display::{Self, Display};
   use sui::tx_context::{Self, TxContext};
 
   use interest_lsd::admin::{AdminCap};
+  use interest_lsd::semi_fungible_asset::{Self as sfa, SFATreasuryCap, SemiFungibleAsset, SFAMetadata};
   
-  // ** Only module that can mint/burn this NFT
+  // ** Only module that can mint/burn/create/mutate this SFA
   friend interest_lsd::pool;
-
-  // ** Structs
-
-  // NFT
-  struct SuiYield has key, store {
-    id: UID,
-    principal: u64,
-    shares: u64,
-    /// ** Clean Mechanism. When is_clean is false, this NFT might have a rewards saved in a dynamic field. It is a UX mechanism to instruct developers to verify with the user if they want to first check their rewards before burning/joining/splitting. It is not enforced in any way.
-    is_clean: bool
-  }
 
   // OTW to create the Sui Yield
   struct SUI_YIELD has drop {}
 
-  // Display Wrapper
+  // ** Structs
+
+  // SFA Data
+  struct SuiYieldData has store, drop {
+    principal: u64,
+    rewards_paid: u64
+  }
+
   struct SuiYieldStorage has key {
     id: UID,
-    display: Display<SuiYield>
+    treasury_cap: SFATreasuryCap<SUI_YIELD>
   }
 
   // ** Events
 
-  struct Mint has copy, drop {
-    sui_yield_id: ID,
-    shares: u64,
-    principal: u64,
-    sender: address
+  struct TransferValue has drop, copy {
+    from_id: ID,
+    to_id: ID,
+    value: u64,
+    sender: address,
+    slot: u256
   }
 
-  struct Burn has copy, drop {
-    sui_yield_id: ID,
-    shares: u64,
-    principal: u64,
+  struct DestroySuiYield has drop, copy {
+    asset_id: ID,
+    slot: u256,
     sender: address
   }
 
   fun init(witness: SUI_YIELD, ctx: &mut TxContext) {
-      let keys = vector[
-        utf8(b"name"),
-        utf8(b"symbol"),
-        utf8(b"description"),
-        utf8(b"project_url"),
-        utf8(b"image_url"),
-      ];
+    let (treasury_cap, metadata) = sfa::create_sfa(
+      witness,
+      9,
+      b"SUIY",
+      b"SuiYield",
+      b"It represents the Yield portion of a Interest Sui position", 
+      b"The slot is the maturity date of this asset",
+      option::none(),
+      ctx
+    );
 
-      let values = vector[
-        utf8(b"Sui Yield"),
-        utf8(b"SUIY"),
-        utf8(b"This NFT accrues Sui rewards from Interest LSD"),
-        utf8(b"https://www.interestprotocol.com"),
-        utf8(b"ipfs://TODO"),
-      ];
-
-      let publisher = package::claim(witness, ctx);
-
-      let display = display::new_with_fields<SuiYield>(&publisher, keys, values, ctx);
-      display::update_version(&mut display);
-
-      transfer::share_object(
-        SuiYieldStorage {
-          id: object::new(ctx),
-          display,
-        }
-      );
-
-      transfer::public_transfer(publisher, tx_context::sender(ctx));
-  }
-
-  /**
-  * @dev Only friend packages can mint SUI_YIELD
-  * @param storage The InterestSuiYNStorage
-  * @param principal The SUI_YIELD minted in conjunction with this NFT
-  * @param shares The iSUI assigned to this NFT
-  * @return SuiYield
-  */
-  public(friend) fun mint(principal: u64, shares: u64, ctx: &mut TxContext): SuiYield {
-    let id = object::new(ctx);
-    emit(Mint { sui_yield_id: *object::uid_as_inner(&id), principal, shares , sender: tx_context::sender(ctx) });
-    
-    SuiYield {
-      id,
-      principal,
-      shares,
-      is_clean: true
-    }
-  }
-
-  /**
-  * @dev Only friend packages can burn SUI_YIELD
-  * @param nft The NFT to burn
-  * @return (shares, principal)
-  */
-  public(friend) fun burn(nft: SuiYield, ctx: &mut TxContext): (u64, u64) {
-    emit(
-      Burn { 
-      sui_yield_id: *object::uid_as_inner(&nft.id), 
-      principal: nft.principal, 
-      shares: nft.shares , 
-      sender: tx_context::sender(ctx) 
+    transfer::share_object(
+      SuiYieldStorage {
+        id: object::new(ctx),
+        treasury_cap
       }
     );
-    let SuiYield {id, principal, shares,  is_clean: _} = nft;
-    object::delete(id);
-    (principal, shares)
+    transfer::public_share_object(metadata);
   }
 
-  /**
-  * @dev It allows the friend package to create a Join function
-  * @param  nft The NFT to update
-  * @param principal The new principal
-  * @param shares The new shares
-  */
-  public(friend) fun update(nft: &mut SuiYield, principal: u64, shares: u64) {
-    nft.principal = principal;
-    nft.shares = shares;
+  // === Open Functions ===
+
+  public fun total_supply_in_slot(storage: &SuiYieldStorage, slot: u256): u64 {
+    sfa::total_supply_in_slot(&storage.treasury_cap, slot)
   }
 
-  /// ** UID Access 
-
-  /// SuiYield UID to allow reading dynamic fields.
-  public fun uid(nft: &SuiYield): &UID { &nft.id }
-
-  /// Expose mutable access to the SuiYield `UID` to allow extensions.
-  public fun uid_mut(nft: &mut SuiYield): &mut UID { 
-    // If anyone ever calls this function, we assume it has a dynamic field.
-    nft.is_clean = false;
-    &mut nft.id 
+  public fun value(self: &SemiFungibleAsset<SUI_YIELD, SuiYieldData>): u64 {
+    sfa::value(self)
   }
 
-  /**
-  * @dev It reads the shares and principal associated with an {SuiYield} nft
-  */
-  public fun read(nft: &SuiYield):(u64, u64) {
-    (nft.principal, nft.shares)
+  public fun slot(self: &SemiFungibleAsset<SUI_YIELD, SuiYieldData>): u256 {
+    sfa::slot(self)
   }
 
-  /**
-  * @dev Utility function to transfer Coin<SUI_YIELD>
-  * @param The nft to transfer
-  * @param recipient The address that will receive the Coin<SUI_YIELD>
-  */
-  public entry fun transfer(nft: SuiYield, recipient: address, _: &mut TxContext) {
-    transfer::public_transfer(nft, recipient)
+  public fun transfer_value(
+    from: &mut SemiFungibleAsset<SUI_YIELD, SuiYieldData>, 
+    to: &mut SemiFungibleAsset<SUI_YIELD, SuiYieldData>, 
+    value: u64,
+    ctx: &mut TxContext
+  ) {
+    sfa::transfer_value(from, to, value);
+    emit(
+      TransferValue {
+        from_id: object::id(from),
+        to_id: object::id(to),
+        slot: sfa::slot(from),
+        value,
+        sender: tx_context::sender(ctx)
+      }
+    );
   }
 
-  // ** Admin Functions - The admin can only update the Metadata
-
-  public entry fun display_add_multiple(_: &AdminCap, storage: &mut SuiYieldStorage, keys: vector<String>, values: vector<String>) {
-    display::add_multiple(&mut storage.display, keys, values);
+  public fun zero(storage: &mut SuiYieldStorage, slot: u256, ctx: &mut TxContext): SemiFungibleAsset<SUI_YIELD, SuiYieldData> {
+    sfa::zero(&mut storage.treasury_cap, slot, SuiYieldData { principal: 0, rewards_paid: 0}, ctx)
   }
 
-  public entry fun display_edit(_: &AdminCap, storage: &mut SuiYieldStorage, key: String, value: String) {
-    display::edit(&mut storage.display, key, value);
+  public fun read_data(asset: &SemiFungibleAsset<SUI_YIELD, SuiYieldData>): (u64, u64) {
+    let data = sfa::borrow_data(asset);
+    (data.principal, data.rewards_paid)
   }
 
-  public entry fun display_remove(_: &AdminCap, storage: &mut SuiYieldStorage, key: String) {
-    display::remove(&mut storage.display, key);
+  public fun is_zero(asset: &SemiFungibleAsset<SUI_YIELD, SuiYieldData>): bool {
+    sfa::is_zero(asset)
   }
 
-  public entry fun display_update_version(_: &AdminCap, storage: &mut SuiYieldStorage) {
-    display::update_version(&mut storage.display);
+  public fun destroy_zero(asset: SemiFungibleAsset<SUI_YIELD, SuiYieldData>, ctx: &mut TxContext): (u256, u64) {
+    emit(
+      DestroySuiYield {
+        asset_id: object::id(&asset),
+        slot: slot(&asset),
+        sender: tx_context::sender(ctx)
+      }
+    );
+    sfa::destroy_zero(asset)
   }
 
-  // ** Test Functions
+  // === FRIEND ONLY Functions ===
+
+  public(friend) fun new(
+    storage: &mut SuiYieldStorage, 
+    slot: u256, 
+    value: u64, 
+    principal: u64, 
+    rewards_paid: u64, 
+    ctx: &mut TxContext
+  ): SemiFungibleAsset<SUI_YIELD,SuiYieldData> {
+    sfa::new(&mut storage.treasury_cap, slot, value, SuiYieldData {principal, rewards_paid }, ctx)
+  } 
+
+  public(friend) fun mint(storage: &mut SuiYieldStorage, asset: &mut SemiFungibleAsset<SUI_YIELD, SuiYieldData>, value: u64) {
+    sfa::mint(&mut storage.treasury_cap, asset, value);
+  }  
+
+  public(friend) fun burn(storage: &mut SuiYieldStorage, asset: &mut SemiFungibleAsset<SUI_YIELD, SuiYieldData>, value: u64) {
+    sfa::burn(&mut storage.treasury_cap, asset, value);
+  }  
+
+  public(friend) fun update_data(
+    storage: &mut SuiYieldStorage, 
+    asset: &mut SemiFungibleAsset<SUI_YIELD, SuiYieldData>,
+    principal: u64, 
+    rewards_paid: u64,     
+    ) {
+    let data = sfa::borrow_mut_data(&storage.treasury_cap, asset);
+    data.principal = principal;
+    data.rewards_paid = rewards_paid;
+  }
+
+  // === ADMIN ONLY Functions ===
+
+  public entry fun update_name(
+    _:&AdminCap, storage: &mut SuiYieldStorage, metadata: &mut SFAMetadata<SUI_YIELD>, name: String
+  ) { sfa::update_name(&mut storage.treasury_cap, metadata, name); }
+
+  public entry fun update_symbol(
+    _:&AdminCap, storage: &mut SuiYieldStorage, metadata: &mut SFAMetadata<SUI_YIELD>, symbol: ascii::String
+  ) { sfa::update_symbol(&mut storage.treasury_cap, metadata, symbol) }
+
+  public entry fun update_description(
+    _:&AdminCap, storage: &mut SuiYieldStorage, metadata: &mut SFAMetadata<SUI_YIELD>, description: String
+  ) { sfa::update_description(&mut storage.treasury_cap, metadata, description) }
+
+  public entry fun update_slot_description(
+    _:&AdminCap, storage: &mut SuiYieldStorage, metadata: &mut SFAMetadata<SUI_YIELD>, slot_description: String
+  ) { sfa::update_slot_description(&mut storage.treasury_cap, metadata, slot_description) }
+
+  public entry fun update_icon_url(
+    _:&AdminCap, storage: &mut SuiYieldStorage, metadata: &mut SFAMetadata<SUI_YIELD>, url: ascii::String
+  ) {
+    sfa::update_icon_url(&storage.treasury_cap, metadata, url);
+  }
+
+
+  // === TEST ONLY Functions ===
 
   #[test_only]
   public fun init_for_testing(ctx: &mut TxContext) {
     init(SUI_YIELD {}, ctx);
-  }
-
-  #[test_only]
-  /// Mint nfts of any type for (obviously!) testing purposes only
-  public fun mint_for_testing(principal: u64, shares: u64, ctx: &mut TxContext): SuiYield {
-      SuiYield {
-        id: object::new(ctx),
-        principal,
-        shares,
-        is_clean: true
-    }
-  }
-
-  #[test_only]
-  public fun burn_for_testing(nft: SuiYield) {
-    let SuiYield {id, principal: _, shares: _, is_clean: _} = nft;
-    object::delete(id);
   }
 }
