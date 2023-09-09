@@ -104,7 +104,7 @@ module interest_lsd::pool {
     i_staked_sui_amount: u64,    
   }
 
-  struct BurnISuiYN has copy, drop {
+  struct BurnSuiYield has copy, drop {
     sender: address,
     sui_yield_id: ID,
     sui_amount: u64,   
@@ -499,7 +499,7 @@ module interest_lsd::pool {
     // Sender must Unstake more than his principal to ensure that the leftover is above the threshold of 1 Sui
     assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_amount, EInvalidUnstakeAmount);
 
-    emit(BurnISuiYN { sui_yield_id: object::id(&nft), sui_amount, sender: tx_context::sender(ctx) });
+    emit(BurnSuiYield { sui_yield_id: object::id(&nft), sui_amount, sender: tx_context::sender(ctx) });
 
     // Burn the NFT
     sui_yield::burn(nft, ctx);
