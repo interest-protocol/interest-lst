@@ -279,11 +279,11 @@ module interest_lsd::review {
     }
   }
 
-  // @dev allows the admin to set the maximum number of whitelisted validators 
+  // @dev allows the admin to automatically add the top validators in the whitelist
   /*
   * @param admin cap 
-  * @param reviews: global storage
-  * @param number: the new maximum (list length)
+  * @param reviews: reviews global storage
+  * @param pool: pool global storage
   */
   public fun set_whitelist(_: &AdminCap, reviews: &Reviews, pool: &mut PoolStorage) {
     let whitelist = pool::borrow_mut_whitelist(pool);
