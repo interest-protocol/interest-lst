@@ -146,6 +146,10 @@ module interest_lsd::pool {
     validator: address
   }
 
+  struct AddMaturity has copy, drop {
+    maturity: u64
+  }
+
   fun init(ctx: &mut TxContext) {
     // Share the PoolStorage Object with the Sui network
     transfer::share_object(
@@ -652,6 +656,20 @@ module interest_lsd::pool {
   }
 
   // ** Admin Functions
+
+  // @dev This function allows the admin to enter a valid maturity for the bonds
+  /*
+  * @param _: The AdminCap
+  * @param storage: The Pool Storage Shared Object (this module)
+  * @param maturity A valid maturity
+  */
+  entry public fun add_maturity(_: &AdminCap, storage: &mut PoolStorage, maturity: u64, ctx: &mut TxContext) {
+    // Each epoch is 24 hours
+    // It makes no sense to create bonds that will expire less than 3 months from now
+    assert!(tx_context::epoch(ctx) + 90 >= maturity, EInvalidMaturity);
+    vec_set::insert(&mut storage.whitelist_maturities, maturity);
+    emit(AddMaturity { maturity });
+  }
 
   // @dev This function safely updates the fees. It will throw if you pass values higher than 1e18.  
   /*
