@@ -55,7 +55,7 @@ module interest_lsd::sui_yield {
       b"SUIY",
       b"SuiYield",
       b"It represents the Yield portion of a Interest Sui position", 
-      b"The slot is the maturity date of this asset",
+      b"The slot is the maturity epoch of this asset",
       option::none(),
       ctx
     );
@@ -147,12 +147,11 @@ module interest_lsd::sui_yield {
   }  
 
   public(friend) fun update_data(
-    storage: &mut SuiYieldStorage, 
     asset: &mut SemiFungibleAsset<SUI_YIELD, SuiYieldData>,
     principal: u64, 
     rewards_paid: u64,     
     ) {
-    let data = sfa::borrow_mut_data(&storage.treasury_cap, asset);
+    let data = sfa::borrow_mut_data(asset);
     data.principal = principal;
     data.rewards_paid = rewards_paid;
   }
