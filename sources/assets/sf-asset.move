@@ -7,17 +7,16 @@
 * It has a data field for expressability and functionality
 */
 module interest_lsd::semi_fungible_asset {
-  use std::string::{String, utf8};
   use std::ascii;
+  use std::string::{String, utf8};
   use std::option::{Self, Option};
 
-  use sui::tx_context::TxContext;
   use sui::url::{Self, Url};
-  use sui::object::{Self, UID, ID};
+  use sui::object::{Self, UID};
   use sui::table::{Self, Table};
+  use sui::tx_context::TxContext;
   use sui::vec_set::{Self, VecSet};
   use sui::types::is_one_time_witness;
-  use sui::dynamic_object_field as ofield;
 
   // Errors
   const EIncompatibleSlots: u64 = 0;
@@ -147,6 +146,68 @@ module interest_lsd::semi_fungible_asset {
     (slot, value)
   }
 
+  // === Update Asset Metadata ===
+
+    /// Update name of the coin in `CoinMetadata`
+    public entry fun update_name<T>(
+        _: &TreasuryCap<T>, metadata: &mut Metadata<T>, name: String
+    ) {
+        metadata.name = name;
+    }
+
+    /// Update the symbol of the coin in `CoinMetadata`
+    public entry fun update_symbol<T>(
+        _: &TreasuryCap<T>, metadata: &mut Metadata<T>, symbol: ascii::String
+    ) {
+        metadata.symbol = symbol;
+    }
+
+    /// Update the description of the coin in `CoinMetadata`
+    public entry fun update_description<T>(
+        _: &TreasuryCap<T>, metadata: &mut Metadata<T>, description: String
+    ) {
+        metadata.description = description;
+    }
+
+    /// Update the url of the coin in `CoinMetadata`
+    public entry fun update_icon_url<T>(
+        _: &TreasuryCap<T>, metadata: &mut Metadata<T>, url: ascii::String
+    ) {
+        metadata.icon_url = option::some(url::new_unsafe(url));
+    }
+
+    // === Get coin metadata fields for on-chain consumption ===
+
+    public fun get_decimals<T>(
+        metadata: &Metadata<T>
+    ): u8 {
+        metadata.decimals
+    }
+
+    public fun get_name<T>(
+        metadata: &Metadata<T>
+    ): String {
+        metadata.name
+    }
+
+    public fun get_symbol<T>(
+        metadata: &Metadata<T>
+    ): ascii::String {
+        metadata.symbol
+    }
+
+    public fun get_description<T>(
+        metadata: &Metadata<T>
+    ): String {
+        metadata.description
+    }
+
+    public fun get_icon_url<T>(
+        metadata: &Metadata<T>
+    ): Option<Url> {
+        metadata.icon_url
+    }
+
   // === Test-only code ===
 
   #[test_only]
@@ -159,5 +220,15 @@ module interest_lsd::semi_fungible_asset {
     let SemiFungibleAsset { id, value, slot, data: _ } = asset;
     object::delete(id);
     (slot, value)
+  }
+
+  #[test_only]
+  public fun mint_for_testing<T, D: store + drop>(asset: &mut SemiFungibleAsset<T, D>, value: u64) {
+    asset.value = asset.value + value;
+  }
+
+  #[test_only]
+  public fun burn_for_testing<T, D: store + drop>(asset: &mut SemiFungibleAsset<T, D>, value: u64) {
+    asset.value = asset.value - value;
   }
 }
