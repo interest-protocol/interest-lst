@@ -1,6 +1,6 @@
 // Sui Yield is a Wrapped SFA with extra information about the yield
 // Reward paid is the rewards paid to date
-// Principal was the original principal to create the yield
+// Principal was the original shares to create the yield
 module interest_lsd::sui_yield {
   use std::ascii;
   use std::option;
@@ -27,7 +27,7 @@ module interest_lsd::sui_yield {
   struct SuiYield has key, store {
     id: UID,
     sfa: SemiFungibleAsset<SUI_YIELD>,
-    principal: u64,
+    shares: u64,
     rewards_paid: u64
   }
 
@@ -77,10 +77,10 @@ module interest_lsd::sui_yield {
     self: &mut SuiYield,
     asset: SuiYield,     
     ) {
-    let SuiYield { sfa: a, id, principal, rewards_paid } = asset;
+    let SuiYield { sfa: a, id, shares, rewards_paid } = asset;
     object::delete(id);
     sfa::join(&mut self.sfa, a);
-    self.principal = self.principal + principal;
+    self.shares = self.shares + shares;
     self.rewards_paid = self.rewards_paid + rewards_paid;
   }
 
@@ -93,16 +93,16 @@ module interest_lsd::sui_yield {
     let a = sfa::split(&mut asset.sfa, split_amount, ctx);
     // 1e18
     let split_percentage = fdiv((split_amount as u256), v);
-    let split_principal = (fmul(split_percentage, (asset.principal as u256)) as u64);
+    let split_shares = (fmul(split_percentage, (asset.shares as u256)) as u64);
     let split_rewards_paid = (fmul(split_percentage, (asset.rewards_paid as u256)) as u64);
     let x = SuiYield {
       id: object::new(ctx),
       sfa: a,
-      principal: split_principal,
+      shares: split_shares,
       rewards_paid: split_rewards_paid
     };
 
-    asset.principal = asset.principal - split_principal;
+    asset.shares = asset.shares - split_shares;
     asset.rewards_paid = asset.rewards_paid - split_rewards_paid;
     x
   }
@@ -111,21 +111,21 @@ module interest_lsd::sui_yield {
     SuiYield {
       id: object::new(ctx),
       sfa: sfa::zero(&mut storage.treasury_cap, slot, ctx),
-      principal: 0, 
+      shares: 0, 
       rewards_paid: 0
     }
   }
 
-  public fun read_principal(asset: &SuiYield): u64 {
-    asset.principal
+  public fun shares(asset: &SuiYield): u64 {
+    asset.shares
   }
 
-  public fun read_reward_paid(asset: &SuiYield): u64 {
+  public fun rewards_paid(asset: &SuiYield): u64 {
     asset.rewards_paid
   }
 
   public fun read_data(asset: &SuiYield): (u64, u64, u64) {
-    (value(asset), asset.principal, asset.rewards_paid)
+    (asset.shares, value(asset), asset.rewards_paid)
   }
 
   public fun is_zero(asset: &SuiYield): bool {
@@ -133,7 +133,7 @@ module interest_lsd::sui_yield {
   }
 
   public fun destroy_zero(asset: SuiYield) {
-    let SuiYield {sfa: a, id, rewards_paid: _, principal: _} = asset;
+    let SuiYield {sfa: a, id, rewards_paid: _, shares: _} = asset;
     sfa::destroy_zero(a);
     object::delete(id);
   }
@@ -154,16 +154,15 @@ module interest_lsd::sui_yield {
   public(friend) fun new(
     storage: &mut SuiYieldStorage, 
     slot: u256, 
-    value: u64, 
     principal: u64, 
-    rewards_paid: u64, 
+    shares: u64, 
     ctx: &mut TxContext
   ): SuiYield {
     SuiYield {
       id: object::new(ctx),
-      sfa: sfa::new(&mut storage.treasury_cap, slot, value, ctx),
-      principal,
-      rewards_paid 
+      sfa: sfa::new(&mut storage.treasury_cap, slot, principal, ctx),
+      shares,
+      rewards_paid: 0 
     }
   } 
 
@@ -171,13 +170,25 @@ module interest_lsd::sui_yield {
     sfa::mint(&mut storage.treasury_cap, &mut asset.sfa, value);
   }   
 
-  public(friend) fun update_data(
+  public(friend) fun add_rewards_paid(
     asset: &mut SuiYield,
-    principal: u64, 
     rewards_paid: u64,     
     ) {
-    asset.principal = principal;
-    asset.rewards_paid = rewards_paid;
+    asset.rewards_paid = asset.rewards_paid + rewards_paid;
+  }
+
+  public(friend) fun set_shares(
+    asset: &mut SuiYield,
+    shares: u64,     
+    ) {
+    asset.shares = shares;
+  }
+
+  public(friend) fun set_rewards_paid(
+    asset: &mut SuiYield,
+    rewards_paid: u64,     
+    ) {
+    asset.rewards_paid =  rewards_paid;
   }
 
   // === ADMIN ONLY Functions ===
