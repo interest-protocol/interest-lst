@@ -15,6 +15,7 @@ module interest_lsd::review {
 
   use interest_lsd::sui_yield::{Self, SuiYield};
   use interest_lsd::admin::AdminCap;
+  use interest_lsd::pool::{Self, PoolStorage};
 
   const ECannotReviewWithNft: u64 = 0;
   const EWrongStarNumber: u64 = 1;
@@ -276,6 +277,30 @@ module interest_lsd::review {
         vector::remove(&mut reviews.top_validators, min_index);
       };
     }
+  }
+
+  // @dev allows the admin to set the maximum number of whitelisted validators 
+  /*
+  * @param admin cap 
+  * @param reviews: global storage
+  * @param number: the new maximum (list length)
+  */
+  public fun set_whitelist(_: &AdminCap, reviews: &Reviews, pool: &mut PoolStorage) {
+    let whitelist = pool::borrow_mut_whitelist(pool);
+    let len = vector::length(whitelist);
+
+    let i = 0;
+    while (i < len) {
+      vector::pop_back(whitelist);
+      i = i + 1;
+    };
+
+    let j = 0;
+    while (j < vector::length(&reviews.top_validators)) {
+      let validator = vector::borrow(&reviews.top_validators, j);
+      vector::push_back(whitelist, validator.validator_address);
+      j = j + 1;
+    };
   }
 
   // ** CORE OPERATIONS
