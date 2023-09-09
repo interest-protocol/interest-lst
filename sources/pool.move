@@ -1,33 +1,33 @@
 // @Authors - JMVC <> Thouny
-// This contract manages the minting/burning of iSUi Coins and staking/unstaking Sui in Validators
-// ISUI is a share of the total SUI principal + rewards this module owns
-// INTEREST_STAKED_SUI is always 1 SUI as it represents the principal owned by this module
-// SuiYield is an NFT that tracks a custom reeward position
+// This contract manages the minting/burning of iSui, iSUIP, and iSUIY
+// ISsui is a share of the total SUI principal + rewards this module owns
+// iSUIP is always 1 SUI as it represents the principal owned by this module
+// iSUIY represents the yield component of a iSUIP
 module interest_lsd::pool { 
-  // use std::vector;
-  // use std::option;
+  use std::vector;
+  use std::option;
 
-  // use sui::table;
-  // use sui::transfer;
-  // use sui::sui::{SUI};
-  // use sui::event::{emit};
-  // use sui::coin::{Self, Coin};
-  // use sui::vec_set::{Self, VecSet};
-  // use sui::object::{Self, UID, ID};
-  // use sui::tx_context::{Self, TxContext};
-  // use sui::linked_table::{Self, LinkedTable};
+  use sui::table;
+  use sui::transfer;
+  use sui::sui::{SUI};
+  use sui::event::{emit};
+  use sui::coin::{Self, Coin};
+  use sui::vec_set::{Self, VecSet};
+  use sui::object::{Self, UID, ID};
+  use sui::tx_context::{Self, TxContext};
+  use sui::linked_table::{Self, LinkedTable};
 
-  // use sui_system::staking_pool::{Self, StakedSui};
-  // use sui_system::sui_system::{Self, SuiSystemState};
+  use sui_system::staking_pool::{Self, StakedSui};
+  use sui_system::sui_system::{Self, SuiSystemState};
 
-  // use interest_lsd::admin::{AdminCap};
-  // use interest_lsd::rebase::{Self, Rebase};
-  // use interest_lsd::math::{fmul, fdiv, scalar};
-  // use interest_lsd::sui_yield::{Self, SuiYield};
-  // use interest_lsd::isui::{Self, ISUI, InterestSuiStorage};
-  // use interest_lsd::staking_pool_utils::{calc_staking_pool_rewards};
-  // use interest_lsd::interest_staked_sui::{Self, INTEREST_STAKED_SUI, InterestStakedSuiStorage};
-  // use interest_lsd::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
+  use interest_lsd::admin::{AdminCap};
+  use interest_lsd::rebase::{Self, Rebase};
+  use interest_lsd::math::{fmul, fdiv, scalar};
+  use interest_lsd::sui_yield::{Self, SuiYield};
+  use interest_lsd::isui::{Self, ISUI, InterestSuiStorage};
+  use interest_lsd::staking_pool_utils::{calc_staking_pool_rewards};
+  use interest_lsd::interest_staked_sui::{Self, INTEREST_STAKED_SUI, InterestStakedSuiStorage};
+  use interest_lsd::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
   
   // // ** Constants
 

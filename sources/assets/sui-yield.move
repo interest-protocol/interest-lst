@@ -24,7 +24,7 @@ module interest_lsd::sui_yield {
 
   // SFA Data
 
-  struct SuiYieldSFA has key, store {
+  struct SuiYield has key, store {
     id: UID,
     sfa: SemiFungibleAsset<SUI_YIELD>,
     principal: u64,
@@ -65,19 +65,19 @@ module interest_lsd::sui_yield {
     sfa::total_supply_in_slot(&storage.treasury_cap, slot)
   }
 
-  public fun value(asset: &SuiYieldSFA): u64 {
+  public fun value(asset: &SuiYield): u64 {
     sfa::value(&asset.sfa)
   }
 
-  public fun slot(asset: &SuiYieldSFA): u256 {
+  public fun slot(asset: &SuiYield): u256 {
     sfa::slot(&asset.sfa)
   }
 
   public fun join(
-    self: &mut SuiYieldSFA,
-    asset: SuiYieldSFA,     
+    self: &mut SuiYield,
+    asset: SuiYield,     
     ) {
-    let SuiYieldSFA { sfa: a, id, principal, rewards_paid } = asset;
+    let SuiYield { sfa: a, id, principal, rewards_paid } = asset;
     object::delete(id);
     sfa::join(&mut self.sfa, a);
     self.principal = self.principal + principal;
@@ -85,17 +85,17 @@ module interest_lsd::sui_yield {
   }
 
   public fun split(
-    asset: &mut SuiYieldSFA,
+    asset: &mut SuiYield,
     split_amount: u64,
     ctx: &mut TxContext     
-  ): SuiYieldSFA {
+  ): SuiYield {
     let v = (value(asset) as u256);
     let a = sfa::split(&mut asset.sfa, split_amount, ctx);
     // 1e18
     let split_percentage = fdiv((split_amount as u256), v);
     let split_principal = (fmul(split_percentage, (asset.principal as u256)) as u64);
     let split_rewards_paid = (fmul(split_percentage, (asset.rewards_paid as u256)) as u64);
-    let x = SuiYieldSFA {
+    let x = SuiYield {
       id: object::new(ctx),
       sfa: a,
       principal: split_principal,
@@ -107,8 +107,8 @@ module interest_lsd::sui_yield {
     x
   }
 
-  public fun zero(storage: &mut SuiYieldStorage, slot: u256, ctx: &mut TxContext): SuiYieldSFA {
-    SuiYieldSFA {
+  public fun zero(storage: &mut SuiYieldStorage, slot: u256, ctx: &mut TxContext): SuiYield {
+    SuiYield {
       id: object::new(ctx),
       sfa: sfa::zero(&mut storage.treasury_cap, slot, ctx),
       principal: 0, 
@@ -116,33 +116,33 @@ module interest_lsd::sui_yield {
     }
   }
 
-  public fun read_principal(asset: &SuiYieldSFA): u64 {
+  public fun read_principal(asset: &SuiYield): u64 {
     asset.principal
   }
 
-  public fun read_reward_paid(asset: &SuiYieldSFA): u64 {
+  public fun read_reward_paid(asset: &SuiYield): u64 {
     asset.rewards_paid
   }
 
-  public fun read_data(asset: &SuiYieldSFA): (u64, u64, u64) {
+  public fun read_data(asset: &SuiYield): (u64, u64, u64) {
     (value(asset), asset.principal, asset.rewards_paid)
   }
 
-  public fun is_zero(asset: &SuiYieldSFA): bool {
+  public fun is_zero(asset: &SuiYield): bool {
     sfa::is_zero(&asset.sfa)
   }
 
-  public fun destroy_zero(asset: SuiYieldSFA) {
-    let SuiYieldSFA {sfa: a, id, rewards_paid: _, principal: _} = asset;
+  public fun destroy_zero(asset: SuiYield) {
+    let SuiYield {sfa: a, id, rewards_paid: _, principal: _} = asset;
     sfa::destroy_zero(a);
     object::delete(id);
   }
 
-  public fun burn(storage: &mut SuiYieldStorage, asset: &mut SuiYieldSFA, value: u64) {
+  public fun burn(storage: &mut SuiYieldStorage, asset: &mut SuiYield, value: u64) {
     sfa::burn(&mut storage.treasury_cap,&mut asset.sfa, value);
   } 
 
-  public fun burn_destroy(storage: &mut SuiYieldStorage, asset: SuiYieldSFA): u64 {
+  public fun burn_destroy(storage: &mut SuiYieldStorage, asset: SuiYield): u64 {
     let value = value(&asset);
     burn(storage, &mut asset, value);
     destroy_zero(asset);
@@ -158,8 +158,8 @@ module interest_lsd::sui_yield {
     principal: u64, 
     rewards_paid: u64, 
     ctx: &mut TxContext
-  ): SuiYieldSFA {
-    SuiYieldSFA {
+  ): SuiYield {
+    SuiYield {
       id: object::new(ctx),
       sfa: sfa::new(&mut storage.treasury_cap, slot, value, ctx),
       principal,
@@ -167,12 +167,12 @@ module interest_lsd::sui_yield {
     }
   } 
 
-  public(friend) fun mint(storage: &mut SuiYieldStorage, asset: &mut SuiYieldSFA, value: u64) {
+  public(friend) fun mint(storage: &mut SuiYieldStorage, asset: &mut SuiYield, value: u64) {
     sfa::mint(&mut storage.treasury_cap, &mut asset.sfa, value);
   }   
 
   public(friend) fun update_data(
-    asset: &mut SuiYieldSFA,
+    asset: &mut SuiYield,
     principal: u64, 
     rewards_paid: u64,     
     ) {
