@@ -1,5 +1,5 @@
 #[test_only]
-module interest_lsd::pools_test {
+module interest_lsd::pool_tests {
   use std::option;
 
   use sui::linked_table;
