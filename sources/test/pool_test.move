@@ -508,66 +508,67 @@ module interest_lsd::pools_test {
     test::end(scenario); 
   }
 
-//   #[test]
-//   fun test_burn_isui_yc() {
-//     let scenario = scenario();
+  #[test]
+  fun test_burn_sui_principal() {
+    let scenario = scenario();
 
-//     let test = &mut scenario;
+    let test = &mut scenario;
 
-//     init_test(test);
+    init_test(test);
 
-//     let (alice, bob) = people(); 
+    let (alice, bob) = people(); 
 
-//     mint_isui(test, MYSTEN_LABS, alice, 30);
-//     mint_isui(test, COINBASE_CLOUD,  bob, 10);
+    mint_isui(test, MYSTEN_LABS, alice, 30);
+    mint_isui(test, COINBASE_CLOUD,  bob, 10);
 
-//     // Active Staked Sui
-//     advance_epoch_with_reward_amounts(0, 100, test);
-//     // Pay Rewards
-//     advance_epoch_with_reward_amounts(0, 100, test);
-//     // Advance once more so our module registers in the next call
-//     advance_epoch_with_reward_amounts(0, 100, test);
+    // Active Staked Sui
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Pay Rewards
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Advance once more so our module registers in the next call
+    advance_epoch_with_reward_amounts(0, 100, test);
     
-//     // Test that ISUI_YC + ISUI_PC = ISUI
-//     next_tx(test, alice); 
-//     {
-//       let pool_storage = test::take_shared<PoolStorage>(test);
-//       let wrapper = test::take_shared<SuiSystemState>(test);
-//       let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
+    // Test that ISUI_YC + ISUI_PC = ISUI
+    next_tx(test, alice); 
+    {
+      let pool_storage = test::take_shared<PoolStorage>(test);
+      let wrapper = test::take_shared<SuiSystemState>(test);
+      let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
+      let interest_sui_principal_storage = test::take_shared<SuiPrincipalStorage>(test);
 
-//       pool::update_pool(&mut wrapper, &mut pool_storage, ctx(test));
+      pool::update_pool(&mut wrapper, &mut pool_storage, ctx(test));
 
-//       let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
-    
-//       let sui_amount = rebase::to_elastic(pool_rebase, add_decimals(10, 9), false);
+      let residue = sui_principal::new_for_testing(&mut interest_sui_principal_storage, 1, add_decimals(10, 9), ctx(test));
 
-//       let coin_sui = pool::burn_isui(
-//         &mut wrapper, 
-//         &mut pool_storage,
-//         &mut interest_sui_storage,
-//         vector[pool::create_burn_validator_payload(MYSTEN_LABS, 2, add_decimals(1, 9) + sui_amount)],
-//         mint<ISUI>(10, 9, ctx(test)),
-//         MYSTEN_LABS,
-//         ctx(test)
-//       );
+      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
-//       let coin_sui_2 = pool::burn_sui_yield(
-//         &mut wrapper,
-//         &mut pool_storage,
-//         vector[pool::create_burn_validator_payload(MYSTEN_LABS, 2,sui_amount - add_decimals(9, 9))],
-//         mint_nft(add_decimals(10, 9), add_decimals(10, 9), ctx(test)),
-//         MYSTEN_LABS,
-//         ctx(test)
-//       );
+      let old_base = rebase::base(pool_rebase);
+      let old_elastic = rebase::elastic(pool_rebase);
+      let removed_shares = rebase::to_base(pool_rebase, add_decimals(10, 9), false);
 
-//       assert_eq(burn(coin_sui), burn(coin_sui_2) + add_decimals(10, 9));
+      let coin_sui = pool::burn_sui_principal(
+        &mut wrapper,
+        &mut pool_storage,
+        &mut interest_sui_principal_storage,
+        vector[pool::create_burn_validator_payload(MYSTEN_LABS, 2, add_decimals(11, 9))],
+        residue,
+        MYSTEN_LABS,
+        ctx(test)
+      );
 
-//       test::return_shared(interest_sui_storage);
-//       test::return_shared(wrapper);
-//       test::return_shared(pool_storage); 
-//     };
-//     test::end(scenario);
-// }  
+      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
+
+      assert_eq(burn(coin_sui), add_decimals(10, 9));
+      assert_eq(rebase::base(pool_rebase), old_base - removed_shares);
+      assert_eq(rebase::elastic(pool_rebase), old_elastic - add_decimals(10, 9));
+
+      test::return_shared(interest_sui_principal_storage);
+      test::return_shared(interest_sui_storage);
+      test::return_shared(wrapper);
+      test::return_shared(pool_storage); 
+    };
+    test::end(scenario);
+}  
 
 //   #[test]
 //   fun test_quote_isui_yn() {
