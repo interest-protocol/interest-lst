@@ -43,10 +43,9 @@ module interest_lsd::pool {
   const ETooEarly: u64 = 3; // User tried to redeem assets before their maturity
   const EInvalidSplitAmount: u64 = 4; // The user tried to split with an invalid amount, either 0 or more than the SFA contains
   const EInvalidMaturity: u64 = 6; // Sender tried to create a bond with a maturity that is not whitelisted
-  const EOutdatedMaturity: u64 = 7; // Sender tried to create a bond with an old maturity
+  const EInvalidBackupMaturity: u64 = 7; // Sender tried to abuse the maturity 
   const EMistmatchedSlots: u64 = 8; // Sender tried to call a bond with SFAs with different slots
   const EMistmatchedValues: u64 = 8; // Sender did not provide the same quantity of Yield and Principal
-  const EInvalidBackupMaturity: u64 = 9; // Sender tried to abuse the maturity 
 
   // ** Structs
 
@@ -421,10 +420,7 @@ module interest_lsd::pool {
     ctx: &mut TxContext,
   ):(SemiFungibleAsset<SUI_PRINCIPAL>, SuiYield) {
     // It makes no sense to create an expired bond
-    assert!(tx_context::epoch(ctx) > maturity, EInvalidMaturity);
-    
-    let epoch = tx_context::epoch(ctx);
-    assert!(epoch > maturity, EOutdatedMaturity);
+    assert!(maturity > tx_context::epoch(ctx), EInvalidMaturity);
 
     let sui_amount = coin::value(&asset);
 

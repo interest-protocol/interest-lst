@@ -1,3 +1,6 @@
+/*
+ TODO TEST Error cases, Corner Cases and invariant cases.
+*/
 #[test_only]
 module interest_lsd::pools_test {
   use std::option;
@@ -20,8 +23,8 @@ module interest_lsd::pools_test {
   
   use interest_lsd::pool::{Self, PoolStorage};
   use interest_lsd::isui::{Self, ISUI, InterestSuiStorage};
-  use interest_lsd::sui_principal::{Self};
-  use interest_lsd::sui_yield::{Self};
+  use interest_lsd::sui_principal::{Self, SuiPrincipalStorage};
+  use interest_lsd::sui_yield::{Self, SuiYieldStorage};
   use interest_lsd::rebase;
   use interest_lsd::fee_utils::{read_fee};
   use interest_lsd::test_utils::{people, scenario, mint, add_decimals}; 
@@ -330,6 +333,69 @@ module interest_lsd::pools_test {
     test::end(scenario); 
   }
 
+  #[test]
+  fun test_mint_stripped_bond() {
+    let scenario = scenario();
+
+    let test = &mut scenario;
+
+    init_test(test);
+
+    let (alice, _) = people(); 
+    
+    // Mints Derivatives
+    next_tx(test, alice); 
+    {
+      let pool_storage = test::take_shared<PoolStorage>(test);
+      let wrapper = test::take_shared<SuiSystemState>(test);
+      let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
+      let interest_sui_principal_storage = test::take_shared<SuiPrincipalStorage>(test);
+      let interest_sui_yield_Storage = test::take_shared<SuiYieldStorage>(test);
+
+      let (residue, coupon) = pool::mint_stripped_bond(
+        &mut wrapper,
+        &mut pool_storage,
+        &mut interest_sui_storage,
+        &mut interest_sui_principal_storage,
+        &mut interest_sui_yield_Storage,
+        mint<SUI>(10, 9, ctx(test)),
+        MYSTEN_LABS,
+        10,
+        ctx(test)
+      );
+
+      let (pool_rebase, _, validator_data_table, total_principal, _, _) = pool::read_pool_storage(&pool_storage);
+
+      assert_eq(total_principal, add_decimals(10, 9));
+      assert_eq(rebase::elastic(pool_rebase), add_decimals(10, 9));
+      assert_eq(rebase::base(pool_rebase), add_decimals(10, 9));
+
+      // Mysten Labs Data
+      assert_eq(linked_table::length(validator_data_table), 1);
+      let (staked_sui_table,  validator_total_principal) = pool::read_validator_data(linked_table::borrow(validator_data_table, MYSTEN_LABS));
+      // Principal + Rewards as we stake the left over here
+      assert_eq(validator_total_principal, add_decimals(10, 9));
+      assert_eq(linked_table::length(staked_sui_table), 1);
+
+      assert_eq(sui_principal::burn_destroy(&mut interest_sui_principal_storage, residue), add_decimals(10, 9));
+
+      // ISUI_YC has the same minting logic as ISUI
+      let (shares, principal, rewards_paid) = sui_yield::read_data(&coupon);
+      assert_eq(principal, add_decimals(10, 9));
+      assert_eq(shares, add_decimals(10, 9));
+      assert_eq(rewards_paid, 0);
+
+      sui_yield::burn_destroy(&mut interest_sui_yield_Storage, coupon);
+
+      test::return_shared(interest_sui_yield_Storage);
+      test::return_shared(interest_sui_principal_storage);
+      test::return_shared(interest_sui_storage);
+      test::return_shared(wrapper);
+      test::return_shared(pool_storage);
+    };
+    test::end(scenario);
+  }
+
 //   #[test]
 //   fun test_burn_isui_pc() {
 //     let scenario = scenario();
@@ -417,63 +483,6 @@ module interest_lsd::pools_test {
 //     };
 
 //     test::end(scenario); 
-//   }
-
-//   #[test]
-//   fun test_mint_isui_derivatives() {
-//     let scenario = scenario();
-
-//     let test = &mut scenario;
-
-//     init_test(test);
-
-//     let (alice, _) = people(); 
-    
-//     // Mints Derivatives
-//     next_tx(test, alice); 
-//     {
-//       let pool_storage = test::take_shared<PoolStorage>(test);
-//       let wrapper = test::take_shared<SuiSystemState>(test);
-//       let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
-//       let interest_staked_sui_storage = test::take_shared<InterestStakedSuiStorage>(test);
-
-//       let (coin_isui_pc, nft) = pool::mint_isui_derivatives(
-//         &mut wrapper,
-//         &mut pool_storage,
-//         &mut interest_sui_storage,
-//         &mut interest_staked_sui_storage,
-//         mint<SUI>(10, 9, ctx(test)),
-//         MYSTEN_LABS,
-//         ctx(test)
-//       );
-
-//       let (pool_rebase, _, validator_data_table, total_principal, _, _) = pool::read_pool_storage(&pool_storage);
-
-//       assert_eq(total_principal, add_decimals(10, 9));
-//       assert_eq(rebase::elastic(pool_rebase), add_decimals(10, 9));
-//       assert_eq(rebase::base(pool_rebase), add_decimals(10, 9));
-
-//       // Mysten Labs Data
-//       assert_eq(linked_table::length(validator_data_table), 1);
-//       let (staked_sui_table,  validator_total_principal) = pool::read_validator_data(linked_table::borrow(validator_data_table, MYSTEN_LABS));
-//       // Principal + Rewards as we stake the left over here
-//       assert_eq(validator_total_principal, add_decimals(10, 9));
-//       assert_eq(linked_table::length(staked_sui_table), 1);
-
-//       assert_eq(burn(coin_isui_pc), add_decimals(10, 9));
-//       // ISUI_YC has the same minting logic as ISUI
-//       let (principal, shares) = sui_yield::read(&nft);
-//       assert_eq(principal, add_decimals(10, 9));
-//       assert_eq(shares, add_decimals(10, 9));
-
-//       burn_nft(nft);
-
-//       test::return_shared(interest_staked_sui_storage);
-//       test::return_shared(interest_sui_storage);
-//       test::return_shared(wrapper);
-//       test::return_shared(pool_storage);
-//     };
-//     test::end(scenario);
 //   }
 
 //   #[test]
