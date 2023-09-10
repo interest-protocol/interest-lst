@@ -15,7 +15,6 @@ module interest_lsd::pool {
   use sui::object::{Self, UID, ID};
   use sui::tx_context::{Self, TxContext};
   use sui::linked_table::{Self, LinkedTable};
-
   use sui_system::staking_pool::{Self, StakedSui};
   use sui_system::sui_system::{Self, SuiSystemState};
 
@@ -78,7 +77,7 @@ module interest_lsd::pool {
     total_principal: u64, // Total amount of StakedSui principal deposited in Interest LSD Package
     fee: Fee, // Holds the data to calculate the stake fee
     dao_coin: Coin<ISUI>, // Fees collected by the protocol in ISUI
-    whitelist_validators: VecSet<address>,
+    whitelist_validators: vector<address>,
     exchange_rates: Table<u64, u64>, // 1Sui -> Sui Exchange rate
   }
 
@@ -148,7 +147,7 @@ module interest_lsd::pool {
         total_principal: 0,
         fee: new_fee(),
         dao_coin: coin::zero<ISUI>(ctx),
-        whitelist_validators: vec_set::empty(),
+        whitelist_validators: vector::empty(),
         exchange_rates: table::new(ctx)
       }
     );
