@@ -228,10 +228,16 @@ module interest_lsd::sui_yield {
     storage: &mut SuiYieldStorage, 
     slot: u256, 
     principal: u64, 
-    shares: u64, 
+    shares: u64,
+    rewards_paid: u64,
     ctx: &mut TxContext
   ): SuiYield {
-    new(storage, slot, principal, shares, ctx)
+    SuiYield {
+      id: object::new(ctx),
+      sfa: sfa::new(&mut storage.treasury_cap, slot, principal, ctx),
+      shares,
+      rewards_paid
+    }
   } 
 
   #[test_only]

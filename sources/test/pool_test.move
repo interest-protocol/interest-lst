@@ -396,94 +396,117 @@ module interest_lsd::pools_test {
     test::end(scenario);
   }
 
-//   #[test]
-//   fun test_burn_isui_pc() {
-//     let scenario = scenario();
+  #[test]
+  fun test_call_bond() {
+    let scenario = scenario();
 
-//     let test = &mut scenario;
+    let test = &mut scenario;
 
-//     init_test(test);
+    init_test(test);
 
-//     let (alice, bob) = people(); 
+    let (alice, bob) = people(); 
 
-//     // Add Rewards
+    // Add Rewards
 
-//     mint_isui(test, MYSTEN_LABS, alice, 20);
-//     mint_isui(test, COINBASE_CLOUD,  bob, 10);
+    mint_isui(test, MYSTEN_LABS, alice, 20);
+    mint_isui(test, COINBASE_CLOUD,  bob, 10);
 
-//     // Active Staked Sui
-//     advance_epoch_with_reward_amounts(0, 100, test);
-//     // Pay Rewards
-//     advance_epoch_with_reward_amounts(0, 100, test);
-//     // Advance once more so our module registers in the next call
-//     advance_epoch_with_reward_amounts(0, 100, test);
+    // Active Staked Sui
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Pay Rewards
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Advance once more so our module registers in the next call
+    advance_epoch_with_reward_amounts(0, 100, test);
 
-//     mint_isui(test, FIGMENT,  JOSE, 10);
-//     mint_isui(test, MYSTEN_LABS, alice, 20);
-//     mint_isui(test, COINBASE_CLOUD,  bob, 10);
+    mint_isui(test, FIGMENT,  JOSE, 10);
+    mint_isui(test, MYSTEN_LABS, alice, 20);
+    mint_isui(test, COINBASE_CLOUD,  bob, 10);
 
-//     advance_epoch_with_reward_amounts(0, 100, test);
-//     advance_epoch_with_reward_amounts(0, 100, test);    
+    advance_epoch_with_reward_amounts(0, 100, test);
+    advance_epoch_with_reward_amounts(0, 100, test);    
     
-//     // ISUI_PC is always 1:1 with Sui
-//     // It gives no rewards
-//     next_tx(test, alice); 
-//     {
-//       let pool_storage = test::take_shared<PoolStorage>(test);
-//       let wrapper = test::take_shared<SuiSystemState>(test);
-//       let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
-//       let interest_staked_sui_storage = test::take_shared<InterestStakedSuiStorage>(test);
+    // ISUI_PC is always 1:1 with Sui
+    // It gives no rewards
+    next_tx(test, alice); 
+    {
+      let pool_storage = test::take_shared<PoolStorage>(test);
+      let wrapper = test::take_shared<SuiSystemState>(test);
+      let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
+      let interest_sui_principal_storage = test::take_shared<SuiPrincipalStorage>(test);
+      let interest_sui_yield_Storage = test::take_shared<SuiYieldStorage>(test);
+      
+      pool::update_pool(&mut wrapper, &mut pool_storage, ctx(test));
 
-//       let (coin_isui_pc, nft) = pool::mint_isui_derivatives(
-//         &mut wrapper,
-//         &mut pool_storage,
-//         &mut interest_sui_storage,
-//         &mut interest_staked_sui_storage,
-//         mint<SUI>(10, 9, ctx(test)),
-//         MYSTEN_LABS,
-//         ctx(test)
-//       );
+      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
-//       burn_nft(nft);
+   
 
-//       let (pool_rebase, _, _, old_total_principal, _, _) = pool::read_pool_storage(&pool_storage);
+      let principal_amount = add_decimals(10, 9);
 
-//       let validator_payload = vector[
-//         pool::create_burn_validator_payload(COINBASE_CLOUD, 2, add_decimals(10, 9)),
-//         pool::create_burn_validator_payload(COINBASE_CLOUD, 5, add_decimals(1, 9))
-//       ];
+      let old_elastic = rebase::elastic(pool_rebase);
+      let old_base = rebase::base(pool_rebase);
+ 
 
-//       let isui_pc_unstake_amount = add_decimals(10, 9);
+      let coupon = sui_yield::new_for_testing(
+        &mut interest_sui_yield_Storage, 
+        20, 
+        principal_amount, 
+        principal_amount, 
+        0, 
+        ctx(test)
+      );
 
-//       let shares_burned = rebase::to_base(pool_rebase, isui_pc_unstake_amount, false);
-//       let old_elastic = rebase::elastic(pool_rebase);
-//       let old_base = rebase::base(pool_rebase);
+      let yield_amount = pool::get_pending_yield(
+        &mut wrapper,
+        &mut pool_storage,
+        &coupon,
+        20,
+        ctx(test)
+      );
 
-//       assert_eq(burn(pool::burn_interest_staked_sui(
-//         &mut wrapper,
-//         &mut pool_storage,
-//         &mut interest_staked_sui_storage,
-//         validator_payload,
-//         coin_isui_pc,
-//         MYSTEN_LABS,
-//         ctx(test)
-//       )), isui_pc_unstake_amount);
+      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
-//       let (pool_rebase, _, _, total_principal, _, _) = pool::read_pool_storage(&pool_storage);
+      let shares_burned = rebase::to_base(pool_rebase, principal_amount + yield_amount, false);
 
-//       assert_eq(old_base, rebase::base(pool_rebase) + shares_burned);
-//       assert_eq(old_elastic, rebase::elastic(pool_rebase) + isui_pc_unstake_amount);
-//       // 3026830133 are the rewards re-staked
-//       assert_eq(old_total_principal, total_principal + isui_pc_unstake_amount - 3026830133);
+      let validator_payload = vector[
+        pool::create_burn_validator_payload(COINBASE_CLOUD, 2, add_decimals(10, 9)),
+        pool::create_burn_validator_payload(COINBASE_CLOUD, 5, add_decimals(1, 9) + yield_amount)
+      ];
 
-//       test::return_shared(interest_sui_storage);
-//       test::return_shared(interest_staked_sui_storage);
-//       test::return_shared(wrapper);
-//       test::return_shared(pool_storage);
-//     };
+      let residue = sui_principal::new_for_testing(
+        &mut interest_sui_principal_storage,
+        20,
+        principal_amount,
+        ctx(test)
+      );
 
-//     test::end(scenario); 
-//   }
+      assert_eq(burn(pool::call_bond(
+        &mut wrapper,
+        &mut pool_storage,
+        &mut interest_sui_principal_storage,
+        &mut interest_sui_yield_Storage,
+        validator_payload,
+        residue,
+        coupon,
+        MYSTEN_LABS,
+        30,
+        ctx(test)
+      )), principal_amount + yield_amount);
+
+      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
+
+      assert_eq(old_base, rebase::base(pool_rebase) + shares_burned);
+      assert_eq(old_elastic, rebase::elastic(pool_rebase) + principal_amount + yield_amount);
+
+      test::return_shared(interest_sui_storage);
+      test::return_shared(interest_sui_yield_Storage);
+      test::return_shared(interest_sui_principal_storage);
+      test::return_shared(wrapper);
+      test::return_shared(pool_storage);
+    };
+
+    test::end(scenario); 
+  }
 
 //   #[test]
 //   fun test_burn_isui_yc() {
