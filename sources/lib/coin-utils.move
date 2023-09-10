@@ -14,7 +14,7 @@ module interest_lsd::coin_utils {
   ): Coin<X> {
       let coin_x = coin::zero<X>(ctx);
 
-      if (vector::is_empty(&vector_x)){
+      if (vector::is_empty(&vector_x)) {
         vector::destroy_empty(vector_x);
         return coin_x
       };

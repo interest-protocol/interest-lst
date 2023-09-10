@@ -117,7 +117,7 @@ module interest_lsd::review {
 
     // verify that nft isn't being cooled down
     let current_epoch = tx_context::epoch(ctx);
-    let nft_id = object::uid_to_inner(sui_yield::uid(nft));
+    let nft_id = object::id(nft);
     // check if the nft is not being cooldowned, if it has already been used to review
     if (table::contains(&reviews.nft_review_epoch, nft_id)) {
       let prev_epoch = table::borrow_mut(&mut reviews.nft_review_epoch, nft_id);
@@ -171,7 +171,7 @@ module interest_lsd::review {
 
     // verify that nft isn't being cooled down
     let current_epoch = tx_context::epoch(ctx);
-    let nft_id = object::uid_to_inner(sui_yield::uid(nft));
+    let nft_id = object::id(nft);
     let prev_epoch = table::borrow_mut(&mut reviews.nft_review_epoch, nft_id);
 
     assert!(current_epoch > *prev_epoch + reviews.cooldown_epochs, ECannotReviewWithNft);
@@ -434,8 +434,7 @@ module interest_lsd::review {
   * @return the reputation
   */
   fun get_reputation_from_nft(nft: &SuiYield): u64 {
-    let (principal, _) = sui_yield::read(nft);
-    math::sqrt(principal / 1_000_000_000)
+    math::sqrt(sui_yield::value(nft) / 1_000_000_000)
   }
 
   // ** Tests only

@@ -6,12 +6,12 @@ module interest_lsd::isui {
   use std::string;
 
   use sui::transfer;
-  use sui::event::{emit};
+  use sui::event::emit;
   use sui::object::{Self, UID};
   use sui::tx_context::{Self, TxContext};
   use sui::coin::{Self, Coin, TreasuryCap, CoinMetadata};
 
-  use interest_lsd::admin::{AdminCap};
+  use interest_lsd::admin::AdminCap;
 
   // ** Only module that can mint/burn this coin
   friend interest_lsd::pool;
