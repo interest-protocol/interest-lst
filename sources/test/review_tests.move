@@ -13,7 +13,7 @@ module interest_lsd::review_tests {
   use interest_lsd::pool;
   use interest_lsd::admin::{Self, AdminCap};
   use interest_lsd::review::{Self, Reviews};
-  use interest_lsd::sui_yield::{Self, SuiYield};
+  use interest_lsd::sui_yield::{Self, SuiYield, SuiYieldStorage};
   use interest_lsd::test_utils::{people, scenario}; 
 
   const MYSTEN_LABS: address = @0x4;
@@ -33,6 +33,7 @@ module interest_lsd::review_tests {
     // create review
     next_tx(test, alice); {
       let reviews = test::take_shared<Reviews>(test);
+      let interest_sui_yield_Storage = test::take_shared<SuiYieldStorage>(test);
       // verify set up storage
       let (total_reviews, total_reputation, validators, max_top, _, top, cooldown, nft_epochs) = review::read_storage(&reviews);
       assert_eq(total_reviews, 0);
@@ -53,7 +54,7 @@ module interest_lsd::review_tests {
 
       let system = test::take_shared<SuiSystemState>(test);
       // get a nft to create reviews, reputation = 10 sqrt(100SUI)
-      let nft = sui_yield::mint_for_testing(100_000_000_000, 0, test::ctx(test));
+      let nft = sui_yield::new_for_testing(&mut interest_sui_yield_Storage, 10, 100_000_000_000, 0, 0, test::ctx(test));
       
       review::create(&mut system, &mut reviews, &nft, MYSTEN_LABS, true, string::utf8(b"random"), test::ctx(test));
       
@@ -87,6 +88,7 @@ module interest_lsd::review_tests {
       sui::transfer::public_transfer(nft, alice);
       test::return_to_sender(test, admin_cap);
       test::return_shared(reviews);
+      test::return_shared(interest_sui_yield_Storage);
       test::return_shared(system);
     }; 
 
