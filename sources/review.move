@@ -311,6 +311,11 @@ module interest_lsd::review {
     (reviews.total_reviews, reviews.total_reputation)
   }
 
+  public fun get_validator_data(reviews: &Reviews, validator: address): (u64, u64, u64) {
+    let v = table::borrow(&reviews.validators, validator);
+    (v.upvotes, v.downvotes, v.reputation)
+  }
+
   public fun get_review_data(reviews: &Reviews, author: address, validator: address): (bool, u64, String) {
     let v = table::borrow(&reviews.validators, validator);
     let r = table::borrow(&v.reviews, author);
