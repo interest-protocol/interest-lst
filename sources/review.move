@@ -25,6 +25,7 @@ module interest_lsd::review {
 
   struct Review has store, drop {
     vote: bool,
+    reputation: u64,
     comment: String, // max 140 
   }
 
@@ -114,7 +115,7 @@ module interest_lsd::review {
     assert!(!table::contains(&validator.reviews, tx_context::sender(ctx)), EAlreadyReviewed);
     // store the previous reputation of the validator
     let prev_validator_reputation = validator.reputation;
-    let reputation = get_reputation(nft);
+    let reputation = get_reputation_from_nft(nft);
 
     // update stats
     if (vote) { validator.upvotes = validator.upvotes + 1 } else { validator.downvotes = validator.downvotes - 1 };
@@ -122,7 +123,7 @@ module interest_lsd::review {
     validator.reputation = calculate_new_reputation(vote, reputation, prev_validator_reputation);
     reviews.total_reviews = reviews.total_reviews + 1;
 
-    table::add(&mut validator.reviews, tx_context::sender(ctx), create_review(vote, comment));
+    table::add(&mut validator.reviews, tx_context::sender(ctx), create_review(vote, reputation, comment));
     
     // update top validators 
     update_top_validators(reviews, prev_validator_reputation, validator_address);
@@ -163,10 +164,11 @@ module interest_lsd::review {
     let prev_review = table::borrow_mut(&mut validator.reviews, tx_context::sender(ctx));
     // save the previous vote before updating the review 
     let prev_vote = prev_review.vote;
-    // create a new review to replace the previous one
-    *prev_review = create_review(vote, comment);
 
-    let reputation = get_reputation(nft);
+    let reputation = get_reputation_from_nft(nft);
+    // create a new review to replace the previous one
+    *prev_review = create_review(vote, reputation, comment);
+
     // if the vote hasn't changed we just need to update the comment 
     // but if it changed we need to update reputation, votes, stats
     if (prev_vote != vote) {
@@ -209,7 +211,7 @@ module interest_lsd::review {
     assert!(table::contains(&validator.reviews, tx_context::sender(ctx)), ENotReviewed);
     // store the previous reputation of the validator
     let prev_validator_reputation = validator.reputation;
-    let reputation = get_reputation(nft);
+    let reputation = get_reputation_from_nft(nft);
     // save the previous vote before deleting the review 
     let prev_review = table::borrow(&validator.reviews, tx_context::sender(ctx));
     let prev_vote = prev_review.vote;
@@ -225,6 +227,30 @@ module interest_lsd::review {
 
     // update top validators 
     update_top_validators(reviews, prev_validator_reputation, validator_address);
+  }
+
+  // @dev allows anyone to automatically update the whitelist with the top validators
+  /*
+  * @param admin cap 
+  * @param reviews: reviews global storage
+  * @param pool: pool global storage
+  */
+  public fun set_whitelist(reviews: &Reviews, pool: &mut PoolStorage) {
+    let whitelist = pool::borrow_mut_whitelist(pool);
+    let len = vector::length(whitelist);
+
+    let i = 0;
+    while (i < len) {
+      vector::pop_back(whitelist);
+      i = i + 1;
+    };
+
+    let j = 0;
+    while (j < vector::length(&reviews.top_validators)) {
+      let validator = vector::borrow(&reviews.top_validators, j);
+      vector::push_back(whitelist, validator.validator_address);
+      j = j + 1;
+    };
   }
 
   // ** (Admin only) Set Parameters 
@@ -279,28 +305,25 @@ module interest_lsd::review {
     }
   }
 
-  // @dev allows the admin to automatically add the top validators in the whitelist
-  /*
-  * @param admin cap 
-  * @param reviews: reviews global storage
-  * @param pool: pool global storage
-  */
-  public fun set_whitelist(_: &AdminCap, reviews: &Reviews, pool: &mut PoolStorage) {
-    let whitelist = pool::borrow_mut_whitelist(pool);
-    let len = vector::length(whitelist);
+  // ** Getters
 
+  public fun get_reviews_stats(reviews: &Reviews): (u64, u64) {
+    (reviews.total_reviews, reviews.total_reputation)
+  }
+
+  public fun get_review_data(reviews: &Reviews, author: address, validator: address): (bool, u64, String) {
+    let v = table::borrow(&reviews.validators, validator);
+    let r = table::borrow(&v.reviews, author);
+    (r.vote, r.reputation, r.comment)
+  }
+
+  public fun get_top_validator_addresses(reviews: &Reviews): vector<address> {
     let i = 0;
-    while (i < len) {
-      vector::pop_back(whitelist);
-      i = i + 1;
+    let v = vector::empty();
+    while (i < vector::length(&reviews.top_validators)) {
+      vector::push_back(&mut v, vector::borrow(&reviews.top_validators, i).validator_address);
     };
-
-    let j = 0;
-    while (j < vector::length(&reviews.top_validators)) {
-      let validator = vector::borrow(&reviews.top_validators, j);
-      vector::push_back(whitelist, validator.validator_address);
-      j = j + 1;
-    };
+    v
   }
 
   // ** CORE OPERATIONS
@@ -311,10 +334,10 @@ module interest_lsd::review {
   * @param comment: a string of maximum 140 characters
   * @return the review
   */
-  fun create_review(vote: bool, comment: String): Review {
+  fun create_review(vote: bool, reputation: u64, comment: String): Review {
     assert!(string::length(&comment) <= 140, ECommentTooLong);
     // return review
-    Review { vote, comment }
+    Review { vote, reputation, comment }
   }
 
   // @dev This updates the top validators vector and the validator related data in both top list and reviews
@@ -366,6 +389,8 @@ module interest_lsd::review {
     };
   }
 
+  // ** Utils
+
   // @dev calculate the new reputation given the previous one and the current review
   /*
   * @param vote: up/downvote
@@ -382,8 +407,8 @@ module interest_lsd::review {
   * @param nft: SuiYield nft the user send to review
   * @return the reputation
   */
-  fun get_reputation(nft: &SuiYield): u64 {
+  fun get_reputation_from_nft(nft: &SuiYield): u64 {
     let (principal, _) = sui_yield::read(nft);
-    math::sqrt(principal)
+    math::sqrt(principal / 1_000_000_000)
   }
 }
