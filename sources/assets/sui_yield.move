@@ -222,4 +222,44 @@ module interest_lsd::sui_yield {
   public fun init_for_testing(ctx: &mut TxContext) {
     init(SUI_YIELD {}, ctx);
   }
+
+  #[test_only]
+  public fun new_for_testing(
+    storage: &mut SuiYieldStorage, 
+    slot: u256, 
+    principal: u64, 
+    shares: u64, 
+    ctx: &mut TxContext
+  ): SuiYield {
+    new(storage, slot, principal, shares, ctx)
+  } 
+
+  #[test_only]
+  public fun mint_for_testing(storage: &mut SuiYieldStorage, asset: &mut SuiYield, value: u64) {
+    mint(storage, asset, value);
+  }   
+
+  #[test_only]
+  public fun add_rewards_paid_for_testing(
+    asset: &mut SuiYield,
+    rewards_paid: u64,     
+    ) {
+    asset.rewards_paid = asset.rewards_paid + rewards_paid;
+  }
+
+  #[test_only]
+  public fun set_shares_for_testing(
+    asset: &mut SuiYield,
+    shares: u64,     
+    ) {
+    asset.shares = shares;
+  }
+
+  #[test_only]
+  public fun set_rewards_paid_for_testing(
+    asset: &mut SuiYield,
+    rewards_paid: u64,     
+    ) {
+    asset.rewards_paid =  rewards_paid;
+  }
 }

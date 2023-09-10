@@ -129,4 +129,19 @@ module interest_lsd::sui_principal {
   public fun init_for_testing(ctx: &mut TxContext) {
     init(SUI_PRINCIPAL {}, ctx);
   }
+
+  #[test_only]
+  public fun new_for_testing(
+    storage: &mut SuiPrincipalStorage, 
+    slot: u256, 
+    value: u64, 
+    ctx: &mut TxContext
+  ): SemiFungibleAsset<SUI_PRINCIPAL> {
+    new(storage, slot, value, ctx)
+  } 
+
+  #[test_only]
+  public fun mint_for_testing(storage: &mut SuiPrincipalStorage, asset: &mut SemiFungibleAsset<SUI_PRINCIPAL>, value: u64) {
+    mint(storage, asset, value);
+  }  
 }

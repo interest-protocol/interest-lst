@@ -79,7 +79,6 @@ module interest_lsd::pool {
     fee: Fee, // Holds the data to calculate the stake fee
     dao_coin: Coin<ISUI>, // Fees collected by the protocol in ISUI
     whitelist_validators: VecSet<address>,
-    whitelist_maturities: VecSet<u64>,
     exchange_rates: Table<u64, u64>, // 1Sui -> Sui Exchange rate
   }
 
@@ -162,7 +161,6 @@ module interest_lsd::pool {
         fee: new_fee(),
         dao_coin: coin::zero<ISUI>(ctx),
         whitelist_validators: vec_set::empty(),
-        whitelist_maturities: vec_set::empty(),
         exchange_rates: table::new(ctx)
       }
     );
@@ -202,7 +200,7 @@ module interest_lsd::pool {
     rebase::to_base(&storage.pool, sui_amount, false)
   }
 
-  // @dev It returns the Sui value of the {sfa}
+  // @dev It returns how much Sui a SuiYield can claim
   /*
   * @param wrapper The Sui System Shared Object
   * @param storage The Pool Storage Shared Object (this module)
@@ -210,7 +208,7 @@ module interest_lsd::pool {
   * @param maturity the backup maturity
   * @return the exchange rate
   */
-  public fun quote_sui_yield(
+  public fun get_pending_yield(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage, 
     sfa: &SuiYield,
@@ -221,7 +219,7 @@ module interest_lsd::pool {
     // We update the pool to make sure the rewards are up to date
     update_pool(wrapper, storage, ctx);
 
-    quote_sui_yield_logic(storage, sfa, maturity, ctx)
+    get_pending_yield_logic(storage, sfa, maturity, ctx)
   }
 
   // @dev Utility function to create {BurnValidatorPayload} Object for other modules
@@ -426,8 +424,8 @@ module interest_lsd::pool {
     maturity: u64,
     ctx: &mut TxContext,
   ):(SemiFungibleAsset<SUI_PRINCIPAL>, SuiYield) {
-    // It is a whitelisted maturity
-    assert!(vec_set::contains(&storage.whitelist_maturities, &EInvalidMaturity), EInvalidMaturity);
+    // It makes no sense to create an expired bond
+    assert!(tx_context::epoch(ctx) > maturity, EInvalidMaturity);
     
     let epoch = tx_context::epoch(ctx);
     assert!(epoch > maturity, EOutdatedMaturity);
@@ -437,7 +435,7 @@ module interest_lsd::pool {
     // mint_isui_logic will update the pool
     let sfa_yield = sui_yield::new( 
       sui_yield_storage,
-      (epoch as u256),
+      (maturity as u256),
       sui_amount,
       mint_isui_logic(wrapper, storage,asset, validator_address, ctx),
       ctx
@@ -456,7 +454,7 @@ module interest_lsd::pool {
       )
     };
 
-    let sfa_principal = sui_principal::new(sui_principal_storage, (epoch as u256), sui_amount, ctx);
+    let sfa_principal = sui_principal::new(sui_principal_storage, (maturity as u256), sui_amount, ctx);
 
     emit(MintStrippedBond { 
       sender: tx_context::sender(ctx), 
@@ -510,7 +508,7 @@ module interest_lsd::pool {
 
     // Destroy both assets
     // Calculate how much Sui they are worth
-    let sui_value_to_return = quote_sui_yield_logic(storage, &sfa_yield, maturity, ctx) + sui_principal::burn_destroy(sui_principal_storage, sfa_principal);
+    let sui_value_to_return = get_pending_yield_logic(storage, &sfa_yield, maturity, ctx) + sui_principal::burn_destroy(sui_principal_storage, sfa_principal);
     sui_yield::burn_destroy(sui_yield_storage, sfa_yield);
 
     emit(CallBond { 
@@ -598,7 +596,7 @@ module interest_lsd::pool {
     
     // Destroy both assets
     // Calculate how much Sui they are worth
-    let sui_amount = quote_sui_yield(wrapper, storage, &sfa_yield, maturity, ctx);
+    let sui_amount = get_pending_yield(wrapper, storage, &sfa_yield, maturity, ctx);
 
     // Consider yield paid
     sui_yield::add_rewards_paid(&mut sfa_yield, sui_amount);
@@ -653,22 +651,6 @@ module interest_lsd::pool {
 
     vec_set::remove(&mut storage.whitelist_validators, &validator);
     emit(RemoveWhitelist { validator });
-  }
-
-  // ** Admin Functions
-
-  // @dev This function allows the admin to enter a valid maturity for the bonds
-  /*
-  * @param _: The AdminCap
-  * @param storage: The Pool Storage Shared Object (this module)
-  * @param maturity A valid maturity
-  */
-  entry public fun add_maturity(_: &AdminCap, storage: &mut PoolStorage, maturity: u64, ctx: &mut TxContext) {
-    // Each epoch is 24 hours
-    // It makes no sense to create bonds that will expire less than 3 months from now
-    assert!(tx_context::epoch(ctx) + 90 >= maturity, EInvalidMaturity);
-    vec_set::insert(&mut storage.whitelist_maturities, maturity);
-    emit(AddMaturity { maturity });
   }
 
   // @dev This function safely updates the fees. It will throw if you pass values higher than 1e18.  
@@ -1011,7 +993,7 @@ module interest_lsd::pool {
   * @param sfa The SuiYield
   * @return u64 the exchange rate
   */
-  fun quote_sui_yield_logic(
+  fun get_pending_yield_logic(
     storage: &mut PoolStorage, 
     sfa_yield: &SuiYield,
     maturity: u64,

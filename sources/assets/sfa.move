@@ -13,7 +13,6 @@ module interest_lsd::semi_fungible_asset {
   use sui::object::{Self, UID};
   use sui::table::{Self, Table};
   use sui::tx_context::TxContext;
-  use sui::vec_set::{Self, VecSet};
   use sui::types::is_one_time_witness;
 
   // Errors
@@ -39,8 +38,7 @@ module interest_lsd::semi_fungible_asset {
 
   struct SFATreasuryCap<phantom T> has key, store {
     id: UID,
-    total_supply: Table<u256, u64>,
-    slots: VecSet<u256>
+    total_supply: Table<u256, u64>
   }
 
   public fun total_supply_in_slot<T>(cap: &SFATreasuryCap<T>, slot: u256): u64 {
@@ -73,7 +71,8 @@ module interest_lsd::semi_fungible_asset {
   }
 
   public fun zero<T>(cap: &mut SFATreasuryCap<T>, slot: u256, ctx: &mut TxContext): SemiFungibleAsset<T> {
-    if (!vec_set::contains(&cap.slots, &slot)) vec_set::insert(&mut cap.slots, slot);
+    new_slot(cap, slot);
+    
     SemiFungibleAsset {
       id: object::new(ctx),
       slot,
@@ -96,8 +95,7 @@ module interest_lsd::semi_fungible_asset {
     (
       SFATreasuryCap {
         id: object::new(ctx),
-        total_supply: table::new(ctx),
-        slots: vec_set::empty()
+        total_supply: table::new(ctx)
       },  
       SFAMetadata
         {
@@ -113,7 +111,7 @@ module interest_lsd::semi_fungible_asset {
   }
 
   public fun new<T>(cap: &mut SFATreasuryCap<T>, slot: u256, value: u64, ctx: &mut TxContext): SemiFungibleAsset<T> {
-    if (!vec_set::contains(&cap.slots, &slot)) vec_set::insert(&mut cap.slots, slot);
+    new_slot(cap, slot);
 
     let supply = table::borrow_mut(&mut cap.total_supply, slot);
     *supply = *supply + value;
@@ -216,6 +214,12 @@ module interest_lsd::semi_fungible_asset {
     ): Option<Url> {
         metadata.icon_url
     }
+
+  fun new_slot<T>(cap: &mut SFATreasuryCap<T>, slot: u256) {
+    if (table::contains(&cap.total_supply, slot)) return;
+
+    table::add(&mut cap.total_supply, slot, 0);
+  }  
 
   // === Test-only code ===
 
