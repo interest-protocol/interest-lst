@@ -145,10 +145,6 @@ module interest_lsd::pool {
     validator: address
   }
 
-  struct AddMaturity has copy, drop {
-    maturity: u64
-  }
-
   fun init(ctx: &mut TxContext) {
     // Share the PoolStorage Object with the Sui network
     transfer::share_object(
