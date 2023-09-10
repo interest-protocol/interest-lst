@@ -12,7 +12,6 @@ module interest_lsd::pool {
   use sui::event::emit;
   use sui::table::{Self, Table};
   use sui::coin::{Self, Coin};
-  use sui::vec_set::{Self, VecSet};
   use sui::object::{Self, UID, ID};
   use sui::tx_context::{Self, TxContext};
   use sui::linked_table::{Self, LinkedTable};
@@ -29,6 +28,8 @@ module interest_lsd::pool {
   use interest_lsd::staking_pool_utils::{calc_staking_pool_rewards};
   use interest_lsd::sui_principal::{Self, SuiPrincipalStorage, SUI_PRINCIPAL};
   use interest_lsd::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
+
+  friend interest_lsd::review;
   
   // ** Constants
 
@@ -134,14 +135,6 @@ module interest_lsd::pool {
   struct DaoWithdraw<phantom T> has copy, drop {
     sender: address,
     amount: u64
-  }
-
-  struct AddWhitelist has copy, drop {
-    validator: address
-  }
-
-  struct RemoveWhitelist has copy, drop {
-    validator: address
   }
 
   fun init(ctx: &mut TxContext) {
@@ -616,33 +609,27 @@ module interest_lsd::pool {
   * @return bool true if it is whitelisted
   */
   public fun is_whitelisted(storage: &PoolStorage, validator: address): bool {
-    vec_set::contains(&storage.whitelist_validators, &validator)
+    vector::contains(&storage.whitelist_validators, &validator)
   }
 
-  // Whitelists a validator to pay no fee
+  // Checks if a validator is whitelisted (pays no fee)
   /*
-  * @param _ The Admin Cap
   * @param storage The Pool Storage Shared Object (this module)
   * @param validator The address of the validator
+  * @return bool true if it is whitelisted
   */
-  public entry fun add_whitelist(_: &AdminCap, storage: &mut PoolStorage, validator: address) {
-    if (is_whitelisted(storage, validator)) return;
-
-    vec_set::insert(&mut storage.whitelist_validators, validator);
-    emit(AddWhitelist { validator });
+  public fun borrow_whitelist(storage: &PoolStorage): &vector<address> {
+    &storage.whitelist_validators
   }
 
-  // Removes a validator from the whitelist
+  // Checks if a validator is whitelisted (pays no fee)
   /*
-  * @param _ The Admin Cap
   * @param storage The Pool Storage Shared Object (this module)
   * @param validator The address of the validator
+  * @return bool true if it is whitelisted
   */
-  public entry fun remove_whitelist(_: &AdminCap, storage: &mut PoolStorage, validator: address) {
-    if (!is_whitelisted(storage, validator)) return;
-
-    vec_set::remove(&mut storage.whitelist_validators, &validator);
-    emit(RemoveWhitelist { validator });
+  public(friend) fun borrow_mut_whitelist(storage: &mut PoolStorage): &mut vector<address> {
+    &mut storage.whitelist_validators
   }
 
   // @dev This function safely updates the fees. It will throw if you pass values higher than 1e18.  
