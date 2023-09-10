@@ -1,5 +1,6 @@
 /*
  TODO TEST Error cases, Corner Cases and invariant cases.
+ We only tested the core functionality
 */
 #[test_only]
 module interest_lsd::pools_test {
@@ -570,49 +571,74 @@ module interest_lsd::pools_test {
     test::end(scenario);
 }  
 
-//   #[test]
-//   fun test_quote_isui_yn() {
-//     let scenario = scenario();
+  #[test]
+  fun test_claim_yield() {
+    let scenario = scenario();
 
-//     let test = &mut scenario;
+    let test = &mut scenario;
 
-//     init_test(test);
+    init_test(test);
 
-//     let (alice, bob) = people(); 
+    let (alice, bob) = people(); 
 
-//     mint_isui(test, MYSTEN_LABS, alice, 30);
-//     mint_isui(test, COINBASE_CLOUD,  bob, 10);
+    mint_isui(test, MYSTEN_LABS, alice, 30);
+    mint_isui(test, COINBASE_CLOUD,  bob, 10);
 
-//     // Active Staked Sui
-//     advance_epoch_with_reward_amounts(0, 100, test);
-//     // Pay Rewards
-//     advance_epoch_with_reward_amounts(0, 100, test);
-//     // Advance once more so our module registers in the next call
-//     advance_epoch_with_reward_amounts(0, 100, test);
+    // Active Staked Sui
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Pay Rewards
+    advance_epoch_with_reward_amounts(0, 100, test);
+    // Advance once more so our module registers in the next call
+    advance_epoch_with_reward_amounts(0, 100, test);
 
-//     // Mint Derivative
-//     next_tx(test, alice); 
-//     {
-//       let pool_storage = test::take_shared<PoolStorage>(test);
-//       let wrapper = test::take_shared<SuiSystemState>(test);
+    // Mint Derivative
+    next_tx(test, alice); 
+    {
+      let pool_storage = test::take_shared<PoolStorage>(test);
+      let wrapper = test::take_shared<SuiSystemState>(test);
+      let interest_sui_yield_Storage = test::take_shared<SuiYieldStorage>(test);
 
-//       let value = add_decimals(10, 9);
+      pool::update_pool(&mut wrapper, &mut pool_storage, ctx(test));
 
-//       let nft = mint_nft(value, value, ctx(test));
+      let value = add_decimals(10, 9);
 
-//       let sui_nft_amount = pool::quote_sui_yield(&mut wrapper, &mut pool_storage, &nft, ctx(test));
-//       let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
-//       let test_value = rebase::to_elastic(pool_rebase, value, false) - value;
+      let coupon = sui_yield::new_for_testing(
+        &mut interest_sui_yield_Storage, 10, value, value, 800000, ctx(test));
 
-//       assert_eq(sui_nft_amount, test_value);
+      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
-//       burn_nft(nft);
+      let old_base = rebase::base(pool_rebase);
+      let old_elastic = rebase::elastic(pool_rebase);
+      let yield_earned = rebase::to_elastic(pool_rebase, value, false) - 800000 - value;
+      let shares_burned = rebase::to_base(pool_rebase, yield_earned, false);
 
-//       test::return_shared(wrapper);
-//       test::return_shared(pool_storage); 
-//     };
-//     test::end(scenario);
-//   }
+      let (coupon_returned, rewards) = pool::claim_yield(
+        &mut wrapper,
+        &mut pool_storage,
+        vector[
+          pool::create_burn_validator_payload(MYSTEN_LABS, 2, yield_earned + add_decimals(1, 9))],
+        coupon,
+        MYSTEN_LABS, 99,
+        ctx(test)
+      );
+
+      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
+
+      assert_eq(burn(rewards), yield_earned);
+      assert_eq(sui_yield::shares(&coupon_returned), value);
+      assert_eq(sui_yield::value(&coupon_returned), value);
+      assert_eq(sui_yield::rewards_paid(&coupon_returned), yield_earned + 800000);
+      assert_eq(rebase::base(pool_rebase), old_base - shares_burned);
+      assert_eq(rebase::elastic(pool_rebase), old_elastic - yield_earned);
+      
+      sui_yield::burn_destroy(&mut interest_sui_yield_Storage, coupon_returned);
+
+      test::return_shared(interest_sui_yield_Storage);
+      test::return_shared(wrapper);
+      test::return_shared(pool_storage); 
+    };
+    test::end(scenario);
+  }
 
   // Set up Functions
 
