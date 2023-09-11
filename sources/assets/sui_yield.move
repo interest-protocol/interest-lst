@@ -45,7 +45,7 @@ module interest_lst::sui_yield {
       9,
       b"iSUIY",
       b"Interest Sui Yield",
-      b"It represents the yield of Native Staked Sui in the Interest lst pool.", 
+      b"It represents the yield of Native Staked Sui in the Interest LST pool.", 
       b"The slot is the maturity epoch of this token",
       option::some(url::new_unsafe_from_bytes(b"https://interestprotocol.infura-ipfs.io/ipfs/QmWiC7W6gF5F7LeSKkAGwgcC58DmRb8BC254iA5N3QKSRz")),
       ctx

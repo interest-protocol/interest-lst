@@ -47,7 +47,7 @@ module interest_lst::isui {
             9,
             b"iSUI",
             b"Interest Sui",
-            b"This coin represents your share on the Interest lst Pool",
+            b"This coin represents your share on the Interest LST Pool",
             option::some(url::new_unsafe_from_bytes(b"https://interestprotocol.infura-ipfs.io/ipfs/QmPGCeoDN89GJwbKrY6ocxYUk8byYeDCCpJU2doSdgoDww")),
             ctx
         );

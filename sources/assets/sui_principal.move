@@ -32,7 +32,7 @@ module interest_lst::sui_principal {
       9,
       b"iSUIP",
       b"Interest Sui Principal",
-      b"It represents the principal of Native Staked Sui in the Interest lst pool", 
+      b"It represents the principal of Native Staked Sui in the Interest LST pool", 
       b"The slot is the maturity epoch of this token.",
       option::some(url::new_unsafe_from_bytes(b"https://interestprotocol.infura-ipfs.io/ipfs/QmVvGuZZVhe78ewrCJLucPySVPio1VZRVnHSZpw9bNZTbD")),
       ctx
