@@ -76,7 +76,7 @@ module interest_lsd::pool {
     fee: Fee, // Holds the data to calculate the stake fee
     dao_coin: Coin<ISUI>, // Fees collected by the protocol in ISUI
     whitelist_validators: vector<address>,
-    exchange_rates: Table<u64, u64>, // 1Sui -> Sui Exchange rate
+    exchange_rates: Table<u64, Rebase>, // Epoch => Pool Data
   }
 
   // ** Events
@@ -298,7 +298,7 @@ module interest_lsd::pool {
     table::add(
       &mut storage.exchange_rates, 
       epoch + 1, 
-      rebase::to_elastic(&storage.pool, MIN_STAKING_THRESHOLD, false)
+      storage.pool
     );
   }
 
@@ -985,15 +985,15 @@ module interest_lsd::pool {
 
       // Check if the table has slot exchange rate
       // If it does not we use the back up maturity value
-      let exchange_rate = if (table::contains(&storage.exchange_rates, slot)) { 
-        *table::borrow(&storage.exchange_rates, slot)
+      let pool = if (table::contains(&storage.exchange_rates, slot)) { 
+        table::borrow(&storage.exchange_rates, slot)
       } else {
         // Back up maturity needs to be before the slot
         assert!(slot > maturity, EInvalidBackupMaturity);
-        *table::borrow(&storage.exchange_rates, maturity)
+        table::borrow(&storage.exchange_rates, maturity)
       };
 
-      ((exchange_rate as u256) * (shares as u256) / (MIN_STAKING_THRESHOLD as u256) as u64)
+      rebase::to_elastic(pool, shares, false)
     } else {
       // If it is before maturity - we just read the pool
       rebase::to_elastic(&storage.pool, shares, false)

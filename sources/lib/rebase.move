@@ -3,7 +3,7 @@ module interest_lsd::rebase {
 
   use interest_lsd::math::{mul_div};
 
-  struct Rebase has store {
+  struct Rebase has store, copy {
     base: u256,
     elastic: u256
   }
