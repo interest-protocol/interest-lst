@@ -76,7 +76,7 @@ module interest_lsd::pool {
     fee: Fee, // Holds the data to calculate the stake fee
     dao_coin: Coin<ISUI>, // Fees collected by the protocol in ISUI
     whitelist_validators: vector<address>,
-    exchange_rates: Table<u64, Rebase>, // Epoch => Pool Data
+    pool_history: Table<u64, Rebase>, // Epoch => Pool Data
   }
 
   // ** Events
@@ -146,7 +146,7 @@ module interest_lsd::pool {
         fee: new_fee(),
         dao_coin: coin::zero<ISUI>(ctx),
         whitelist_validators: vector::empty(),
-        exchange_rates: table::new(ctx)
+        pool_history: table::new(ctx)
       }
     );
   }
@@ -296,7 +296,7 @@ module interest_lsd::pool {
     // We save the epoch => exchange rate for iSui => Sui
     // Today's exchange rate is always yesterdays
     table::add(
-      &mut storage.exchange_rates, 
+      &mut storage.pool_history, 
       epoch + 1, 
       storage.pool
     );
@@ -985,12 +985,12 @@ module interest_lsd::pool {
 
       // Check if the table has slot exchange rate
       // If it does not we use the back up maturity value
-      let pool = if (table::contains(&storage.exchange_rates, slot)) { 
-        table::borrow(&storage.exchange_rates, slot)
+      let pool = if (table::contains(&storage.pool_history, slot)) { 
+        table::borrow(&storage.pool_history, slot)
       } else {
         // Back up maturity needs to be before the slot
         assert!(slot > maturity, EInvalidBackupMaturity);
-        table::borrow(&storage.exchange_rates, maturity)
+        table::borrow(&storage.pool_history, maturity)
       };
 
       rebase::to_elastic(pool, shares, false)
