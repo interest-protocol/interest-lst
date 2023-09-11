@@ -3,7 +3,7 @@
  We only tested the core functionality
 */
 #[test_only]
-module interest_lsd::pool_tests {
+module interest_lst::pool_tests {
   use std::option;
 
   use sui::linked_table;
@@ -22,13 +22,13 @@ module interest_lsd::pool_tests {
   };
   use sui_system::staking_pool;
   
-  use interest_lsd::pool::{Self, PoolStorage};
-  use interest_lsd::isui::{Self, ISUI, InterestSuiStorage};
-  use interest_lsd::sui_principal::{Self, SuiPrincipalStorage};
-  use interest_lsd::sui_yield::{Self, SuiYieldStorage};
-  use interest_lsd::rebase;
-  use interest_lsd::fee_utils::{read_fee};
-  use interest_lsd::test_utils::{people, scenario, mint, add_decimals}; 
+  use interest_lst::pool::{Self, PoolStorage};
+  use interest_lst::isui::{Self, ISUI, InterestSuiStorage};
+  use interest_lst::sui_principal::{Self, SuiPrincipalStorage};
+  use interest_lst::sui_yield::{Self, SuiYieldStorage};
+  use interest_lst::rebase;
+  use interest_lst::fee_utils::{read_fee};
+  use interest_lst::test_utils::{people, scenario, mint, add_decimals}; 
 
   const MYSTEN_LABS: address = @0x4;
   const FIGMENT: address = @0x5;

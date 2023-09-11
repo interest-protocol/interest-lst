@@ -3,7 +3,7 @@
 // ISsui is a share of the total SUI principal + rewards this module owns
 // iSUIP is always 1 SUI as it represents the principal owned by this module
 // iSUIY represents the yield component of a iSUIP
-module interest_lsd::pool { 
+module interest_lst::pool { 
   use std::vector;
   use std::option;
 
@@ -18,17 +18,17 @@ module interest_lsd::pool {
   use sui_system::staking_pool::{Self, StakedSui};
   use sui_system::sui_system::{Self, SuiSystemState};
 
-  use interest_lsd::admin::AdminCap;
-  use interest_lsd::rebase::{Self, Rebase};
-  use interest_lsd::math::{fmul, scalar};
-  use interest_lsd::semi_fungible_token::SemiFungibleToken;
-  use interest_lsd::isui::{Self, ISUI, InterestSuiStorage};
-  use interest_lsd::sui_yield::{Self, SuiYield, SuiYieldStorage};
-  use interest_lsd::staking_pool_utils::{calc_staking_pool_rewards};
-  use interest_lsd::sui_principal::{Self, SuiPrincipalStorage, SUI_PRINCIPAL};
-  use interest_lsd::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
+  use interest_lst::admin::AdminCap;
+  use interest_lst::rebase::{Self, Rebase};
+  use interest_lst::math::{fmul, scalar};
+  use interest_lst::semi_fungible_token::SemiFungibleToken;
+  use interest_lst::isui::{Self, ISUI, InterestSuiStorage};
+  use interest_lst::sui_yield::{Self, SuiYield, SuiYieldStorage};
+  use interest_lst::staking_pool_utils::{calc_staking_pool_rewards};
+  use interest_lst::sui_principal::{Self, SuiPrincipalStorage, SUI_PRINCIPAL};
+  use interest_lst::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
 
-  friend interest_lsd::review;
+  friend interest_lst::review;
   
   // ** Constants
 
@@ -63,16 +63,16 @@ module interest_lsd::pool {
   }
 
   // Shared Object
-  // Unfortunately, we cannot fully exploit Sui's concurrency model because we need our LSD Coins to reflect the rewards accrued
+  // Unfortunately, we cannot fully exploit Sui's concurrency model because we need our lst Coins to reflect the rewards accrued
   // This allows users to instantly to stake Sui by buying this coin without having to go through the process
   // This also makes Coins omnichannel and a user in Ethereum can buy the coin and instantly became a Sui Staker
-  // Sui StakingV3 module will have a bonding period, LSDs will be a great way to exit immediately
+  // Sui StakingV3 module will have a bonding period, lsts will be a great way to exit immediately
   struct PoolStorage has key {
     id: UID,
     pool: Rebase, // This struct holds the total shares of ISUI and the total SUI (Principal + Rewards). Rebase {base: ISUI total supply, elastic: total Sui}
     last_epoch: u64, // Last epoch that pool was updated
     validators_table: LinkedTable<address, ValidatorData>, // We need a linked table to iterate through all validators once every epoch to ensure all pool data is accurate
-    total_principal: u64, // Total amount of StakedSui principal deposited in Interest LSD Package
+    total_principal: u64, // Total amount of StakedSui principal deposited in Interest lst Package
     fee: Fee, // Holds the data to calculate the stake fee
     dao_coin: Coin<ISUI>, // Fees collected by the protocol in ISUI
     whitelist_validators: vector<address>,
@@ -222,7 +222,7 @@ module interest_lsd::pool {
     }
   }
 
-  // @dev This function costs a lot of gas and must be called before any interaction with Interest LSD because it updates the pool. The pool is needed to ensure all 3 Coins' exchange rate is accurate.
+  // @dev This function costs a lot of gas and must be called before any interaction with Interest lst because it updates the pool. The pool is needed to ensure all 3 Coins' exchange rate is accurate.
   // Anyone can call this function
   // It will ONLY RUN ONCE per epoch
   // Dev Team will call as soon as a new epoch starts so the first user does not need to incur this cost

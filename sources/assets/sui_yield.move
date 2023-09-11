@@ -1,7 +1,7 @@
 // Sui Yield is a Wrapped SFT with extra information about the yield
 // Reward paid is the rewards paid to date
 // Principal was the original shares to create the yield
-module interest_lsd::sui_yield {
+module interest_lst::sui_yield {
   use std::ascii;
   use std::option;
   use std::string::String;
@@ -11,12 +11,12 @@ module interest_lsd::sui_yield {
   use sui::object::{Self, UID};
   use sui::tx_context::TxContext;
 
-  use interest_lsd::math::{fdiv, fmul};
-  use interest_lsd::admin::AdminCap;
-  use interest_lsd::semi_fungible_token::{Self as sft, SFTTreasuryCap, SemiFungibleToken, SFTMetadata};
+  use interest_lst::math::{fdiv, fmul};
+  use interest_lst::admin::AdminCap;
+  use interest_lst::semi_fungible_token::{Self as sft, SFTTreasuryCap, SemiFungibleToken, SFTMetadata};
   
   // ** Only module that can mint/burn/create/mutate this SFT
-  friend interest_lsd::pool;
+  friend interest_lst::pool;
 
   // OTW to create the Sui Yield
   struct SUI_YIELD has drop {}
@@ -45,7 +45,7 @@ module interest_lsd::sui_yield {
       9,
       b"iSUIY",
       b"Interest Sui Yield",
-      b"It represents the yield of Native Staked Sui in the Interest LSD pool.", 
+      b"It represents the yield of Native Staked Sui in the Interest lst pool.", 
       b"The slot is the maturity epoch of this token",
       option::some(url::new_unsafe_from_bytes(b"https://interestprotocol.infura-ipfs.io/ipfs/QmWiC7W6gF5F7LeSKkAGwgcC58DmRb8BC254iA5N3QKSRz")),
       ctx

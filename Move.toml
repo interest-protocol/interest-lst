@@ -1,5 +1,5 @@
 [package]
-name = "InterestLSD"
+name = "InterestLST"
 version = "0.0.1"
 
 [dependencies]
@@ -8,7 +8,7 @@ Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-fram
 SuiSystem = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-system", rev = "testnet-v1.9.0" }
 
 [addresses]
-interest_lsd = "0x0"
+interest_lst = "0x0"
 std = "0x1"
 sui = "0x2"
 sui_system = "0x3"

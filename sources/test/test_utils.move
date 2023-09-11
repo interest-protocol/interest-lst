@@ -1,5 +1,5 @@
 #[test_only]
-module interest_lsd::test_utils {
+module interest_lst::test_utils {
   
   use sui::test_scenario::{Self as test, Scenario};
   use sui::coin::{mint_for_testing, Coin};

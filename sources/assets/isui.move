@@ -1,6 +1,6 @@
 // Sui Liquid Staking Derivative Coin
-// A share of all the rewards + principal in Interest LSD Pool
-module interest_lsd::isui {
+// A share of all the rewards + principal in Interest lst Pool
+module interest_lst::isui {
   use std::ascii;
   use std::option;
   use std::string;
@@ -12,14 +12,14 @@ module interest_lsd::isui {
   use sui::tx_context::{Self, TxContext};
   use sui::coin::{Self, Coin, TreasuryCap, CoinMetadata};
 
-  use interest_lsd::admin::AdminCap;
+  use interest_lst::admin::AdminCap;
 
   // ** Only module that can mint/burn this coin
-  friend interest_lsd::pool;
+  friend interest_lst::pool;
 
   // ** Structs
 
-  // OTW to create the Interest Sui LSD
+  // OTW to create the Interest Sui lst
   struct ISUI has drop {}
 
   // Treasury Cap Wrapper
@@ -41,13 +41,13 @@ module interest_lsd::isui {
   }
 
   fun init(witness: ISUI, ctx: &mut TxContext) {
-      // Create the ISUI LSD coin
+      // Create the ISUI lst coin
       let (treasury_cap, metadata) = coin::create_currency<ISUI>(
             witness, 
             9,
             b"iSUI",
             b"Interest Sui",
-            b"This coin represents your share on the Interest LSD Pool",
+            b"This coin represents your share on the Interest lst Pool",
             option::some(url::new_unsafe_from_bytes(b"https://interestprotocol.infura-ipfs.io/ipfs/QmPGCeoDN89GJwbKrY6ocxYUk8byYeDCCpJU2doSdgoDww")),
             ctx
         );

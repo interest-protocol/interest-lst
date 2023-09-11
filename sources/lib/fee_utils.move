@@ -1,7 +1,7 @@
 // Module has the logic on the dominance fee rate
-module interest_lsd::fee_utils {
+module interest_lst::fee_utils {
 
-  use interest_lsd::math::{fmul, fdiv};
+  use interest_lst::math::{fmul, fdiv};
 
   // Formula is
   // dominance = validator_principal / total_principal

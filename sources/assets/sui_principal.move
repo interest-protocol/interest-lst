@@ -1,6 +1,6 @@
-// Interest LSD Staked Sui is a Semi-Fungible Coin  
+// Interest lst Staked Sui is a Semi-Fungible Coin  
 // It represents an active deposit on the pool (NO YIELD - just the residue/principal)
-module interest_lsd::sui_principal {
+module interest_lst::sui_principal {
   use std::ascii;
   use std::option;
   use std::string::String;
@@ -10,11 +10,11 @@ module interest_lsd::sui_principal {
   use sui::object::{Self, UID};
   use sui::tx_context::TxContext;
 
-  use interest_lsd::admin::AdminCap;
-  use interest_lsd::semi_fungible_token::{Self as sft, SFTTreasuryCap, SemiFungibleToken, SFTMetadata};
+  use interest_lst::admin::AdminCap;
+  use interest_lst::semi_fungible_token::{Self as sft, SFTTreasuryCap, SemiFungibleToken, SFTMetadata};
   
   // ** Only module that can mint/burn/create/mutate this SFT
-  friend interest_lsd::pool;
+  friend interest_lst::pool;
 
   // OTW to create the Staked Sui
   struct SUI_PRINCIPAL has drop {}
@@ -32,7 +32,7 @@ module interest_lsd::sui_principal {
       9,
       b"iSUIP",
       b"Interest Sui Principal",
-      b"It represents the principal of Native Staked Sui in the Interest LSD pool", 
+      b"It represents the principal of Native Staked Sui in the Interest lst pool", 
       b"The slot is the maturity epoch of this token.",
       option::some(url::new_unsafe_from_bytes(b"https://interestprotocol.infura-ipfs.io/ipfs/QmVvGuZZVhe78ewrCJLucPySVPio1VZRVnHSZpw9bNZTbD")),
       ctx
