@@ -6,6 +6,7 @@ module interest_lsd::sui_yield {
   use std::option;
   use std::string::String;
 
+  use sui::url;
   use sui::transfer;
   use sui::object::{Self, UID};
   use sui::tx_context::TxContext;
@@ -46,7 +47,7 @@ module interest_lsd::sui_yield {
       b"Interest Sui Yield",
       b"It represents the yield of Native Staked Sui in the Interest LSD pool.", 
       b"The slot is the maturity epoch of this token",
-      option::none(),
+      option::some(url::new_unsafe_from_bytes(b"https://interestprotocol.infura-ipfs.io/ipfs/QmWiC7W6gF5F7LeSKkAGwgcC58DmRb8BC254iA5N3QKSRz")),
       ctx
     );
 

@@ -5,6 +5,7 @@ module interest_lsd::isui {
   use std::option;
   use std::string;
 
+  use sui::url;
   use sui::transfer;
   use sui::event::emit;
   use sui::object::{Self, UID};
@@ -47,7 +48,7 @@ module interest_lsd::isui {
             b"iSUI",
             b"Interest Sui",
             b"This coin represents your share on the Interest LSD Pool",
-            option::none(),
+            option::some(url::new_unsafe_from_bytes(b"https://interestprotocol.infura-ipfs.io/ipfs/QmPGCeoDN89GJwbKrY6ocxYUk8byYeDCCpJU2doSdgoDww")),
             ctx
         );
 

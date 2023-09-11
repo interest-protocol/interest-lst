@@ -5,6 +5,7 @@ module interest_lsd::sui_principal {
   use std::option;
   use std::string::String;
 
+  use sui::url;
   use sui::transfer;
   use sui::object::{Self, UID};
   use sui::tx_context::TxContext;
@@ -33,7 +34,7 @@ module interest_lsd::sui_principal {
       b"Interest Sui Principal",
       b"It represents the principal of Native Staked Sui in the Interest LSD pool", 
       b"The slot is the maturity epoch of this token.",
-      option::none(),
+      option::some(url::new_unsafe_from_bytes(b"https://interestprotocol.infura-ipfs.io/ipfs/QmVvGuZZVhe78ewrCJLucPySVPio1VZRVnHSZpw9bNZTbD")),
       ctx
     );
 
