@@ -1,10 +1,10 @@
 
 /*
-* Title - Semi Fungible Asset
+* Title - Semi Fungible Token
 *
-* Each Asset is fungible within the same slot and non-fungible accross slots
+* Each TOken is fungible within the same slot and non-fungible accross slots
 */
-module interest_lsd::semi_fungible_asset {
+module interest_lsd::semi_fungible_token {
   use std::ascii;
   use std::option::{Self, Option};
   use std::string::{String, utf8};
@@ -18,15 +18,15 @@ module interest_lsd::semi_fungible_asset {
   // Errors
   const EIncompatibleSlots: u64 = 0;
   const EBadWitness: u64 = 1;
-  const EAssetHasValue: u64 = 2;
+  const ETokenHasValue: u64 = 2;
 
-  struct SemiFungibleAsset<phantom T> has key, store {
+  struct SemiFungibleToken<phantom T> has key, store {
     id: UID, // Makes it into an NFT
     slot: u256, // Provides fungibility between the NFTs
     value: u64, // Value the NFT holds
   }
 
-  struct SFAMetadata<phantom T> has key, store {
+  struct SFTMetadata<phantom T> has key, store {
     id: UID,
     decimals: u8,
     name: String,
@@ -36,51 +36,51 @@ module interest_lsd::semi_fungible_asset {
     slot_description: String,
   }
 
-  struct SFATreasuryCap<phantom T> has key, store {
+  struct SFTTreasuryCap<phantom T> has key, store {
     id: UID,
     total_supply: Table<u256, u64>
   }
 
-  public fun total_supply_in_slot<T>(cap: &SFATreasuryCap<T>, slot: u256): u64 {
+  public fun total_supply_in_slot<T>(cap: &SFTTreasuryCap<T>, slot: u256): u64 {
     *table::borrow(&cap.total_supply, slot)
   }
 
-  public fun value<T>(self: &SemiFungibleAsset<T>): u64 {
+  public fun value<T>(self: &SemiFungibleToken<T>): u64 {
     self.value
   }
 
-  public fun slot<T>(self: &SemiFungibleAsset<T>): u256 {
+  public fun slot<T>(self: &SemiFungibleToken<T>): u256 {
     self.slot
   }
   
-  public entry fun join<T>(self: &mut SemiFungibleAsset<T>, a: SemiFungibleAsset<T>) {
-    let SemiFungibleAsset { id, value, slot } = a;
+  public entry fun join<T>(self: &mut SemiFungibleToken<T>, a: SemiFungibleToken<T>) {
+    let SemiFungibleToken { id, value, slot } = a;
     assert!(self.slot == slot, EIncompatibleSlots);
     object::delete(id);
     self.value = self.value + value
   }
 
-  public fun split<T>(self: &mut SemiFungibleAsset<T>, split_amount: u64, ctx: &mut TxContext): SemiFungibleAsset<T> {
+  public fun split<T>(self: &mut SemiFungibleToken<T>, split_amount: u64, ctx: &mut TxContext): SemiFungibleToken<T> {
     // This will throw if it underflows
     self.value = self.value - split_amount;
-    SemiFungibleAsset {
+    SemiFungibleToken {
       id: object::new(ctx),
       value: split_amount,
       slot: self.slot
     }
   }
 
-  public fun zero<T>(cap: &mut SFATreasuryCap<T>, slot: u256, ctx: &mut TxContext): SemiFungibleAsset<T> {
+  public fun zero<T>(cap: &mut SFTTreasuryCap<T>, slot: u256, ctx: &mut TxContext): SemiFungibleToken<T> {
     new_slot(cap, slot);
     
-    SemiFungibleAsset {
+    SemiFungibleToken {
       id: object::new(ctx),
       slot,
       value: 0
     }
   }
 
-  public fun create_sfa<T: drop>(
+  public fun create_sft<T: drop>(
     witness: T,
     decimals: u8,
     symbol: vector<u8>,
@@ -89,15 +89,15 @@ module interest_lsd::semi_fungible_asset {
     slot_description: vector<u8>,
     icon_url: Option<Url>,
     ctx: &mut TxContext 
-  ): (SFATreasuryCap<T>, SFAMetadata<T>) {
+  ): (SFTTreasuryCap<T>, SFTMetadata<T>) {
     assert!(is_one_time_witness(&witness), EBadWitness);
     
     (
-      SFATreasuryCap {
+      SFTTreasuryCap {
         id: object::new(ctx),
         total_supply: table::new(ctx)
       },  
-      SFAMetadata
+      SFTMetadata
         {
           id: object::new(ctx),
           decimals,
@@ -110,112 +110,112 @@ module interest_lsd::semi_fungible_asset {
     )    
   }
 
-  public fun new<T>(cap: &mut SFATreasuryCap<T>, slot: u256, value: u64, ctx: &mut TxContext): SemiFungibleAsset<T> {
+  public fun new<T>(cap: &mut SFTTreasuryCap<T>, slot: u256, value: u64, ctx: &mut TxContext): SemiFungibleToken<T> {
     new_slot(cap, slot);
 
     let supply = table::borrow_mut(&mut cap.total_supply, slot);
     *supply = *supply + value;
 
-    SemiFungibleAsset {
+    SemiFungibleToken {
       id: object::new(ctx),
       value,
       slot
     }
   } 
 
-  public fun mint<T>(cap: &mut SFATreasuryCap<T>, asset: &mut SemiFungibleAsset<T>, value: u64) {
-    let supply = table::borrow_mut(&mut cap.total_supply, asset.slot);
+  public fun mint<T>(cap: &mut SFTTreasuryCap<T>, token: &mut SemiFungibleToken<T>, value: u64) {
+    let supply = table::borrow_mut(&mut cap.total_supply, token.slot);
     *supply = *supply + value;
-    asset.value = asset.value + value;
+    token.value = token.value + value;
   }
 
-  public fun burn<T>(cap: &mut SFATreasuryCap<T>, asset: &mut SemiFungibleAsset<T>, value: u64) {
-    let supply = table::borrow_mut(&mut cap.total_supply, asset.slot);
+  public fun burn<T>(cap: &mut SFTTreasuryCap<T>, token: &mut SemiFungibleToken<T>, value: u64) {
+    let supply = table::borrow_mut(&mut cap.total_supply, token.slot);
     *supply = *supply - value;
-    asset.value = asset.value - value;
+    token.value = token.value - value;
   }
 
-  public fun is_zero<T>(asset: &SemiFungibleAsset<T>): bool {
-    asset.value == 0
+  public fun is_zero<T>(token: &SemiFungibleToken<T>): bool {
+    token.value == 0
   }
 
-  public fun destroy_zero<T>(asset: SemiFungibleAsset<T>) {
-    let SemiFungibleAsset { id, slot: _ , value  } = asset;
-    assert!(value == 0, EAssetHasValue);
+  public fun destroy_zero<T>(token: SemiFungibleToken<T>) {
+    let SemiFungibleToken { id, slot: _ , value  } = token;
+    assert!(value == 0, ETokenHasValue);
     object::delete(id);
   }
 
-  // === Update Asset SFAMetadata ===
+  // === Update Token SFTMetadata ===
 
     public entry fun update_name<T>(
-        _: &SFATreasuryCap<T>, metadata: &mut SFAMetadata<T>, name: String
+        _: &SFTTreasuryCap<T>, metadata: &mut SFTMetadata<T>, name: String
     ) {
         metadata.name = name;
     }
 
     public entry fun update_symbol<T>(
-        _: &SFATreasuryCap<T>, metadata: &mut SFAMetadata<T>, symbol: ascii::String
+        _: &SFTTreasuryCap<T>, metadata: &mut SFTMetadata<T>, symbol: ascii::String
     ) {
         metadata.symbol = symbol;
     }
 
     public entry fun update_description<T>(
-        _: &SFATreasuryCap<T>, metadata: &mut SFAMetadata<T>, description: String
+        _: &SFTTreasuryCap<T>, metadata: &mut SFTMetadata<T>, description: String
     ) {
         metadata.description = description;
     }
 
     public entry fun update_slot_description<T>(
-        _: &SFATreasuryCap<T>, metadata: &mut SFAMetadata<T>, slot_description: String
+        _: &SFTTreasuryCap<T>, metadata: &mut SFTMetadata<T>, slot_description: String
     ) {
         metadata.slot_description = slot_description;
     }
 
     public entry fun update_icon_url<T>(
-        _: &SFATreasuryCap<T>, metadata: &mut SFAMetadata<T>, url: ascii::String
+        _: &SFTTreasuryCap<T>, metadata: &mut SFTMetadata<T>, url: ascii::String
     ) {
         metadata.icon_url = option::some(url::new_unsafe(url));
     }
 
-    // === Get Asset metadata fields for on-chain consumption ===
+    // === Get Token metadata fields for on-chain consumption ===
 
     public fun get_decimals<T>(
-        metadata: &SFAMetadata<T>
+        metadata: &SFTMetadata<T>
     ): u8 {
         metadata.decimals
     }
 
     public fun get_name<T>(
-        metadata: &SFAMetadata<T>
+        metadata: &SFTMetadata<T>
     ): String {
         metadata.name
     }
 
     public fun get_symbol<T>(
-        metadata: &SFAMetadata<T>
+        metadata: &SFTMetadata<T>
     ): ascii::String {
         metadata.symbol
     }
 
     public fun get_description<T>(
-        metadata: &SFAMetadata<T>
+        metadata: &SFTMetadata<T>
     ): String {
         metadata.description
     }
 
     public fun get_slot_description<T>(
-        metadata: &SFAMetadata<T>
+        metadata: &SFTMetadata<T>
     ): String {
         metadata.slot_description
     }
 
     public fun get_icon_url<T>(
-        metadata: &SFAMetadata<T>
+        metadata: &SFTMetadata<T>
     ): Option<Url> {
         metadata.icon_url
     }
 
-  fun new_slot<T>(cap: &mut SFATreasuryCap<T>, slot: u256) {
+  fun new_slot<T>(cap: &mut SFTTreasuryCap<T>, slot: u256) {
     if (table::contains(&cap.total_supply, slot)) return;
 
     table::add(&mut cap.total_supply, slot, 0);
@@ -224,24 +224,24 @@ module interest_lsd::semi_fungible_asset {
   // === Test-only code ===
 
   #[test_only]
-  public fun create_for_testing<T>(slot: u256, value: u64, ctx: &mut TxContext): SemiFungibleAsset<T> {
-    SemiFungibleAsset { id: object::new(ctx), slot, value }
+  public fun create_for_testing<T>(slot: u256, value: u64, ctx: &mut TxContext): SemiFungibleToken<T> {
+    SemiFungibleToken { id: object::new(ctx), slot, value }
   }
 
   #[test_only]
-  public fun destroy_for_testing<T>(asset: SemiFungibleAsset<T>): (u256, u64) {
-    let SemiFungibleAsset { id, value, slot } = asset;
+  public fun destroy_for_testing<T>(token: SemiFungibleToken<T>): (u256, u64) {
+    let SemiFungibleToken { id, value, slot } = token;
     object::delete(id);
     (slot, value)
   }
 
   #[test_only]
-  public fun mint_for_testing<T>(asset: &mut SemiFungibleAsset<T>, value: u64) {
-    asset.value = asset.value + value;
+  public fun mint_for_testing<T>(token: &mut SemiFungibleToken<T>, value: u64) {
+    token.value = token.value + value;
   }
 
   #[test_only]
-  public fun burn_for_testing<T>(asset: &mut SemiFungibleAsset<T>, value: u64) {
-    asset.value = asset.value -  value;
+  public fun burn_for_testing<T>(token: &mut SemiFungibleToken<T>, value: u64) {
+    token.value = token.value -  value;
   }
 }

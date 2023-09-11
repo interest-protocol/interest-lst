@@ -1,4 +1,4 @@
-// Sui Yield is a Wrapped SFA with extra information about the yield
+// Sui Yield is a Wrapped SFT with extra information about the yield
 // Reward paid is the rewards paid to date
 // Principal was the original shares to create the yield
 module interest_lsd::sui_yield {
@@ -12,9 +12,9 @@ module interest_lsd::sui_yield {
 
   use interest_lsd::math::{fdiv, fmul};
   use interest_lsd::admin::AdminCap;
-  use interest_lsd::semi_fungible_asset::{Self as sfa, SFATreasuryCap, SemiFungibleAsset, SFAMetadata};
+  use interest_lsd::semi_fungible_token::{Self as sft, SFTTreasuryCap, SemiFungibleToken, SFTMetadata};
   
-  // ** Only module that can mint/burn/create/mutate this SFA
+  // ** Only module that can mint/burn/create/mutate this SFT
   friend interest_lsd::pool;
 
   // OTW to create the Sui Yield
@@ -22,30 +22,30 @@ module interest_lsd::sui_yield {
 
   // ** Structs
 
-  // SFA Data
+  // SFT Data
 
   struct SuiYield has key, store {
     id: UID,
-    sfa: SemiFungibleAsset<SUI_YIELD>,
+    sft: SemiFungibleToken<SUI_YIELD>,
     shares: u64,
     rewards_paid: u64
   }
 
   struct SuiYieldStorage has key {
     id: UID,
-    treasury_cap: SFATreasuryCap<SUI_YIELD>
+    treasury_cap: SFTTreasuryCap<SUI_YIELD>
   }
 
   // ** Events
 
   fun init(witness: SUI_YIELD, ctx: &mut TxContext) {
-    let (treasury_cap, metadata) = sfa::create_sfa(
+    let (treasury_cap, metadata) = sft::create_sft(
       witness,
       9,
       b"iSUIY",
       b"Interest Sui Yield",
       b"It represents the yield of Native Staked Sui in the Interest LSD pool.", 
-      b"The slot is the maturity epoch of this asset",
+      b"The slot is the maturity epoch of this token",
       option::none(),
       ctx
     );
@@ -62,90 +62,90 @@ module interest_lsd::sui_yield {
   // === Open Functions ===
 
   public fun total_supply_in_slot(storage: &SuiYieldStorage, slot: u256): u64 {
-    sfa::total_supply_in_slot(&storage.treasury_cap, slot)
+    sft::total_supply_in_slot(&storage.treasury_cap, slot)
   }
 
-  public fun value(asset: &SuiYield): u64 {
-    sfa::value(&asset.sfa)
+  public fun value(token: &SuiYield): u64 {
+    sft::value(&token.sft)
   }
 
-  public fun slot(asset: &SuiYield): u256 {
-    sfa::slot(&asset.sfa)
+  public fun slot(token: &SuiYield): u256 {
+    sft::slot(&token.sft)
   }
 
   public fun join(
     self: &mut SuiYield,
-    asset: SuiYield,     
+    token: SuiYield,     
     ) {
-    let SuiYield { sfa: a, id, shares, rewards_paid } = asset;
+    let SuiYield { sft: a, id, shares, rewards_paid } = token;
     object::delete(id);
-    sfa::join(&mut self.sfa, a);
+    sft::join(&mut self.sft, a);
     self.shares = self.shares + shares;
     self.rewards_paid = self.rewards_paid + rewards_paid;
   }
 
   public fun split(
-    asset: &mut SuiYield,
+    token: &mut SuiYield,
     split_amount: u64,
     ctx: &mut TxContext     
   ): SuiYield {
-    let v = (value(asset) as u256);
-    let a = sfa::split(&mut asset.sfa, split_amount, ctx);
+    let v = (value(token) as u256);
+    let a = sft::split(&mut token.sft, split_amount, ctx);
     // 1e18
     let split_percentage = fdiv((split_amount as u256), v);
-    let split_shares = (fmul(split_percentage, (asset.shares as u256)) as u64);
-    let split_rewards_paid = (fmul(split_percentage, (asset.rewards_paid as u256)) as u64);
+    let split_shares = (fmul(split_percentage, (token.shares as u256)) as u64);
+    let split_rewards_paid = (fmul(split_percentage, (token.rewards_paid as u256)) as u64);
     let x = SuiYield {
       id: object::new(ctx),
-      sfa: a,
+      sft: a,
       shares: split_shares,
       rewards_paid: split_rewards_paid
     };
 
-    asset.shares = asset.shares - split_shares;
-    asset.rewards_paid = asset.rewards_paid - split_rewards_paid;
+    token.shares = token.shares - split_shares;
+    token.rewards_paid = token.rewards_paid - split_rewards_paid;
     x
   }
 
   public fun zero(storage: &mut SuiYieldStorage, slot: u256, ctx: &mut TxContext): SuiYield {
     SuiYield {
       id: object::new(ctx),
-      sfa: sfa::zero(&mut storage.treasury_cap, slot, ctx),
+      sft: sft::zero(&mut storage.treasury_cap, slot, ctx),
       shares: 0, 
       rewards_paid: 0
     }
   }
 
-  public fun shares(asset: &SuiYield): u64 {
-    asset.shares
+  public fun shares(token: &SuiYield): u64 {
+    token.shares
   }
 
-  public fun rewards_paid(asset: &SuiYield): u64 {
-    asset.rewards_paid
+  public fun rewards_paid(token: &SuiYield): u64 {
+    token.rewards_paid
   }
 
-  public fun read_data(asset: &SuiYield): (u64, u64, u64) {
-    (asset.shares, value(asset), asset.rewards_paid)
+  public fun read_data(token: &SuiYield): (u64, u64, u64) {
+    (token.shares, value(token), token.rewards_paid)
   }
 
-  public fun is_zero(asset: &SuiYield): bool {
-    sfa::is_zero(&asset.sfa)
+  public fun is_zero(token: &SuiYield): bool {
+    sft::is_zero(&token.sft)
   }
 
-  public fun destroy_zero(asset: SuiYield) {
-    let SuiYield {sfa: a, id, rewards_paid: _, shares: _} = asset;
-    sfa::destroy_zero(a);
+  public fun destroy_zero(token: SuiYield) {
+    let SuiYield {sft: a, id, rewards_paid: _, shares: _} = token;
+    sft::destroy_zero(a);
     object::delete(id);
   }
 
-  public fun burn(storage: &mut SuiYieldStorage, asset: &mut SuiYield, value: u64) {
-    sfa::burn(&mut storage.treasury_cap,&mut asset.sfa, value);
+  public fun burn(storage: &mut SuiYieldStorage, token: &mut SuiYield, value: u64) {
+    sft::burn(&mut storage.treasury_cap,&mut token.sft, value);
   } 
 
-  public fun burn_destroy(storage: &mut SuiYieldStorage, asset: SuiYield): u64 {
-    let value = value(&asset);
-    burn(storage, &mut asset, value);
-    destroy_zero(asset);
+  public fun burn_destroy(storage: &mut SuiYieldStorage, token: SuiYield): u64 {
+    let value = value(&token);
+    burn(storage, &mut token, value);
+    destroy_zero(token);
     value
   } 
 
@@ -160,59 +160,59 @@ module interest_lsd::sui_yield {
   ): SuiYield {
     SuiYield {
       id: object::new(ctx),
-      sfa: sfa::new(&mut storage.treasury_cap, slot, principal, ctx),
+      sft: sft::new(&mut storage.treasury_cap, slot, principal, ctx),
       shares,
       rewards_paid: 0 
     }
   } 
 
-  public(friend) fun mint(storage: &mut SuiYieldStorage, asset: &mut SuiYield, value: u64) {
-    sfa::mint(&mut storage.treasury_cap, &mut asset.sfa, value);
+  public(friend) fun mint(storage: &mut SuiYieldStorage, token: &mut SuiYield, value: u64) {
+    sft::mint(&mut storage.treasury_cap, &mut token.sft, value);
   }   
 
   public(friend) fun add_rewards_paid(
-    asset: &mut SuiYield,
+    token: &mut SuiYield,
     rewards_paid: u64,     
     ) {
-    asset.rewards_paid = asset.rewards_paid + rewards_paid;
+    token.rewards_paid = token.rewards_paid + rewards_paid;
   }
 
   public(friend) fun set_shares(
-    asset: &mut SuiYield,
+    token: &mut SuiYield,
     shares: u64,     
     ) {
-    asset.shares = shares;
+    token.shares = shares;
   }
 
   public(friend) fun set_rewards_paid(
-    asset: &mut SuiYield,
+    token: &mut SuiYield,
     rewards_paid: u64,     
     ) {
-    asset.rewards_paid =  rewards_paid;
+    token.rewards_paid =  rewards_paid;
   }
 
   // === ADMIN ONLY Functions ===
 
   public entry fun update_name(
-    _:&AdminCap, storage: &mut SuiYieldStorage, metadata: &mut SFAMetadata<SUI_YIELD>, name: String
-  ) { sfa::update_name(&mut storage.treasury_cap, metadata, name); }
+    _:&AdminCap, storage: &mut SuiYieldStorage, metadata: &mut SFTMetadata<SUI_YIELD>, name: String
+  ) { sft::update_name(&mut storage.treasury_cap, metadata, name); }
 
   public entry fun update_symbol(
-    _:&AdminCap, storage: &mut SuiYieldStorage, metadata: &mut SFAMetadata<SUI_YIELD>, symbol: ascii::String
-  ) { sfa::update_symbol(&mut storage.treasury_cap, metadata, symbol) }
+    _:&AdminCap, storage: &mut SuiYieldStorage, metadata: &mut SFTMetadata<SUI_YIELD>, symbol: ascii::String
+  ) { sft::update_symbol(&mut storage.treasury_cap, metadata, symbol) }
 
   public entry fun update_description(
-    _:&AdminCap, storage: &mut SuiYieldStorage, metadata: &mut SFAMetadata<SUI_YIELD>, description: String
-  ) { sfa::update_description(&mut storage.treasury_cap, metadata, description) }
+    _:&AdminCap, storage: &mut SuiYieldStorage, metadata: &mut SFTMetadata<SUI_YIELD>, description: String
+  ) { sft::update_description(&mut storage.treasury_cap, metadata, description) }
 
   public entry fun update_slot_description(
-    _:&AdminCap, storage: &mut SuiYieldStorage, metadata: &mut SFAMetadata<SUI_YIELD>, slot_description: String
-  ) { sfa::update_slot_description(&mut storage.treasury_cap, metadata, slot_description) }
+    _:&AdminCap, storage: &mut SuiYieldStorage, metadata: &mut SFTMetadata<SUI_YIELD>, slot_description: String
+  ) { sft::update_slot_description(&mut storage.treasury_cap, metadata, slot_description) }
 
   public entry fun update_icon_url(
-    _:&AdminCap, storage: &mut SuiYieldStorage, metadata: &mut SFAMetadata<SUI_YIELD>, url: ascii::String
+    _:&AdminCap, storage: &mut SuiYieldStorage, metadata: &mut SFTMetadata<SUI_YIELD>, url: ascii::String
   ) {
-    sfa::update_icon_url(&storage.treasury_cap, metadata, url);
+    sft::update_icon_url(&storage.treasury_cap, metadata, url);
   }
 
 
@@ -234,38 +234,38 @@ module interest_lsd::sui_yield {
   ): SuiYield {
     SuiYield {
       id: object::new(ctx),
-      sfa: sfa::new(&mut storage.treasury_cap, slot, principal, ctx),
+      sft: sft::new(&mut storage.treasury_cap, slot, principal, ctx),
       shares,
       rewards_paid
     }
   } 
 
   #[test_only]
-  public fun mint_for_testing(storage: &mut SuiYieldStorage, asset: &mut SuiYield, value: u64) {
-    mint(storage, asset, value);
+  public fun mint_for_testing(storage: &mut SuiYieldStorage, token: &mut SuiYield, value: u64) {
+    mint(storage, token, value);
   }   
 
   #[test_only]
   public fun add_rewards_paid_for_testing(
-    asset: &mut SuiYield,
+    token: &mut SuiYield,
     rewards_paid: u64,     
     ) {
-    asset.rewards_paid = asset.rewards_paid + rewards_paid;
+    token.rewards_paid = token.rewards_paid + rewards_paid;
   }
 
   #[test_only]
   public fun set_shares_for_testing(
-    asset: &mut SuiYield,
+    token: &mut SuiYield,
     shares: u64,     
     ) {
-    asset.shares = shares;
+    token.shares = shares;
   }
 
   #[test_only]
   public fun set_rewards_paid_for_testing(
-    asset: &mut SuiYield,
+    token: &mut SuiYield,
     rewards_paid: u64,     
     ) {
-    asset.rewards_paid =  rewards_paid;
+    token.rewards_paid =  rewards_paid;
   }
 }

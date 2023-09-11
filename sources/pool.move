@@ -21,7 +21,7 @@ module interest_lsd::pool {
   use interest_lsd::admin::AdminCap;
   use interest_lsd::rebase::{Self, Rebase};
   use interest_lsd::math::{fmul, scalar};
-  use interest_lsd::semi_fungible_asset::SemiFungibleAsset;
+  use interest_lsd::semi_fungible_token::SemiFungibleToken;
   use interest_lsd::isui::{Self, ISUI, InterestSuiStorage};
   use interest_lsd::sui_yield::{Self, SuiYield, SuiYieldStorage};
   use interest_lsd::staking_pool_utils::{calc_staking_pool_rewards};
@@ -38,14 +38,12 @@ module interest_lsd::pool {
   // ** Errors
 
   const EInvalidFee: u64 = 0; // All values inside the Fees Struct must be equal or below 1e18 as it represents 100%
-  const EInvalidStakeAmount: u64 = 1; // Users need to stake more than 1 MIST as the sui_system will throw 0 value stakes
+  const EMistmatchedValues: u64 = 1; // Sender did not provide the same quantity of Yield and Principal
   const EInvalidUnstakeAmount: u64 = 2; // The sender tried to unstake more than he is allowed 
-  const ETooEarly: u64 = 3; // User tried to redeem assets before their maturity
-  const EInvalidSplitAmount: u64 = 4; // The user tried to split with an invalid amount, either 0 or more than the SFA contains
-  const EInvalidMaturity: u64 = 6; // Sender tried to create a bond with a maturity that is not whitelisted
-  const EInvalidBackupMaturity: u64 = 7; // Sender tried to abuse the maturity 
-  const EMistmatchedSlots: u64 = 8; // Sender tried to call a bond with SFAs with different slots
-  const EMistmatchedValues: u64 = 8; // Sender did not provide the same quantity of Yield and Principal
+  const ETooEarly: u64 = 3; // User tried to redeem tokens before their maturity
+  const EInvalidMaturity: u64 = 4; // Sender tried to create a bond with an outdated maturity
+  const EInvalidBackupMaturity: u64 = 5; // Sender tried to abuse the maturity 
+  const EMistmatchedSlots: u64 = 6; // Sender tried to call a bond with SFTs with different slots
 
   // ** Structs
 
@@ -191,14 +189,14 @@ module interest_lsd::pool {
   /*
   * @param wrapper The Sui System Shared Object
   * @param storage The Pool Storage Shared Object (this module)
-  * @param sfa The SuiYield
+  * @param sft The SuiYield
   * @param maturity the backup maturity
   * @return the exchange rate
   */
   public fun get_pending_yield(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage, 
-    sfa: &SuiYield,
+    sft: &SuiYield,
     maturity: u64,
     ctx: &mut TxContext
   ): u64 {
@@ -206,7 +204,7 @@ module interest_lsd::pool {
     // We update the pool to make sure the rewards are up to date
     update_pool(wrapper, storage, ctx);
 
-    get_pending_yield_logic(storage, sfa, maturity, ctx)
+    get_pending_yield_logic(storage, sft, maturity, ctx)
   }
 
   // @dev Utility function to create {BurnValidatorPayload} Object for other modules
@@ -309,7 +307,7 @@ module interest_lsd::pool {
   * @param wrapper The Sui System Shared Object
   * @param storage The Pool Storage Shared Object (this module)
   * @param interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
-  * @param asset The Sui Coin, the sender wishes to stake
+  * @param token The Sui Coin, the sender wishes to stake
   * @param validator_address The Sui Coin will be staked in this validator
   * @return Coin<ISUI> in exchange for the Sui deposited
   */
@@ -317,14 +315,14 @@ module interest_lsd::pool {
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     interest_sui_storage: &mut InterestSuiStorage,
-    asset: Coin<SUI>,
+    token: Coin<SUI>,
     validator_address: address,
     ctx: &mut TxContext,
   ): Coin<ISUI> {
-    let sui_amount = coin::value(&asset);
+    let sui_amount = coin::value(&token);
     
     // mint_isui_logic will update the pool
-    let shares = mint_isui_logic(wrapper, storage, asset, validator_address, ctx);
+    let shares = mint_isui_logic(wrapper, storage, token, validator_address, ctx);
 
     let shares_to_mint = if (is_whitelisted(storage, validator_address)) {
       shares
@@ -351,7 +349,7 @@ module interest_lsd::pool {
   * @param storage The Pool Storage Shared Object (this module)
   * @param interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
   * @param validator_payload A vector containing the information about which StakedSui to unstake
-  * @param asset The iSui Coin, the sender wishes to burn
+  * @param token The iSui Coin, the sender wishes to burn
   * @param validator_address The validator is to re-stake any remaining Sui if any
   * @return Coin<SUI> in exchange for the iSui burned
   */
@@ -360,7 +358,7 @@ module interest_lsd::pool {
     storage: &mut PoolStorage,
     interest_sui_storage: &mut InterestSuiStorage,
     validator_payload: vector<BurnValidatorPayload>,
-    asset: Coin<ISUI>,
+    token: Coin<ISUI>,
     validator_address: address,
     ctx: &mut TxContext,
   ): Coin<SUI> {
@@ -368,12 +366,12 @@ module interest_lsd::pool {
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
     update_pool(wrapper, storage, ctx);
 
-    let isui_amount = coin::value(&asset);
+    let isui_amount = coin::value(&token);
 
     // Update the pool 
     // Remove the shares
     // Burn the iSUI
-    let sui_value_to_return = rebase::sub_base(&mut storage.pool, isui::burn(interest_sui_storage, asset, ctx), false);
+    let sui_value_to_return = rebase::sub_base(&mut storage.pool, isui::burn(interest_sui_storage, token, ctx), false);
 
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
@@ -395,7 +393,7 @@ module interest_lsd::pool {
   * @param interest_sui_storage The shared object of ISUI, it contains the treasury_cap. We need it to mint ISUI
   * @param sui_principal_storage The shared object of Sui Principal, it contains the treasury_cap. We need it to mint.
   * @param sui_yield_storage The shared object of Sui Yield, it contains the treasury_cap. We need it to mint.
-  * @param asset The Sui Coin, the sender wishes to stake
+  * @param token The Sui Coin, the sender wishes to stake
   * @param validator_address The Sui Coin will be staked in this validator
   * @param maturity The intended maturity of the bond
   * @return (COIN<Sui Principal>, SuiYield)
@@ -406,22 +404,22 @@ module interest_lsd::pool {
     interest_sui_storage: &mut InterestSuiStorage,
     sui_principal_storage: &mut SuiPrincipalStorage,
     sui_yield_storage: &mut SuiYieldStorage,
-    asset: Coin<SUI>,
+    token: Coin<SUI>,
     validator_address: address,
     maturity: u64,
     ctx: &mut TxContext,
-  ):(SemiFungibleAsset<SUI_PRINCIPAL>, SuiYield) {
+  ):(SemiFungibleToken<SUI_PRINCIPAL>, SuiYield) {
     // It makes no sense to create an expired bond
     assert!(maturity > tx_context::epoch(ctx), EInvalidMaturity);
 
-    let sui_amount = coin::value(&asset);
+    let sui_amount = coin::value(&token);
 
     // mint_isui_logic will update the pool
-    let sfa_yield = sui_yield::new( 
+    let sft_yield = sui_yield::new( 
       sui_yield_storage,
       (maturity as u256),
       sui_amount,
-      mint_isui_logic(wrapper, storage,asset, validator_address, ctx),
+      mint_isui_logic(wrapper, storage,token, validator_address, ctx),
       ctx
     );
 
@@ -438,19 +436,19 @@ module interest_lsd::pool {
       )
     };
 
-    let sfa_principal = sui_principal::new(sui_principal_storage, (maturity as u256), sui_amount, ctx);
+    let sft_principal = sui_principal::new(sui_principal_storage, (maturity as u256), sui_amount, ctx);
 
     emit(MintStrippedBond { 
       sender: tx_context::sender(ctx), 
       sui_amount, 
-      sui_principal_id: object::id(&sfa_principal),
-      sui_yield_id: object::id(&sfa_yield),
+      sui_principal_id: object::id(&sft_principal),
+      sui_yield_id: object::id(&sft_yield),
       validator: validator_address 
     });
 
     (
-      sfa_principal,
-      sfa_yield
+      sft_principal,
+      sft_yield
     ) 
   } 
 
@@ -461,8 +459,8 @@ module interest_lsd::pool {
   * @param sui_principal_storage The shared object of Sui Principal, it contains the treasury_cap. We need it to mint.
   * @param sui_yield_storage The shared object of Sui Yield, it contains the treasury_cap. We need it to mint.
   * @param validator_payload A vector containing the information about which StakedSui to unstake
-  * @param sfa_principal The residue portion of the bond
-  * @param sfa_yield The yield portion of the bond
+  * @param sft_principal The residue portion of the bond
+  * @param sft_yield The yield portion of the bond
   * @param validator_address The Sui Coin will be staked in this validator
   * @param maturity Back up maturity in case we missed an pool update call (should not happen)
   * @return Coin<SUI> in exchange for the Sui Principal burned
@@ -473,27 +471,27 @@ module interest_lsd::pool {
     sui_principal_storage: &mut SuiPrincipalStorage,
     sui_yield_storage: &mut SuiYieldStorage,
     validator_payload: vector<BurnValidatorPayload>,
-    sfa_principal: SemiFungibleAsset<SUI_PRINCIPAL>,
-    sfa_yield: SuiYield,
+    sft_principal: SemiFungibleToken<SUI_PRINCIPAL>,
+    sft_yield: SuiYield,
     validator_address: address,
     maturity: u64,
     ctx: &mut TxContext,
   ): Coin<SUI> {
-    let slot = (sui_yield::slot(&sfa_yield) as u64);
+    let slot = (sui_yield::slot(&sft_yield) as u64);
     
     // They must be with the same slot
-    assert!((slot as u256) == sui_principal::slot(&sfa_principal), EMistmatchedSlots);
+    assert!((slot as u256) == sui_principal::slot(&sft_principal), EMistmatchedSlots);
     // They must have the same value
-    assert!(sui_yield::value(&sfa_yield) == sui_principal::value(&sfa_principal), EMistmatchedValues);
+    assert!(sui_yield::value(&sft_yield) == sui_principal::value(&sft_principal), EMistmatchedValues);
 
     // Need to update the entire state of Sui/Sui Rewards once every epoch
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
     update_pool(wrapper, storage, ctx);
 
-    // Destroy both assets
+    // Destroy both tokens
     // Calculate how much Sui they are worth
-    let sui_value_to_return = get_pending_yield_logic(storage, &sfa_yield, maturity, ctx) + sui_principal::burn_destroy(sui_principal_storage, sfa_principal);
-    sui_yield::burn_destroy(sui_yield_storage, sfa_yield);
+    let sui_value_to_return = get_pending_yield_logic(storage, &sft_yield, maturity, ctx) + sui_principal::burn_destroy(sui_principal_storage, sft_principal);
+    sui_yield::burn_destroy(sui_yield_storage, sft_yield);
 
     emit(CallBond { 
       sui_amount: 
@@ -521,7 +519,7 @@ module interest_lsd::pool {
   * @param storage The Pool Storage Shared Object (this module)
   * @param sui_principal_storage The shared object of Sui Principal, it contains the treasury_cap. We need it to burn Sui Principal
   * @param validator_payload A vector containing the information about which StakedSui to unstake
-  * @param asset The Sui Principal, the sender wishes to burn
+  * @param token The Sui Principal, the sender wishes to burn
   * @param validator_address The validator to re stake any remaining Sui if any
   * @return Coin<SUI> in exchange for the Sui Principal burned
   */
@@ -530,11 +528,11 @@ module interest_lsd::pool {
     storage: &mut PoolStorage,
     sui_principal_storage: &mut SuiPrincipalStorage,
     validator_payload: vector<BurnValidatorPayload>,
-    asset: SemiFungibleAsset<SUI_PRINCIPAL>,
+    token: SemiFungibleToken<SUI_PRINCIPAL>,
     validator_address: address,
     ctx: &mut TxContext,
   ): Coin<SUI> {
-    assert!(tx_context::epoch(ctx) > (sui_principal::slot(&asset) as u64), ETooEarly);
+    assert!(tx_context::epoch(ctx) > (sui_principal::slot(&token) as u64), ETooEarly);
 
     // Need to update the entire state of Sui/Sui Rewards once every epoch
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
@@ -542,7 +540,7 @@ module interest_lsd::pool {
 
     // 1 Sui Principal is always 1 SUI
     // Burn the Sui Principal
-    let sui_value_to_return = sui_principal::burn_destroy(sui_principal_storage, asset);
+    let sui_value_to_return = sui_principal::burn_destroy(sui_principal_storage, token);
 
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
@@ -563,27 +561,27 @@ module interest_lsd::pool {
   * @param wrapper The Sui System Shared Object
   * @param storage The Pool Storage Shared Object (this module)
   * @param validator_payload A vector containing the information about which StakedSui to unstake
-  * @param sfa_yield The SuiYield to burn in exchange for rewards
+  * @param sft_yield The SuiYield to burn in exchange for rewards
   * @param validator_address The validator to re stake any remaining Sui if any
   * @param maturity The back up maturity in case we missed a {update_pool} call
-  * @return (SuiYield, Coin<SUI>) Returns the original asset and the yield to the sender
+  * @return (SuiYield, Coin<SUI>) Returns the original token and the yield to the sender
   */
   public fun claim_yield(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     validator_payload: vector<BurnValidatorPayload>,
-    sfa_yield: SuiYield,
+    sft_yield: SuiYield,
     validator_address: address,
     maturity: u64,
     ctx: &mut TxContext,
   ): (SuiYield, Coin<SUI>) {
     
-    // Destroy both assets
+    // Destroy both tokens
     // Calculate how much Sui they are worth
-    let sui_amount = get_pending_yield(wrapper, storage, &sfa_yield, maturity, ctx);
+    let sui_amount = get_pending_yield(wrapper, storage, &sft_yield, maturity, ctx);
 
     // Consider yield paid
-    sui_yield::add_rewards_paid(&mut sfa_yield, sui_amount);
+    sui_yield::add_rewards_paid(&mut sft_yield, sui_amount);
 
     // We need to update the pool
     rebase::sub_elastic(&mut storage.pool, sui_amount, false);
@@ -593,10 +591,10 @@ module interest_lsd::pool {
     // Sender must Unstake more than his principal to ensure that the leftover is above the threshold of 1 Sui
     assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_amount, EInvalidUnstakeAmount);
 
-    emit(ClaimYield { sui_yield_id: object::id(&sfa_yield), sui_amount, sender: tx_context::sender(ctx) });
+    emit(ClaimYield { sui_yield_id: object::id(&sft_yield), sui_amount, sender: tx_context::sender(ctx) });
 
     // Unstake Sui
-    (sfa_yield, unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_amount, ctx))
+    (sft_yield, unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_amount, ctx))
   }
 
   // ** Functions to handle Whitelist validators
@@ -685,19 +683,19 @@ module interest_lsd::pool {
   * @param wrapper The Sui System Shared Object
   * @param storage The Pool Storage Shared Object (this module)
   * @param interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
-  * @param asset The Sui Coin, the sender wishes to stake
+  * @param token The Sui Coin, the sender wishes to stake
   * @param validator_address The Sui Coin will be staked in this validator
   * @return Coin<ISUI> in exchange for the Sui deposited
   */
   fun mint_isui_logic(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    asset: Coin<SUI>,
+    token: Coin<SUI>,
     validator_address: address,
     ctx: &mut TxContext,    
   ): u64 {
     // Save the value of Sui being staked in memory
-    let stake_value = coin::value(&asset);
+    let stake_value = coin::value(&token);
 
     // Will save gas since the sui_system will throw
     assert!(stake_value >= MIN_STAKING_THRESHOLD, EInvalidUnstakeAmount);
@@ -708,7 +706,7 @@ module interest_lsd::pool {
   
     // Stake Sui 
     // We need to stake Sui before registering the validator to have access to the pool_id
-    let staked_sui = sui_system::request_add_stake_non_entry(wrapper, asset, validator_address, ctx);
+    let staked_sui = sui_system::request_add_stake_non_entry(wrapper, token, validator_address, ctx);
 
     // Register the validator once in the linked_list
     safe_register_validator(storage, staking_pool::pool_id(&staked_sui), validator_address, ctx);
@@ -965,21 +963,21 @@ module interest_lsd::pool {
       }); 
   }
 
-  // @dev It returns the Sui value of the {sfa}. it does not update the pool so careful!
+  // @dev It returns the Sui value of the {sft}. it does not update the pool so careful!
   /*
   * @param storage The Pool Storage Shared Object (this module)
-  * @param sfa The SuiYield
+  * @param sft The SuiYield
   * @return u64 the exchange rate
   */
   fun get_pending_yield_logic(
     storage: &mut PoolStorage, 
-    sfa_yield: &SuiYield,
+    sft_yield: &SuiYield,
     maturity: u64,
     ctx: &mut TxContext
   ): u64 {
-    let slot = (sui_yield::slot(sfa_yield) as u64);
+    let slot = (sui_yield::slot(sft_yield) as u64);
 
-    let (shares, principal, rewards_paid) = sui_yield::read_data(sfa_yield);
+    let (shares, principal, rewards_paid) = sui_yield::read_data(sft_yield);
 
     let shares_value = if (tx_context::epoch(ctx) > slot) {
       // If the user is getting the yield after maturity
@@ -1003,7 +1001,7 @@ module interest_lsd::pool {
 
     let debt = rewards_paid + principal;
 
-    // Remove the principal to find out how many rewards this SFA has accrued
+    // Remove the principal to find out how many rewards this SFT has accrued
     if (debt >= shares_value) {
       0
     } else {
