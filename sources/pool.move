@@ -412,29 +412,31 @@ module interest_lsd::pool {
     // It makes no sense to create an expired bond
     assert!(maturity > tx_context::epoch(ctx), EInvalidMaturity);
 
-    let sui_amount = coin::value(&token);
+    let token_amount = coin::value(&token);
+    let shares_amount = mint_isui_logic(wrapper, storage,token, validator_address, ctx);
 
-    // mint_isui_logic will update the pool
-    let sft_yield = sui_yield::new( 
-      sui_yield_storage,
-      (maturity as u256),
-      sui_amount,
-      mint_isui_logic(wrapper, storage,token, validator_address, ctx),
-      ctx
-    );
 
     let sui_amount = if (is_whitelisted(storage, validator_address)) { 
-      sui_amount 
+      token_amount
     } else {
       let validator_principal = linked_table::borrow(&storage.validators_table, validator_address).total_principal;
       charge_interest_staked_sui_mint(
         storage, 
         interest_sui_storage, 
         validator_principal, 
-        sui_amount, 
+        token_amount, 
         ctx        
       )
     };
+
+    // mint_isui_logic will update the pool
+    let sft_yield = sui_yield::new( 
+      sui_yield_storage,
+      (maturity as u256),
+      sui_amount,
+      shares_amount,
+      ctx
+    );
 
     let sft_principal = sui_principal::new(sui_principal_storage, (maturity as u256), sui_amount, ctx);
 
