@@ -366,12 +366,12 @@ module interest_lsd::pool {
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
     update_pool(wrapper, storage, ctx);
 
-    let isui_amount = coin::value(&token);
+    let isui_amount = isui::burn(interest_sui_storage, token, ctx);
 
     // Update the pool 
     // Remove the shares
     // Burn the iSUI
-    let sui_value_to_return = rebase::sub_base(&mut storage.pool, isui::burn(interest_sui_storage, token, ctx), false);
+    let sui_value_to_return = rebase::sub_base(&mut storage.pool, isui_amount, false);
 
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
