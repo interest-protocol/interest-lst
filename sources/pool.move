@@ -7,10 +7,10 @@ module interest_lst::pool {
   use std::vector;
   use std::option;
 
+  use sui::table;
   use sui::transfer;
   use sui::sui::SUI;
   use sui::event::emit;
-  use sui::table::{Self, Table};
   use sui::coin::{Self, Coin};
   use sui::object::{Self, UID, ID};
   use sui::tx_context::{Self, TxContext};
@@ -76,7 +76,7 @@ module interest_lst::pool {
     fee: Fee, // Holds the data to calculate the stake fee
     dao_coin: Coin<ISUI>, // Fees collected by the protocol in ISUI
     whitelist_validators: vector<address>,
-    pool_history: Table<u64, Rebase>, // Epoch => Pool Data
+    pool_history: LinkedTable<u64, Rebase>, // Epoch => Pool Data
   }
 
   // ** Events
@@ -146,7 +146,7 @@ module interest_lst::pool {
         fee: new_fee(),
         dao_coin: coin::zero<ISUI>(ctx),
         whitelist_validators: vector::empty(),
-        pool_history: table::new(ctx)
+        pool_history: linked_table::new(ctx)
       }
     );
   }
@@ -295,7 +295,7 @@ module interest_lst::pool {
     storage.last_epoch = epoch;
     // We save the epoch => exchange rate for iSui => Sui
     // Today's exchange rate is always yesterdays
-    table::add(
+    linked_table::push_back(
       &mut storage.pool_history, 
       epoch + 1, 
       storage.pool
@@ -874,7 +874,7 @@ module interest_lst::pool {
     ): u64 {
     
     // Find the fee % based on the validator dominance and fee parameters.  
-    let fee_amount = calc_fee(storage, validator_principal, shares);
+    let fee_amount = calculate_fee(storage, validator_principal, shares);
 
     // If the fee is zero, there is nothing else to do
     if (fee_amount == 0) return shares;
@@ -902,7 +902,7 @@ module interest_lst::pool {
     ): u64 {
     
     // Find the fee % based on the validator dominance and fee parameters.  
-    let fee_amount = calc_fee(storage, validator_principal, amount);
+    let fee_amount = calculate_fee(storage, validator_principal, amount);
 
     // If the fee is zero, there is nothing else to do
     if (fee_amount == 0) return amount;
@@ -916,29 +916,6 @@ module interest_lst::pool {
 
     // Return the shares amount to mint to the sender
     amount - fee_amount
-  }
-
-  // Core fee calculation logic
-  /*
-  * @storage: The Pool Storage Shared Object (this module)
-  * @validator_principal The amount of Sui principal deposited to the validator
-  * @amount The amount being minted
-  * @return u64 The fee amount
-  */
-  fun calc_fee(
-    storage: &mut PoolStorage,
-    validator_principal: u64,
-    amount: u64,
-  ): u64 {
-    // Find the fee % based on the validator dominance and fee parameters.  
-    let fee = calculate_fee_percentage(
-      &storage.fee,
-      (validator_principal as u256),
-      (storage.total_principal as u256)
-    );
-
-    // Calculate fee
-    (fmul((amount as u256), fee) as u64)
   }
 
   // @dev Adds a Validator to the linked_list
@@ -987,12 +964,12 @@ module interest_lst::pool {
 
       // Check if the table has slot exchange rate
       // If it does not we use the back up maturity value
-      let pool = if (table::contains(&storage.pool_history, slot)) { 
-        table::borrow(&storage.pool_history, slot)
+      let pool = if (linked_table::contains(&storage.pool_history, slot)) { 
+        linked_table::borrow(&storage.pool_history, slot)
       } else {
         // Back up maturity needs to be before the slot
         assert!(slot > maturity, EInvalidBackupMaturity);
-        table::borrow(&storage.pool_history, maturity)
+        linked_table::borrow(&storage.pool_history, maturity)
       };
 
       rebase::to_elastic(pool, shares, false)
@@ -1011,28 +988,54 @@ module interest_lst::pool {
     }
   }
 
-  #[test_only]
-  public fun init_for_testing(ctx: &mut TxContext) {
-    init(ctx);
+  // Core fee calculation logic
+  /*
+  * @storage: The Pool Storage Shared Object (this module)
+  * @validator_principal The amount of Sui principal deposited to the validator
+  * @amount The amount being minted
+  * @return u64 The fee amount
+  */
+  fun calculate_fee(
+    storage: &PoolStorage,
+    validator_principal: u64,
+    amount: u64,
+  ): u64 {
+    // Find the fee % based on the validator dominance and fee parameters.  
+    let fee = calculate_fee_percentage(
+      &storage.fee,
+      (validator_principal as u256),
+      (storage.total_principal as u256)
+    );
+
+    // Calculate fee
+    (fmul((amount as u256), fee) as u64)
   }
 
-  #[test_only]
-  public fun read_pool_storage(storage: &PoolStorage): (&Rebase, u64, &LinkedTable<address, ValidatorData>, u64, &Fee, &Coin<ISUI>) {
+ // ** SDK Functions
+  
+ public fun read_pool_storage(storage: &PoolStorage): (&Rebase, u64, &LinkedTable<address, ValidatorData>, u64, &Fee, &Coin<ISUI>, &LinkedTable<u64, Rebase>) {
     (
       &storage.pool, 
       storage.last_epoch, 
       &storage.validators_table, 
       storage.total_principal, 
       &storage.fee, 
-      &storage.dao_coin
+      &storage.dao_coin,
+      &storage.pool_history
     ) 
   }
 
-  #[test_only]
   public fun read_validator_data(data: &ValidatorData): (&LinkedTable<u64, StakedSui>, u64) {
     (
       &data.staked_sui_table,
       data.total_principal
     )
+  }
+
+  // ** TEST FUNCTIONS
+
+  #[test_only]
+  public fun init_for_testing(ctx: &mut TxContext) {
+    init(ctx);
   }
 }
