@@ -219,10 +219,12 @@ module interest_lst::sdk {
           
           let value = staking_pool::staked_sui_amount(staked_sui);
 
+          let amount_left = amount - total_value;
+
           // We add the different and break;
-          if (value > total_value) {
-            vector::push_back(&mut data, pool::create_burn_validator_payload(validator_address, activation_epoch, total_value - value));
-            total_value = total_value + (total_value - value);
+          if (value >= amount_left) {
+            vector::push_back(&mut data, pool::create_burn_validator_payload(validator_address, activation_epoch, amount_left));
+            total_value = total_value + amount_left;
             break
           } else {
             total_value = total_value + value;
