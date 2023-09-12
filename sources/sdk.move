@@ -5,7 +5,6 @@ module interest_lst::sdk {
   use sui::sui::SUI;
   use sui::coin::Coin;
   use sui::linked_table;
-  use sui::transfer::transfer;
   use sui::tx_context::{Self, TxContext};
 
   use sui_system::staking_pool;
@@ -23,7 +22,8 @@ module interest_lst::sdk {
     handle_yield_vector,
     public_transfer_coin,
     public_transfer_yield,
-    handle_principal_vector
+    handle_principal_vector,
+    public_transfer_principal
   };
 
   const MIN_STAKING_THRESHOLD: u64 = 1_000_000_000; // 1 
@@ -52,7 +52,7 @@ module interest_lst::sdk {
     ), tx_context::sender(ctx));
   }
 
-  public entry fun burn_isui(
+  public fun burn_isui(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     interest_sui_storage: &mut InterestSuiStorage,
@@ -99,11 +99,11 @@ module interest_lst::sdk {
 
     let sender = tx_context::sender(ctx);
 
-    transfer(principal, sender);
-    transfer(yield, sender);
+    public_transfer_principal(principal, sender);
+    public_transfer_yield(yield, sender);
   }
 
-  public entry fun call_bond(
+  public fun call_bond(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     sui_principal_storage: &mut SuiPrincipalStorage,
@@ -134,7 +134,7 @@ module interest_lst::sdk {
     );
   }
 
-  public entry fun burn_sui_principal(
+  public fun burn_sui_principal(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     sui_principal_storage: &mut SuiPrincipalStorage,
@@ -157,7 +157,7 @@ module interest_lst::sdk {
       tx_context::sender(ctx))
   }
 
-  public entry fun claim_yield(
+  public fun claim_yield(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     validator_payload: vector<BurnValidatorPayload>,
@@ -218,7 +218,7 @@ module interest_lst::sdk {
           if (value > total_value) {
             vector::push_back(&mut data, pool::create_burn_validator_payload(validator_address, activation_epoch, total_value - value));
             total_value = total_value + (total_value - value);
-            break;
+            break
           } else {
             total_value = total_value + value;
             vector::push_back(&mut data, pool::create_burn_validator_payload(validator_address, activation_epoch, value));
@@ -262,7 +262,7 @@ module interest_lst::sdk {
   * @param to The last key to get
   * @return vector<ValidatorStakePosition>
   */
-  public fun get_validator_stake_position(storage: &PoolStorage, from: address, to: address, ctx: &mut TxContext): vector<ValidatorStakePosition> {
+  public fun get_validator_stake_position(storage: &PoolStorage, from: address, to: address): vector<ValidatorStakePosition> {
     let data = vector::empty<ValidatorStakePosition>();
 
     let (_, _, validators_table, _, _, _, _) = pool::read_pool_storage(storage);

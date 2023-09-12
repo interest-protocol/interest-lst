@@ -77,8 +77,10 @@ module interest_lst::asset_utils {
       index = index + 1;
     };
 
+    vector::destroy_empty(vector_asset);
+
     if (total_value > asset_in_value)
-      transfer::transfer(sfa::split(&mut asset, total_value - asset_in_value, ctx),tx_context::sender(ctx));
+      transfer::public_transfer(sfa::split(&mut asset, total_value - asset_in_value, ctx),tx_context::sender(ctx));
 
     asset
   }
@@ -105,8 +107,10 @@ module interest_lst::asset_utils {
       index = index + 1;
     };
 
+    vector::destroy_empty(vector_asset);
+
     if (total_value > asset_in_value)
-      transfer::transfer(sui_yield::split(&mut asset, total_value - asset_in_value, ctx),tx_context::sender(ctx));
+      transfer::public_transfer(sui_yield::split(&mut asset, total_value - asset_in_value, ctx),tx_context::sender(ctx));
 
     asset
   }
