@@ -65,7 +65,7 @@ module interest_lst::sdk_tests {
 
       let (pool_rebase, _, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
-      let validator_payload = sdk::create_burn_validator_payload(&pool_storage, add_decimals(10, 9));
+      let validator_payload = sdk::create_burn_validator_payload(&pool_storage, add_decimals(10, 9), ctx(test));
 
       let isui_unstake_amount = rebase::to_base(pool_rebase, add_decimals(10, 9), true);
 

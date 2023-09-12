@@ -190,7 +190,8 @@ module interest_lst::sdk {
 
   public fun create_burn_validator_payload(
     storage: &PoolStorage,
-    amount: u64
+    amount: u64,
+    ctx: &mut TxContext
   ): vector<BurnValidatorPayload> {
      let (_, _, validators_table, _, _, _, _) = pool::read_pool_storage(storage);
 
@@ -216,6 +217,11 @@ module interest_lst::sdk {
           let activation_epoch = *option::borrow(next_key);
           
           let staked_sui = linked_table::borrow(staked_sui_table, activation_epoch);
+
+          let activation_epoch = staking_pool::stake_activation_epoch(staked_sui);
+
+          // It is not possible to unstake before the activation epoch
+          if (activation_epoch > tx_context::epoch(ctx)) continue;
           
           let value = staking_pool::staked_sui_amount(staked_sui);
 
