@@ -253,7 +253,7 @@ module interest_lsd::review {
   * @param reviews: reviews global storage
   * @param pool: pool global storage
   */
-  public fun set_whitelist(reviews: &Reviews, pool: &mut PoolStorage) {
+  entry public fun set_whitelist(reviews: &Reviews, pool: &mut PoolStorage) {
     let whitelist = pool::borrow_mut_whitelist(pool);
     let len = vector::length(whitelist);
 
@@ -279,7 +279,7 @@ module interest_lsd::review {
   * @param reviews: global storage
   * @param number: the new epoch number to wait
   */
-  public fun set_cooldown_epochs(_: &AdminCap, reviews: &mut Reviews, number: u64) {
+  entry public fun set_cooldown_epochs(_: &AdminCap, reviews: &mut Reviews, number: u64) {
     reviews.cooldown_epochs = number;
   }
 
@@ -289,7 +289,7 @@ module interest_lsd::review {
   * @param reviews: global storage
   * @param number: the new maximum (list length)
   */
-  public fun set_max_top_len(_: &AdminCap, reviews: &mut Reviews, number: u64) {
+  entry public fun set_max_top_len(_: &AdminCap, reviews: &mut Reviews, number: u64) {
     // if same number or higher do nothing since it's gonna be filled by users
     // if lower, we need to remove the lowest rated validators
     let top_length = vector::length(&reviews.top_validators);
