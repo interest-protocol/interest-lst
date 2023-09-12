@@ -50,7 +50,7 @@ module interest_lst::pool_tests {
     {
       let pool_storage = test::take_shared<PoolStorage>(test);
 
-      let (pool_rebase, last_epoch, validators_table, total_principal, fee, dao_coin) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, last_epoch, validators_table, total_principal, fee, dao_coin, _) = pool::read_pool_storage(&pool_storage);
 
       let (base, kink, jump) = read_fee(fee);
 
@@ -82,7 +82,7 @@ module interest_lst::pool_tests {
 
       assert_eq(burn(coin_isui), add_decimals(1000, 9));
 
-      let (pool_rebase, last_epoch, validators_table, total_principal, _, dao_coin) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, last_epoch, validators_table, total_principal, _, dao_coin, _) = pool::read_pool_storage(&pool_storage);
 
       // The first deposit gets all shares
       assert_eq(rebase::base(pool_rebase), add_decimals(1000, 9));
@@ -149,7 +149,7 @@ module interest_lst::pool_tests {
     {
       let pool_storage = test::take_shared<PoolStorage>(test);
 
-      let (pool_rebase, last_epoch, validator_data_table, total_principal, _, _) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, last_epoch, validator_data_table, total_principal, _, _, _) = pool::read_pool_storage(&pool_storage);
 
       let validator_data = linked_table::borrow(validator_data_table, MYSTEN_LABS);
 
@@ -211,7 +211,7 @@ module interest_lst::pool_tests {
 
       pool::update_pool(&mut wrapper, &mut pool_storage, ctx(test));
 
-      let (pool_rebase, _, validator_data_table, total_principal, _, _) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, _, validator_data_table, total_principal, _, _, _) = pool::read_pool_storage(&pool_storage);
 
       assert_eq(rebase::base(pool_rebase), 65093317280);
       assert_eq(rebase::elastic(pool_rebase), 82583633555);
@@ -276,7 +276,7 @@ module interest_lst::pool_tests {
 
       pool::update_pool(&mut wrapper, &mut pool_storage, ctx(test));
 
-      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, _, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
       let validator_payload = vector[
         pool::create_burn_validator_payload(COINBASE_CLOUD, 2, add_decimals(10, 9)),
@@ -304,7 +304,7 @@ module interest_lst::pool_tests {
       add_decimals(10, 9)
       );
 
-      let (pool_rebase, _, validator_data_table, total_principal, _, _) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, _, validator_data_table, total_principal, _, _, _) = pool::read_pool_storage(&pool_storage);
 
       // Pool is correctly updated after burn
       assert_eq(rebase::elastic(pool_rebase), old_elastic - add_decimals(10, 9));
@@ -365,7 +365,7 @@ module interest_lst::pool_tests {
         ctx(test)
       );
 
-      let (pool_rebase, _, validator_data_table, total_principal, _, _) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, _, validator_data_table, total_principal, _, _, _) = pool::read_pool_storage(&pool_storage);
 
       assert_eq(total_principal, add_decimals(10, 9));
       assert_eq(rebase::elastic(pool_rebase), add_decimals(10, 9));
@@ -438,7 +438,7 @@ module interest_lst::pool_tests {
       
       pool::update_pool(&mut wrapper, &mut pool_storage, ctx(test));
 
-      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, _, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
    
 
@@ -465,7 +465,7 @@ module interest_lst::pool_tests {
         ctx(test)
       );
 
-      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, _, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
       let shares_burned = rebase::to_base(pool_rebase, principal_amount + yield_amount, false);
 
@@ -494,7 +494,7 @@ module interest_lst::pool_tests {
         ctx(test)
       )), principal_amount + yield_amount);
 
-      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, _, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
       assert_eq(old_base, rebase::base(pool_rebase) + shares_burned);
       assert_eq(old_elastic, rebase::elastic(pool_rebase) + principal_amount + yield_amount);
@@ -541,7 +541,7 @@ module interest_lst::pool_tests {
 
       let residue = sui_principal::new_for_testing(&mut interest_sui_principal_storage, 1, add_decimals(10, 9), ctx(test));
 
-      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, _, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
       let old_base = rebase::base(pool_rebase);
       let old_elastic = rebase::elastic(pool_rebase);
@@ -557,7 +557,7 @@ module interest_lst::pool_tests {
         ctx(test)
       );
 
-      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, _, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
       assert_eq(burn(coin_sui), add_decimals(10, 9));
       assert_eq(rebase::base(pool_rebase), old_base - removed_shares);
@@ -605,7 +605,7 @@ module interest_lst::pool_tests {
       let coupon = sui_yield::new_for_testing(
         &mut interest_sui_yield_Storage, 10, value, value, 800000, ctx(test));
 
-      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, _, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
       let old_base = rebase::base(pool_rebase);
       let old_elastic = rebase::elastic(pool_rebase);
@@ -622,7 +622,7 @@ module interest_lst::pool_tests {
         ctx(test)
       );
 
-      let (pool_rebase, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, _, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
       assert_eq(burn(rewards), yield_earned);
       assert_eq(sui_yield::shares(&coupon_returned), value);

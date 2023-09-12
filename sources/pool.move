@@ -222,29 +222,6 @@ module interest_lst::pool {
     }
   }
 
-  // Core fee calculation logic
-  /*
-  * @storage: The Pool Storage Shared Object (this module)
-  * @validator_principal The amount of Sui principal deposited to the validator
-  * @amount The amount being minted
-  * @return u64 The fee amount
-  */
-  public fun calculate_fee(
-    storage: &PoolStorage,
-    validator_principal: u64,
-    amount: u64,
-  ): u64 {
-    // Find the fee % based on the validator dominance and fee parameters.  
-    let fee = calculate_fee_percentage(
-      &storage.fee,
-      (validator_principal as u256),
-      (storage.total_principal as u256)
-    );
-
-    // Calculate fee
-    (fmul((amount as u256), fee) as u64)
-  }
-
   // @dev This function costs a lot of gas and must be called before any interaction with Interest lst because it updates the pool. The pool is needed to ensure all 3 Coins' exchange rate is accurate.
   // Anyone can call this function
   // It will ONLY RUN ONCE per epoch
@@ -1011,28 +988,54 @@ module interest_lst::pool {
     }
   }
 
-  #[test_only]
-  public fun init_for_testing(ctx: &mut TxContext) {
-    init(ctx);
+  // Core fee calculation logic
+  /*
+  * @storage: The Pool Storage Shared Object (this module)
+  * @validator_principal The amount of Sui principal deposited to the validator
+  * @amount The amount being minted
+  * @return u64 The fee amount
+  */
+  fun calculate_fee(
+    storage: &PoolStorage,
+    validator_principal: u64,
+    amount: u64,
+  ): u64 {
+    // Find the fee % based on the validator dominance and fee parameters.  
+    let fee = calculate_fee_percentage(
+      &storage.fee,
+      (validator_principal as u256),
+      (storage.total_principal as u256)
+    );
+
+    // Calculate fee
+    (fmul((amount as u256), fee) as u64)
   }
 
-  #[test_only]
-  public fun read_pool_storage(storage: &PoolStorage): (&Rebase, u64, &LinkedTable<address, ValidatorData>, u64, &Fee, &Coin<ISUI>) {
+ // ** SDK Functions
+  
+ public fun read_pool_storage(storage: &PoolStorage): (&Rebase, u64, &LinkedTable<address, ValidatorData>, u64, &Fee, &Coin<ISUI>, &LinkedTable<u64, Rebase>) {
     (
       &storage.pool, 
       storage.last_epoch, 
       &storage.validators_table, 
       storage.total_principal, 
       &storage.fee, 
-      &storage.dao_coin
+      &storage.dao_coin,
+      &storage.pool_history
     ) 
   }
 
-  #[test_only]
   public fun read_validator_data(data: &ValidatorData): (&LinkedTable<u64, StakedSui>, u64) {
     (
       &data.staked_sui_table,
       data.total_principal
     )
+  }
+
+  // ** TEST FUNCTIONS
+
+  #[test_only]
+  public fun init_for_testing(ctx: &mut TxContext) {
+    init(ctx);
   }
 }
