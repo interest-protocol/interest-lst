@@ -1,6 +1,6 @@
 // Module finds out the current total rewards an account has accrued with a validator
 // Re-engineered the logic from https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/packages/sui-system/sources/staking_pool.move
-module interest_lsd::staking_pool_utils {
+module interest_lst::staking_pool_utils {
 
   use sui_system::staking_pool::{Self, PoolTokenExchangeRate};
 

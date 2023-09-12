@@ -1,5 +1,5 @@
 // Access Control for Interest LSD package
-module interest_lsd::admin {
+module interest_lst::admin {
 
   use sui::object::{Self, UID};
   use sui::tx_context::{Self, TxContext};

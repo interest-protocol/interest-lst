@@ -2,7 +2,7 @@
 /// by getting informed on validators and rating them
 /// The validator which gets the most points during a period will be whitelisted removing fees for stakers
 
-module interest_lsd::review {
+module interest_lst::review {
   use std::vector;
   use std::string::{Self, String};
 
@@ -15,9 +15,9 @@ module interest_lsd::review {
 
   use sui_system::sui_system::{Self, SuiSystemState};
 
-  use interest_lsd::sui_yield::{Self, SuiYield};
-  use interest_lsd::admin::AdminCap;
-  use interest_lsd::pool::{Self, PoolStorage};
+  use interest_lst::sui_yield::{Self, SuiYield};
+  use interest_lst::admin::AdminCap;
+  use interest_lst::pool::{Self, PoolStorage};
 
   const ECannotReviewWithNft: u64 = 0;
   const EWrongStarNumber: u64 = 1;

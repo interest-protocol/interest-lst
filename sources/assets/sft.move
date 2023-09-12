@@ -4,7 +4,7 @@
 *
 * Each TOken is fungible within the same slot and non-fungible accross slots
 */
-module interest_lsd::semi_fungible_token {
+module interest_lst::semi_fungible_token {
   use std::ascii;
   use std::option::{Self, Option};
   use std::string::{String, utf8};

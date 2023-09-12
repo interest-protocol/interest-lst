@@ -1,5 +1,5 @@
 #[test_only]
-module interest_lsd::review_tests {
+module interest_lst::review_tests {
   use std::vector;
   use std::string;
 
@@ -10,11 +10,11 @@ module interest_lsd::review_tests {
   use sui_system::sui_system::{SuiSystemState};
   use sui_system::governance_test_utils::{advance_epoch, create_validator_for_testing, create_sui_system_state_for_testing};
 
-  use interest_lsd::pool;
-  use interest_lsd::admin::{Self, AdminCap};
-  use interest_lsd::review::{Self, Reviews};
-  use interest_lsd::sui_yield::{Self, SuiYield, SuiYieldStorage};
-  use interest_lsd::test_utils::{people, scenario}; 
+  use interest_lst::pool;
+  use interest_lst::admin::{Self, AdminCap};
+  use interest_lst::review::{Self, Reviews};
+  use interest_lst::sui_yield::{Self, SuiYield, SuiYieldStorage};
+  use interest_lst::test_utils::{people, scenario}; 
 
   const MYSTEN_LABS: address = @0x4;
   const FIGMENT: address = @0x5;
