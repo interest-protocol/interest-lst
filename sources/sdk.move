@@ -248,6 +248,10 @@ module interest_lst::sdk {
   * @return The fee in 1e18
   */
   public fun get_validator_fee(storage: &PoolStorage, validator_address: address): u256 {
+    let whitelist = pool::borrow_whitelist(storage);
+
+    if (vector::contains(whitelist, &validator_address)) return 0;
+    
     let (_, _, validator_table, total_principal, fee, _, _) = pool::read_pool_storage(storage);
     let (_, validator_principal) = pool::read_validator_data(linked_table::borrow(validator_table, validator_address));
 
