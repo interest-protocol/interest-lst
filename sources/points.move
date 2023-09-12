@@ -5,7 +5,7 @@
 /// Developers can create their own module similar to `review` to "plug" their protocol on Interest's composable mechanism
 /// while providing additional quests and rewards
 
-module interest_lsd::points {
+module interest_lst::points {
   use std::vector;
   use std::ascii::{Self, String};
   use std::type_name::{Self, TypeName};
@@ -20,9 +20,9 @@ module interest_lsd::points {
   use sui::bag::{Self, Bag};
   use sui::dynamic_field as df;
 
-  use interest_lsd::sui_yield::{Self, SuiYield};
-  use interest_lsd::admin::AdminCap;
-  use interest_lsd::pool::{Self, PoolStorage};
+  use interest_lst::sui_yield::{Self, SuiYield};
+  use interest_lst::admin::AdminCap;
+  use interest_lst::pool::{Self, PoolStorage};
 
   const EStillLocked: u64 = 0;
 
