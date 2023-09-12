@@ -222,6 +222,29 @@ module interest_lst::pool {
     }
   }
 
+  // Core fee calculation logic
+  /*
+  * @storage: The Pool Storage Shared Object (this module)
+  * @validator_principal The amount of Sui principal deposited to the validator
+  * @amount The amount being minted
+  * @return u64 The fee amount
+  */
+  public fun calculate_fee(
+    storage: &PoolStorage,
+    validator_principal: u64,
+    amount: u64,
+  ): u64 {
+    // Find the fee % based on the validator dominance and fee parameters.  
+    let fee = calculate_fee_percentage(
+      &storage.fee,
+      (validator_principal as u256),
+      (storage.total_principal as u256)
+    );
+
+    // Calculate fee
+    (fmul((amount as u256), fee) as u64)
+  }
+
   // @dev This function costs a lot of gas and must be called before any interaction with Interest lst because it updates the pool. The pool is needed to ensure all 3 Coins' exchange rate is accurate.
   // Anyone can call this function
   // It will ONLY RUN ONCE per epoch
@@ -874,7 +897,7 @@ module interest_lst::pool {
     ): u64 {
     
     // Find the fee % based on the validator dominance and fee parameters.  
-    let fee_amount = calc_fee(storage, validator_principal, shares);
+    let fee_amount = calculate_fee(storage, validator_principal, shares);
 
     // If the fee is zero, there is nothing else to do
     if (fee_amount == 0) return shares;
@@ -902,7 +925,7 @@ module interest_lst::pool {
     ): u64 {
     
     // Find the fee % based on the validator dominance and fee parameters.  
-    let fee_amount = calc_fee(storage, validator_principal, amount);
+    let fee_amount = calculate_fee(storage, validator_principal, amount);
 
     // If the fee is zero, there is nothing else to do
     if (fee_amount == 0) return amount;
@@ -916,29 +939,6 @@ module interest_lst::pool {
 
     // Return the shares amount to mint to the sender
     amount - fee_amount
-  }
-
-  // Core fee calculation logic
-  /*
-  * @storage: The Pool Storage Shared Object (this module)
-  * @validator_principal The amount of Sui principal deposited to the validator
-  * @amount The amount being minted
-  * @return u64 The fee amount
-  */
-  fun calc_fee(
-    storage: &mut PoolStorage,
-    validator_principal: u64,
-    amount: u64,
-  ): u64 {
-    // Find the fee % based on the validator dominance and fee parameters.  
-    let fee = calculate_fee_percentage(
-      &storage.fee,
-      (validator_principal as u256),
-      (storage.total_principal as u256)
-    );
-
-    // Calculate fee
-    (fmul((amount as u256), fee) as u64)
   }
 
   // @dev Adds a Validator to the linked_list
