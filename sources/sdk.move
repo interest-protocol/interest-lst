@@ -262,7 +262,7 @@ module interest_lst::sdk {
   * @param to The last key to get
   * @return vector<ValidatorStakePosition>
   */
-  public fun get_validator_stake_position(storage: &PoolStorage, from: address, to: address): vector<ValidatorStakePosition> {
+  public fun get_validators_stake_position(storage: &PoolStorage, from: address, to: address): vector<ValidatorStakePosition> {
     let data = vector::empty<ValidatorStakePosition>();
 
     let (_, _, validators_table, _, _, _, _) = pool::read_pool_storage(storage);
@@ -294,7 +294,7 @@ module interest_lst::sdk {
     data
   }
 
-  // @dev It allows the frontend to gather the past balances of the pool to estimate an early reward rate
+  // @dev It allows the frontend to gather the past balances of the pool to estimate an yearly reward rate
   /*
   * @param pool_storage The shared object of the interest_lst::pool module
   * @param total The number of records to fetch from the last one
