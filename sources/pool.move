@@ -7,10 +7,10 @@ module interest_lst::pool {
   use std::vector;
   use std::option;
 
+  use sui::table;
   use sui::transfer;
   use sui::sui::SUI;
   use sui::event::emit;
-  use sui::table::{Self, Table};
   use sui::coin::{Self, Coin};
   use sui::object::{Self, UID, ID};
   use sui::tx_context::{Self, TxContext};
@@ -76,7 +76,7 @@ module interest_lst::pool {
     fee: Fee, // Holds the data to calculate the stake fee
     dao_coin: Coin<ISUI>, // Fees collected by the protocol in ISUI
     whitelist_validators: vector<address>,
-    pool_history: Table<u64, Rebase>, // Epoch => Pool Data
+    pool_history: LinkedTable<u64, Rebase>, // Epoch => Pool Data
   }
 
   // ** Events
@@ -146,7 +146,7 @@ module interest_lst::pool {
         fee: new_fee(),
         dao_coin: coin::zero<ISUI>(ctx),
         whitelist_validators: vector::empty(),
-        pool_history: table::new(ctx)
+        pool_history: linked_table::new(ctx)
       }
     );
   }
@@ -295,7 +295,7 @@ module interest_lst::pool {
     storage.last_epoch = epoch;
     // We save the epoch => exchange rate for iSui => Sui
     // Today's exchange rate is always yesterdays
-    table::add(
+    linked_table::push_back(
       &mut storage.pool_history, 
       epoch + 1, 
       storage.pool
@@ -987,12 +987,12 @@ module interest_lst::pool {
 
       // Check if the table has slot exchange rate
       // If it does not we use the back up maturity value
-      let pool = if (table::contains(&storage.pool_history, slot)) { 
-        table::borrow(&storage.pool_history, slot)
+      let pool = if (linked_table::contains(&storage.pool_history, slot)) { 
+        linked_table::borrow(&storage.pool_history, slot)
       } else {
         // Back up maturity needs to be before the slot
         assert!(slot > maturity, EInvalidBackupMaturity);
-        table::borrow(&storage.pool_history, maturity)
+        linked_table::borrow(&storage.pool_history, maturity)
       };
 
       rebase::to_elastic(pool, shares, false)
