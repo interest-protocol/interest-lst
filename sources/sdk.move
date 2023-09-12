@@ -33,6 +33,11 @@ module interest_lst::sdk {
     total_principal: u64
   }
 
+  struct PoolHistory has store {
+    pool: Rebase,
+    epoch: u64
+  }
+
   public entry fun mint_isui(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
@@ -304,7 +309,7 @@ module interest_lst::sdk {
   * @param total The number of records to fetch from the last one
   * @return vector<Rebase> - reverse order
   */
-  public fun get_pool_history(storage: &PoolStorage, total: u64): vector<Rebase> {
+  public fun get_pool_history(storage: &PoolStorage, total: u64): vector<PoolHistory> {
     let data = vector::empty();
 
    let (_, _, _, _, _, _, pool_history) = pool::read_pool_storage(storage);
@@ -316,8 +321,7 @@ module interest_lst::sdk {
       if (index > total) break;
       let key = *option::borrow(last);
 
-      vector::push_back(&mut data, *linked_table::borrow(pool_history, key));
-
+      vector::push_back(&mut data, PoolHistory {epoch: key, pool: *linked_table::borrow(pool_history, key) });
 
       last = linked_table::prev(pool_history, key);
       index = index + 1;
