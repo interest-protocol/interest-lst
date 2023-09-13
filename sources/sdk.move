@@ -190,7 +190,8 @@ module interest_lst::sdk {
 
   public fun create_burn_validator_payload(
     storage: &PoolStorage,
-    amount: u64
+    amount: u64,
+    ctx: &mut TxContext
   ): vector<BurnValidatorPayload> {
      let (_, _, validators_table, _, _, _, _) = pool::read_pool_storage(storage);
 
@@ -216,13 +217,20 @@ module interest_lst::sdk {
           let activation_epoch = *option::borrow(next_key);
           
           let staked_sui = linked_table::borrow(staked_sui_table, activation_epoch);
+
+          let activation_epoch = staking_pool::stake_activation_epoch(staked_sui);
+
+          // It is not possible to unstake before the activation epoch
+          if (activation_epoch > tx_context::epoch(ctx)) continue;
           
           let value = staking_pool::staked_sui_amount(staked_sui);
 
+          let amount_left = amount - total_value;
+
           // We add the different and break;
-          if (value > total_value) {
-            vector::push_back(&mut data, pool::create_burn_validator_payload(validator_address, activation_epoch, total_value - value));
-            total_value = total_value + (total_value - value);
+          if (value >= amount_left) {
+            vector::push_back(&mut data, pool::create_burn_validator_payload(validator_address, activation_epoch, amount_left));
+            total_value = total_value + amount_left;
             break
           } else {
             total_value = total_value + value;
@@ -253,9 +261,7 @@ module interest_lst::sdk {
   * @return The fee in 1e18
   */
   public fun get_validator_fee(storage: &PoolStorage, validator_address: address): u256 {
-    let whitelist = pool::borrow_whitelist(storage);
-
-    if (vector::contains(whitelist, &validator_address)) return 0;
+    if (pool::is_whitelisted(storage, validator_address)) return 0;
     
     let (_, _, validator_table, total_principal, fee, _, _) = pool::read_pool_storage(storage);
     let (_, validator_principal) = pool::read_validator_data(linked_table::borrow(validator_table, validator_address));
