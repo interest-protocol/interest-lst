@@ -5,25 +5,20 @@
 /// Developers can create their own module similar to `review` to "plug" their protocol on Interest's composable mechanism
 /// while providing additional quests and rewards
 
-module interest_lst::points {
-  use std::vector;
-  use std::ascii::{Self, String};
+module interest_lst::soulbound_token {
+  use std::ascii::String;
   use std::type_name::{Self, TypeName};
 
   use sui::transfer;
   use sui::coin::{Self, Coin};
   use sui::event::{emit};
-  use sui::object::{Self, UID, ID};
+  use sui::object::{Self, UID};
   use sui::tx_context::{Self, TxContext};
   use sui::table::{Self, Table};
-  use sui::math;
   use sui::bag::{Self, Bag};
   use sui::dynamic_field as df;
 
-  use interest_lst::sui_yield::{Self, SuiYield};
-  use interest_lst::admin::AdminCap;
-  use interest_lst::pool::{Self, PoolStorage};
-  use interest_lst::semi_fungible_token::{Self, SemiFungibleToken};
+  use interest_lst::semi_fungible_token::{Self as sft, SemiFungibleToken};
 
   const EStillLocked: u64 = 0;
 
@@ -33,11 +28,12 @@ module interest_lst::points {
     asset: Asset,
   }
 
-  // sould bound token, cannot be transferred without custom function (no store ability)
+  // soul bound token, cannot be transferred without custom function (no store ability)
   struct Interestore has key {
     id: UID,
+    points: Table<String, u64>, // package_id => points (prevents sbt deletion when non empty)
     locked_assets: Bag, // type_name => LockedAsset (Coin or SFT)
-    // package_id => points (dynamic field)
+    // package_id => object (dynamic object field for additional rewards, doesn't prevent sbt deletion if not empty)
   }
 
   // TODO we might want to restrict dynamic points field creation
@@ -46,14 +42,26 @@ module interest_lst::points {
   //   whitelist: vector<address>,
   // }
 
+  // TODO: need events
+
+  // @dev create a SBT on sender wallet
   public fun mint_sbt(ctx: &mut TxContext) {
     transfer::transfer(
       Interestore {
         id: object::new(ctx),
+        points: table::new(ctx),
         locked_assets: bag::new(ctx),
       },
       tx_context::sender(ctx)
     )
+  }
+
+  // @dev destroy an empty sbt (can still contain dynamic fields)
+  public fun destroy_empty(sbt: Interestore) {
+    let Interestore { id, points, locked_assets } = sbt;
+    table::destroy_empty(points);
+    bag::destroy_empty(locked_assets);
+    object::delete(id);
   }
 
   // ** Points 
@@ -65,54 +73,35 @@ module interest_lst::points {
   * @param points: number of points to initialize the field (can be 0) 
   */
   public fun create_points<Witness: drop>(_: Witness, sbt: &mut Interestore, points: u64) {
-    let type = type_name::get<Witness>();
-    let package = type_name::get_address(&type);
-    df::add(borrow_uid_mut(sbt), package, points);
+    table::add(&mut sbt.points, package_id<Witness>(), points);
   }
 
-  // @dev add points to the dynamic field on the SBT
-  /*
-  * @param Witness: witness type for getting package id calling the function
-  * @param sbt: soulbound token  
-  * @param points: number of points to add to the field 
-  */
   public fun add_points<Witness: drop>(w: Witness, sbt: &mut Interestore, points: u64) {
     let prev_points = borrow_mut_points(w, sbt);
     *prev_points = *prev_points + points;
   }
 
-  // @dev remove points to the dynamic field on the SBT
-  /*
-  * @param Witness: witness type for getting package id calling the function
-  * @param sbt: soulbound token  
-  * @param points: number of points to remove to the field 
-  */
   public fun remove_points<Witness: drop>(w: Witness, sbt: &mut Interestore, points: u64) {
     let prev_points = borrow_mut_points(w, sbt);
     *prev_points = if (*prev_points > points) { *prev_points - points } else { 0 };
   }
 
-  // TODO we might want to restrict the access
-  // @dev borrow points dynamic field mutably
-  /*
-  * @param Witness: witness type for getting package id calling the function
-  * @param sbt: soulbound token  
-  */
-  public fun borrow_mut_points<Witness: drop>(_: Witness, sbt: &mut Interestore): &mut u64 {
-    let type = type_name::get<Witness>();
-    let package = type_name::get_address(&type);
-    df::borrow_mut<String, u64>(borrow_uid_mut(sbt), package)
+  // @dev allows anyone to clear the points to empty the table 
+  public fun clear_points(package_id: String, sbt: &mut Interestore): u64 {
+    table::remove(&mut sbt.points, package_id)
   }
 
-  // @dev borrow points dynamic field immutably
-  /*
-  * @param Witness: witness type for getting package id calling the function
-  * @param sbt: soulbound token  
-  */
+  // TODO we might want to restrict the access
+  public fun borrow_mut_points<Witness: drop>(_: Witness, sbt: &mut Interestore): &mut u64 {
+    table::borrow_mut<String, u64>(&mut sbt.points, package_id<Witness>())
+  }
+
   public fun borrow_points<Witness: drop>(_: Witness, sbt: &Interestore): &u64 {
-    let type = type_name::get<Witness>();
-    let package = type_name::get_address(&type);
-    df::borrow<String, u64>(borrow_uid(sbt), package)
+    table::borrow<String, u64>(&sbt.points, package_id<Witness>())
+  }
+
+  public fun read_points(package_id: String, sbt: &Interestore): &u64 {
+    table::borrow<String, u64>(&sbt.points, package_id)
   }
 
   // ** Lock assets
@@ -129,11 +118,6 @@ module interest_lst::points {
     bag::add(&mut sbt.locked_assets, type, LockedAsset { unlock_epoch, asset });
   } 
 
-  // @dev unlock an asset if the unlock_epoch has passed
-  /*
-  * @param sbt: soulbound token  
-  * @return the asset
-  */
   public fun unlock_asset<Asset: key + store>(sbt: &mut Interestore, ctx: &mut TxContext): Asset {
     let type = type_name::get<Asset>();
 
@@ -143,12 +127,6 @@ module interest_lst::points {
     asset
   } 
 
-  // @dev add a quantity of a Coin already locked
-  /*
-  * @param sbt: soulbound token  
-  * @param asset: asset to lock
-  * @param number_of_epochs: duration during which the asset should be locked
-  */
   public fun lock_more_coin<T: drop>(sbt: &mut Interestore, new_coin: Coin<T>, number_of_epochs: u64, ctx: &mut TxContext) {
     let type = type_name::get<Coin<T>>();
     let new_epoch = tx_context::epoch(ctx) + number_of_epochs;
@@ -164,12 +142,6 @@ module interest_lst::points {
     coin::join(asset, new_coin);
   } 
 
-  // @dev add a quantity of a sft already locked
-  /*
-  * @param sbt: soulbound token  
-  * @param asset: asset to lock
-  * @param number_of_epochs: duration during which the asset should be locked
-  */
   public fun lock_more_sft<T: drop>(sbt: &mut Interestore, new_sft: SemiFungibleToken<T>, number_of_epochs: u64, ctx: &mut TxContext) {
     let type = type_name::get<SemiFungibleToken<T>>();
     let new_epoch = tx_context::epoch(ctx) + number_of_epochs;
@@ -182,8 +154,46 @@ module interest_lst::points {
       // we could weight each unlock epoch with the amount and slot of each asset
     };
 
-    semi_fungible_token::join(asset, new_sft);
+    sft::join(asset, new_sft);
   } 
+
+  public fun read_locked_coin<T: drop>(sbt: &Interestore): (u64, u64) {
+    let type = type_name::get<Coin<T>>();
+    let locked = bag::borrow<TypeName, LockedAsset<Coin<T>>>(&sbt.locked_assets, type);
+
+    (locked.unlock_epoch, coin::value(&locked.asset))
+  }
+
+  public fun read_locked_sft<T: drop>(sbt: &Interestore): (u64, u256, u64) {
+    let type = type_name::get<Coin<T>>();
+    let locked = bag::borrow<TypeName, LockedAsset<SemiFungibleToken<T>>>(&sbt.locked_assets, type);
+
+    (locked.unlock_epoch, sft::slot(&locked.asset), sft::value(&locked.asset))
+  }
+
+  // ** Arbitrary dynamic fields
+
+  // @dev add a dynamic field on the SBT that can be any storable struct
+  /*
+  * @param Witness: witness type for getting package id calling the function
+  * @param sbt: soulbound token  
+  * @param field: field to append 
+  */
+  public fun create_field<Witness: drop, Field: store>(_: Witness, sbt: &mut Interestore, field: Field) {
+    df::add(borrow_uid_mut(sbt), package_id<Witness>(), field);
+  }
+
+  public fun remove_field<Witness: drop, Field: store>(_: Witness, sbt: &mut Interestore): Field {
+    df::remove(borrow_uid_mut(sbt), package_id<Witness>())
+  }
+
+  public fun borrow_mut_field<Witness: drop, Field: store>(_: Witness, sbt: &mut Interestore): &mut Field {
+    df::borrow_mut<String, Field>(borrow_uid_mut(sbt), package_id<Witness>())
+  }
+
+  public fun borrow_field<Witness: drop, Field: store>(_: Witness, sbt: &Interestore): &Field {
+    df::borrow<String, Field>(borrow_uid(sbt), package_id<Witness>())
+  }
 
   // TODO we might want to expose it to open more use cases
   fun borrow_uid_mut(sbt: &mut Interestore): &mut UID {
@@ -192,6 +202,11 @@ module interest_lst::points {
 
   fun borrow_uid(sbt: &Interestore): &UID {
     &sbt.id
+  }
+
+  fun package_id<Witness: drop>(): String {
+    let type = type_name::get<Witness>();
+    type_name::get_address(&type)
   } 
 
 } 
