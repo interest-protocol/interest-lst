@@ -4,8 +4,8 @@ module interest_lst::sdk {
 
   use sui::sui::SUI;
   use sui::coin::Coin;
-  use sui::linked_table;
   use sui::tx_context::{Self, TxContext};
+  use sui::linked_table::{Self, LinkedTable};
 
   use sui_system::staking_pool;
   use sui_system::sui_system::SuiSystemState;
@@ -15,8 +15,8 @@ module interest_lst::sdk {
   use interest_lst::fee_utils::{calculate_fee_percentage};
   use interest_lst::sui_yield::{SuiYieldStorage, SuiYield};
   use interest_lst::semi_fungible_token::{SemiFungibleToken};
-  use interest_lst::pool::{Self, PoolStorage, BurnValidatorPayload};
   use interest_lst::sui_principal::{SuiPrincipalStorage, SUI_PRINCIPAL};
+  use interest_lst::pool::{Self, PoolStorage, ValidatorData, BurnValidatorPayload};
   use interest_lst::asset_utils::{
     handle_coin_vector, 
     handle_yield_vector,
@@ -28,9 +28,15 @@ module interest_lst::sdk {
 
   const MIN_STAKING_THRESHOLD: u64 = 1_000_000_000; // 1 
 
+  struct StakePosition has store, drop {
+    epoch: u64,
+    amount: u64
+  }
+
   struct ValidatorStakePosition has store, drop {
     validator: address,
-    total_principal: u64
+    total_principal: u64,
+    stakes: vector<StakePosition>
   }
 
   struct PoolHistory has store {
@@ -228,7 +234,7 @@ module interest_lst::sdk {
           let amount_left = amount - total_value;
 
           // We add the different and break;
-          if (value >= amount_left) {
+          if (value >= amount_left + MIN_STAKING_THRESHOLD) {
             vector::push_back(&mut data, pool::create_burn_validator_payload(validator_address, activation_epoch, amount_left));
             total_value = total_value + amount_left;
             break
@@ -282,24 +288,14 @@ module interest_lst::sdk {
 
     let (_, _, validators_table, _, _, _, _) = pool::read_pool_storage(storage);
 
-    let validator_data = linked_table::borrow(validators_table, from);
+    push_stake_position(&mut data, validators_table, from);
 
-    let (_, total_principal) = pool::read_validator_data(validator_data);
-
-    vector::push_back(&mut data, ValidatorStakePosition { validator: from, total_principal });
-
-
-      // Get the first validator in the linked_table
     let next_validator = linked_table::next(validators_table, from);
     
     while (option::is_some(next_validator)) {
       let validator_address = *option::borrow(next_validator);
 
-      let validator_data = linked_table::borrow(validators_table, validator_address);
-
-      let (_, total_principal) = pool::read_validator_data(validator_data);
-
-      vector::push_back(&mut data, ValidatorStakePosition { validator: validator_address, total_principal });
+      push_stake_position(&mut data, validators_table, validator_address);
 
       if (validator_address == to) break;
 
@@ -334,5 +330,31 @@ module interest_lst::sdk {
     };
 
     data
+  }
+
+  fun push_stake_position(data: &mut vector<ValidatorStakePosition>, validators_table: &LinkedTable<address, ValidatorData>, validator_address: address) {
+    let validator_data = linked_table::borrow(validators_table, validator_address);
+
+    let (staked_sui_table, total_principal) = pool::read_validator_data(validator_data);
+
+    let validator_stake = ValidatorStakePosition { validator: validator_address, total_principal, stakes: vector::empty() };
+
+    if (total_principal != 0) {
+
+      let next_key = linked_table::front(staked_sui_table);
+
+      while (option::is_some(next_key)) {
+        let activation_epoch = *option::borrow(next_key);
+          
+        let staked_sui = linked_table::borrow(staked_sui_table, activation_epoch);
+          
+        vector::push_back(&mut validator_stake.stakes, 
+        StakePosition { epoch: staking_pool::stake_activation_epoch(staked_sui), amount: staking_pool::staked_sui_amount(staked_sui) });
+
+        next_key = linked_table::next(staked_sui_table, activation_epoch);
+        };
+    };
+
+    vector::push_back(data, validator_stake);
   }
 }
