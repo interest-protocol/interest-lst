@@ -259,7 +259,7 @@ module interest_lst::pool {
       let validator_address = *option::borrow(next_validator);
 
       // Get the validator data
-      let validator_data = linked_table::borrow_mut(&mut storage.validators_table, validator_address);
+      let validator_data = linked_table::borrow(&storage.validators_table, validator_address);
 
       let pool_exchange_rates = sui_system::pool_exchange_rates(wrapper, &validator_data.staking_pool_id);
       let current_exchange_rate = table::borrow(pool_exchange_rates, epoch);
