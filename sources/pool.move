@@ -591,7 +591,7 @@ module interest_lst::pool {
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
     // Sender must Unstake more than his principal to ensure that the leftover is above the threshold of 1 Sui
-    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_amount, EInvalidUnstakeAmount);
+    assert!(total_principal_unstaked == sui_amount, EInvalidUnstakeAmount);
 
     emit(ClaimYield { sui_yield_id: object::id(&sft_yield), sui_amount, sender: tx_context::sender(ctx) });
 

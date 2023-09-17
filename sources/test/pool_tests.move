@@ -615,7 +615,7 @@ module interest_lst::pool_tests {
         &mut wrapper,
         &mut pool_storage,
         vector[
-          pool::create_burn_validator_payload(MYSTEN_LABS, 2, yield_earned + add_decimals(1, 9))],
+          pool::create_burn_validator_payload(MYSTEN_LABS, 2, yield_earned)],
         coupon,
         MYSTEN_LABS, 99,
         ctx(test)
