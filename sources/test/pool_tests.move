@@ -155,7 +155,7 @@ module interest_lst::pool_tests {
 
       let (staked_sui_table,  validator_total_principal) = pool::read_validator_data(validator_data);
 
-      assert_eq(last_epoch, 3);
+      assert_eq(last_epoch, 4);
       assert_eq(total_principal, add_decimals(40, 9));
       // 30 (deposit from Bob and alice) * 10 (Jose Deposit) / ~35.7 (Pool principal + rewards)
       assert_eq(rebase::base(pool_rebase), 38387096774);
@@ -213,8 +213,8 @@ module interest_lst::pool_tests {
 
       let (pool_rebase, _, validator_data_table, total_principal, _, _, _) = pool::read_pool_storage(&pool_storage);
 
-      assert_eq(rebase::base(pool_rebase), 65093317280);
-      assert_eq(rebase::elastic(pool_rebase), 82583633555);
+      assert_eq(rebase::base(pool_rebase), 61258881888);
+      assert_eq(rebase::elastic(pool_rebase), 89958076487);
       assert_eq(total_principal, add_decimals(70, 9));
       // Three diff validators
       assert_eq(linked_table::length(validator_data_table), 3);
@@ -279,8 +279,7 @@ module interest_lst::pool_tests {
       let (pool_rebase, _, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
       let validator_payload = vector[
-        pool::create_burn_validator_payload(COINBASE_CLOUD, 2, add_decimals(10, 9)),
-        pool::create_burn_validator_payload(COINBASE_CLOUD, 5, add_decimals(1, 9))
+        pool::create_burn_validator_payload(COINBASE_CLOUD, 2, add_decimals(10, 9))
       ];
 
       let isui_unstake_amount = rebase::to_base(pool_rebase, add_decimals(10, 9), true);
@@ -312,18 +311,18 @@ module interest_lst::pool_tests {
 
       // Correctly updates the total principal
       // it is 60 Sui + Rewards
-      assert_eq(total_principal, 63026830133);
+      assert_eq(total_principal, 62967306324);
 
       // Coinbase Cloud Data
       let (staked_sui_table,  validator_total_principal) = pool::read_validator_data(linked_table::borrow(validator_data_table, COINBASE_CLOUD));
-      assert_eq(validator_total_principal, add_decimals(9, 9));
+      assert_eq(validator_total_principal, add_decimals(10, 9));
       // We removed One Staked Sui
       assert_eq(linked_table::length(staked_sui_table), 1);
 
       // Mysten Labs Data
       let (staked_sui_table,  validator_total_principal) = pool::read_validator_data(linked_table::borrow(validator_data_table, MYSTEN_LABS));
       // Principal + Rewards as we stake the left over here
-      assert_eq(validator_total_principal, 44026830133);
+      assert_eq(validator_total_principal, 42967306324);
       assert_eq(linked_table::length(staked_sui_table), 3);
 
       test::return_shared(interest_sui_storage);
@@ -470,7 +469,7 @@ module interest_lst::pool_tests {
       let shares_burned = rebase::to_base(pool_rebase, principal_amount + yield_amount, false);
 
       let validator_payload = vector[
-        pool::create_burn_validator_payload(COINBASE_CLOUD, 2, add_decimals(10, 9)),
+        pool::create_burn_validator_payload(COINBASE_CLOUD, 2, add_decimals(9, 9)) ,
         pool::create_burn_validator_payload(COINBASE_CLOUD, 5, add_decimals(1, 9) + yield_amount)
       ];
 
@@ -551,7 +550,7 @@ module interest_lst::pool_tests {
         &mut wrapper,
         &mut pool_storage,
         &mut interest_sui_principal_storage,
-        vector[pool::create_burn_validator_payload(MYSTEN_LABS, 2, add_decimals(11, 9))],
+        vector[pool::create_burn_validator_payload(MYSTEN_LABS, 2, add_decimals(10, 9))],
         residue,
         MYSTEN_LABS,
         ctx(test)
@@ -616,7 +615,7 @@ module interest_lst::pool_tests {
         &mut wrapper,
         &mut pool_storage,
         vector[
-          pool::create_burn_validator_payload(MYSTEN_LABS, 2, yield_earned + add_decimals(1, 9))],
+          pool::create_burn_validator_payload(MYSTEN_LABS, 2, yield_earned)],
         coupon,
         MYSTEN_LABS, 99,
         ctx(test)

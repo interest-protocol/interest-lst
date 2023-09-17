@@ -202,7 +202,6 @@ module interest_lst::sdk {
      let (_, _, validators_table, _, _, _, _) = pool::read_pool_storage(storage);
 
     let total_value = 0;
-    let amount = amount + MIN_STAKING_THRESHOLD;
     let data = vector::empty();
 
     // Get the first validator in the linked_table
