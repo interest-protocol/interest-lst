@@ -11,7 +11,6 @@ module interest_lst::soulbound_token {
 
   use sui::transfer;
   use sui::coin::{Self, Coin};
-  use sui::event::{emit};
   use sui::object::{Self, UID};
   use sui::tx_context::{Self, TxContext};
   use sui::table::{Self, Table};

@@ -13,6 +13,7 @@ module interest_lst::pool {
   use sui::event::emit;
   use sui::coin::{Self, Coin};
   use sui::object::{Self, UID, ID};
+  use sui::balance::{Self, Balance};
   use sui::tx_context::{Self, TxContext};
   use sui::linked_table::{Self, LinkedTable};
   use sui_system::staking_pool::{Self, StakedSui};
@@ -39,11 +40,12 @@ module interest_lst::pool {
 
   const EInvalidFee: u64 = 0; // All values inside the Fees Struct must be equal or below 1e18 as it represents 100%
   const EMistmatchedValues: u64 = 1; // Sender did not provide the same quantity of Yield and Principal
-  const EInvalidUnstakeAmount: u64 = 2; // The sender tried to unstake more than he is allowed 
+  const EInvalidStakeAmount: u64 = 2; // The sender tried to unstake more than he is allowed 
   const ETooEarly: u64 = 3; // User tried to redeem tokens before their maturity
   const EInvalidMaturity: u64 = 4; // Sender tried to create a bond with an outdated maturity
   const EInvalidBackupMaturity: u64 = 5; // Sender tried to abuse the maturity 
   const EMistmatchedSlots: u64 = 6; // Sender tried to call a bond with SFTs with different slots
+  const EInvalidUnstakeAmount: u64 = 7; // User tried to unstake more than he is owed
 
   // ** Structs
 
@@ -77,6 +79,7 @@ module interest_lst::pool {
     dao_coin: Coin<ISUI>, // Fees collected by the protocol in ISUI
     whitelist_validators: vector<address>,
     pool_history: LinkedTable<u64, Rebase>, // Epoch => Pool Data
+    dust: Balance<SUI> // If there is less than 1 Sui from unstaking (rewards)
   }
 
   // ** Events
@@ -146,7 +149,8 @@ module interest_lst::pool {
         fee: new_fee(),
         dao_coin: coin::zero<ISUI>(ctx),
         whitelist_validators: vector::empty(),
-        pool_history: linked_table::new(ctx)
+        pool_history: linked_table::new(ctx),
+        dust: balance::zero()
       }
     );
   }
@@ -238,7 +242,7 @@ module interest_lst::pool {
     // Save current epoch -1 in memory
     // Rewards are given at the end of each epoch
     // If users withdraw coins in the current epoch the rewards will change, therefore, we only calculate rewards once they are fully finalized
-    let epoch = tx_context::epoch(ctx) - 1;
+    let epoch = tx_context::epoch(ctx);
 
     //If the function has been called this epoch, we do not need to do anything else
     // If there are no shares in the pool, it means there is no sui being staked. So there are no updates
@@ -297,7 +301,7 @@ module interest_lst::pool {
     // Today's exchange rate is always yesterdays
     linked_table::push_back(
       &mut storage.pool_history, 
-      epoch + 1, 
+      epoch, 
       storage.pool
     );
   }
@@ -375,10 +379,7 @@ module interest_lst::pool {
 
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
-    // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
-    // The user withdraw 1 Sui Above what he wishes to withdraw to guarantee that we can re-stake the rewards
-    // If we allow more than 1 Sui, a user can grief the module and force a re-stake of all {StakedSui} preventing the module ot earn rewards
-    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, EInvalidUnstakeAmount);
+    assert!(total_principal_unstaked == sui_value_to_return, EInvalidUnstakeAmount);
 
     emit(BurnISui { sender: tx_context::sender(ctx), sui_amount: sui_value_to_return, isui_amount });
 
@@ -506,7 +507,7 @@ module interest_lst::pool {
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
     // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
-    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, EInvalidUnstakeAmount);
+    assert!(total_principal_unstaked == sui_value_to_return, EInvalidUnstakeAmount);
 
     // We need to update the pool
     rebase::sub_elastic(&mut storage.pool, sui_value_to_return, false);
@@ -546,8 +547,7 @@ module interest_lst::pool {
 
     let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
 
-    // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
-    assert!((total_principal_unstaked - MIN_STAKING_THRESHOLD) == sui_value_to_return, EInvalidUnstakeAmount);
+    assert!(total_principal_unstaked == sui_value_to_return, EInvalidUnstakeAmount);
 
     // We need to update the pool
     rebase::sub_elastic(&mut storage.pool, sui_value_to_return, false);
@@ -700,7 +700,7 @@ module interest_lst::pool {
     let stake_value = coin::value(&token);
 
     // Will save gas since the sui_system will throw
-    assert!(stake_value >= MIN_STAKING_THRESHOLD, EInvalidUnstakeAmount);
+    assert!(stake_value >= MIN_STAKING_THRESHOLD, EInvalidStakeAmount);
     
     // Need to update the entire state of Sui/Sui Rewards once every epoch
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
@@ -848,11 +848,19 @@ module interest_lst::pool {
     validator_data.total_principal = validator_data.total_principal + left_over_amount;
     storage.total_principal = storage.total_principal + left_over_amount;
 
-    // Stake the Sui and store the Staked Sui in memory
-    store_staked_sui(
-      validator_data, 
-      sui_system::request_add_stake_non_entry(wrapper, total_sui_coin, validator_address, ctx)
-    );
+    let dust_value = balance::value(&storage.dust);
+
+    if (coin::value(&total_sui_coin) + dust_value >= MIN_STAKING_THRESHOLD) {
+      // Add Dust to the restake
+      coin::join(&mut total_sui_coin, coin::take(&mut storage.dust, dust_value, ctx));
+        // Stake the Sui and store the Staked Sui in memory
+      store_staked_sui(
+        validator_data, 
+        sui_system::request_add_stake_non_entry(wrapper, total_sui_coin, validator_address, ctx)
+      );
+    } else {
+      coin::put(&mut storage.dust, total_sui_coin);
+    };
 
     sui_to_return
   }

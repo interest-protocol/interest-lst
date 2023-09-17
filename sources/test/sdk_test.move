@@ -89,7 +89,7 @@ module interest_lst::sdk_tests {
 
       // Correctly updates the total principal
       // it is 60 Sui + Rewards
-      assert_eq(total_principal, 67428160919);
+      assert_eq(total_principal, 66752873563);
 
       test::return_shared(interest_sui_storage);
       test::return_shared(wrapper);
