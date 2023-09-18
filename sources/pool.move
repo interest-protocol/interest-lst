@@ -127,6 +127,11 @@ module interest_lst::pool {
     amount: u64
   }
 
+  struct UpdatePool has copy, drop {
+    rewards: u64,
+    principal: u64
+  }
+
   fun init(ctx: &mut TxContext) {
     // Share the PoolStorage Object with the Sui network
     transfer::share_object(
@@ -279,6 +284,7 @@ module interest_lst::pool {
       epoch, 
       storage.pool
     );
+    emit(UpdatePool { principal: storage.total_principal, rewards: total_rewards  });
   }
 
   // @dev This function stakes Sui in a validator chosen by the sender and returns ISUI. 
@@ -761,7 +767,7 @@ module interest_lst::pool {
               // Update the validator data
               validator_data.total_principal =  validator_data.total_principal - amount_left;
               // We have unstaked enough
-              break;
+              break
             } else {
               // If we cannot split, we simply unstake the whole Staked Sui
               coin::join(&mut coin_sui_unstaked, coin::from_balance(sui_system::request_withdraw_stake_non_entry(wrapper, staked_sui, ctx), ctx));
@@ -786,10 +792,14 @@ module interest_lst::pool {
     // Check how much we unstaked
     let total_value_unstaked = coin::value(&coin_sui_unstaked);
 
+    // Update the total principal
+    storage.total_principal = storage.total_principal - total_value_unstaked;
+
     // If we unstaked more than the desired amount, we need to restake the different
     if (total_value_unstaked > amount) {
+      let extra_value = total_value_unstaked - amount;
       // Split the different in a new coin
-      let extra_coin_sui = coin::split(&mut coin_sui_unstaked, amount - total_value_unstaked, ctx);
+      let extra_coin_sui = coin::split(&mut coin_sui_unstaked, extra_value, ctx);
       // Save the current dust in storage
       let dust_value = balance::value(&storage.dust);
 
@@ -797,16 +807,18 @@ module interest_lst::pool {
       if (coin::value(&extra_coin_sui) + dust_value >= MIN_STAKING_THRESHOLD) {
         // Join Dust and extra coin
         coin::join(&mut extra_coin_sui, coin::take(&mut storage.dust, dust_value, ctx));
+        let validator_data = linked_table::borrow_mut(&mut storage.validators_table, validator_address);
         // Stake and store
-        store_staked_sui(linked_table::borrow_mut(&mut storage.validators_table, validator_address), sui_system::request_add_stake_non_entry(wrapper, extra_coin_sui, validator_address, ctx));
+        store_staked_sui(validator_data, sui_system::request_add_stake_non_entry(wrapper, extra_coin_sui, validator_address, ctx));
+        validator_data.total_principal = validator_data.total_principal + extra_value;
       } else {
         // If we do not have enough to stake we save in the dust to be staked later on
         coin::put(&mut storage.dust, extra_coin_sui);
       };
+
+      storage.total_principal = storage.total_principal + extra_value;
     };
 
-    // Update the total principal
-    storage.total_principal = storage.total_principal - amount;
     // Return the Sui Coin
     coin_sui_unstaked
   }

@@ -278,10 +278,6 @@ module interest_lst::pool_tests {
 
       let (pool_rebase, _, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
-      let validator_payload = vector[
-        pool::create_burn_validator_payload(COINBASE_CLOUD, 2, add_decimals(10, 9))
-      ];
-
       let isui_unstake_amount = rebase::to_base(pool_rebase, add_decimals(10, 9), true);
 
       let old_elastic = rebase::elastic(pool_rebase);
@@ -294,9 +290,8 @@ module interest_lst::pool_tests {
           &mut wrapper, 
           &mut pool_storage,
           &mut interest_sui_storage,
-          validator_payload,
           mint_for_testing<ISUI>(isui_unstake_amount, ctx(test)),
-          MYSTEN_LABS,
+          COINBASE_CLOUD,
           ctx(test)
           )
         ),
@@ -311,19 +306,19 @@ module interest_lst::pool_tests {
 
       // Correctly updates the total principal
       // it is 60 Sui + Rewards
-      assert_eq(total_principal, 62967306324);
+      assert_eq(total_principal, 60000000000);
 
       // Coinbase Cloud Data
-      let (staked_sui_table,  validator_total_principal) = pool::read_validator_data(linked_table::borrow(validator_data_table, COINBASE_CLOUD));
+      let (staked_sui_table,  validator_total_principal) = pool::read_validator_data(linked_table::borrow(validator_data_table, FIGMENT));
       assert_eq(validator_total_principal, add_decimals(10, 9));
       // We removed One Staked Sui
       assert_eq(linked_table::length(staked_sui_table), 1);
 
       // Mysten Labs Data
       let (staked_sui_table,  validator_total_principal) = pool::read_validator_data(linked_table::borrow(validator_data_table, MYSTEN_LABS));
-      // Principal + Rewards as we stake the left over here
-      assert_eq(validator_total_principal, 42967306324);
-      assert_eq(linked_table::length(staked_sui_table), 3);
+      // Principal - The rewards are in Coinbase Cloud
+      assert_eq(validator_total_principal, 30000000000);
+      assert_eq(linked_table::length(staked_sui_table), 2);
 
       test::return_shared(interest_sui_storage);
       test::return_shared(wrapper);
@@ -468,11 +463,6 @@ module interest_lst::pool_tests {
 
       let shares_burned = rebase::to_base(pool_rebase, principal_amount + yield_amount, false);
 
-      let validator_payload = vector[
-        pool::create_burn_validator_payload(COINBASE_CLOUD, 2, add_decimals(9, 9)) ,
-        pool::create_burn_validator_payload(COINBASE_CLOUD, 5, add_decimals(1, 9) + yield_amount)
-      ];
-
       let residue = sui_principal::new_for_testing(
         &mut interest_sui_principal_storage,
         20,
@@ -485,11 +475,10 @@ module interest_lst::pool_tests {
         &mut pool_storage,
         &mut interest_sui_principal_storage,
         &mut interest_sui_yield_Storage,
-        validator_payload,
         residue,
         coupon,
-        MYSTEN_LABS,
         30,
+         MYSTEN_LABS,
         ctx(test)
       )), principal_amount + yield_amount);
 
@@ -550,7 +539,6 @@ module interest_lst::pool_tests {
         &mut wrapper,
         &mut pool_storage,
         &mut interest_sui_principal_storage,
-        vector[pool::create_burn_validator_payload(MYSTEN_LABS, 2, add_decimals(10, 9))],
         residue,
         MYSTEN_LABS,
         ctx(test)
@@ -614,10 +602,9 @@ module interest_lst::pool_tests {
       let (coupon_returned, rewards) = pool::claim_yield(
         &mut wrapper,
         &mut pool_storage,
-        vector[
-          pool::create_burn_validator_payload(MYSTEN_LABS, 2, yield_earned)],
         coupon,
-        MYSTEN_LABS, 99,
+        MYSTEN_LABS, 
+        99,
         ctx(test)
       );
 
