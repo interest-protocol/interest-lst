@@ -36,7 +36,7 @@ sui  client  publish  --gas-budget  500000000
 
 ### Functionality
 
-Interest Liquid Staking Derivative allows users to stake and unstake Sui in their validator of choice. Users have two Mint options:
+Interest Liquid Staking Tokens allows users to stake and unstake Sui in their validator of choice. Users have two Mint options:
 
 **First Option**
 
