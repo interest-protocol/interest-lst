@@ -189,7 +189,7 @@ module interest_lst::sdk {
   // @dev It allows the frontend to find the current fee of a specific validator
   /*
   * @param pool_storage The shared object of the interest_lst::pool module
-  * @param The address of a validator
+  * @param validator_address The address of a validator
   * @return The fee in 1e18
   */
   public fun get_validator_fee(storage: &PoolStorage, validator_address: address): u256 {
@@ -199,6 +199,25 @@ module interest_lst::sdk {
     let (_, validator_principal) = pool::read_validator_data(linked_table::borrow(validator_table, validator_address));
 
     calculate_fee_percentage(fee, (validator_principal as u256), (total_principal as u256))
+  }
+
+  // @dev It allows the frontend to find the current fee for all validators
+  /*
+  * @param pool_storage The shared object of the interest_lst::pool module
+  * @param validators A vector with the address of all validators
+  * @return The fee in 1e18
+  */
+  public fun get_validators_fee_vector(storage: &PoolStorage, validators: vector<address>): vector<u256> {
+    let len = vector::length(&validators);
+    let i = 0;
+    let result = vector::empty();
+
+    while(len > i) {
+      vector::push_back(&mut result, get_validator_fee(storage, *vector::borrow(&validators, i)));
+      i = i + 1;
+    };
+    
+    result
   }
 
   // @dev It allows the frontend to know how much Sui was staked in each validator in our LST
