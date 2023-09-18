@@ -14,9 +14,9 @@ module interest_lst::sdk {
   use interest_lst::isui::{ISUI, InterestSuiStorage};
   use interest_lst::fee_utils::{calculate_fee_percentage};
   use interest_lst::sui_yield::{SuiYieldStorage, SuiYield};
+  use interest_lst::pool::{Self, PoolStorage, ValidatorData};
   use interest_lst::semi_fungible_token::{SemiFungibleToken};
   use interest_lst::sui_principal::{SuiPrincipalStorage, SUI_PRINCIPAL};
-  use interest_lst::pool::{Self, PoolStorage, ValidatorData, BurnValidatorPayload};
   use interest_lst::asset_utils::{
     handle_coin_vector, 
     handle_yield_vector,
@@ -67,7 +67,6 @@ module interest_lst::sdk {
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     interest_sui_storage: &mut InterestSuiStorage,
-    validator_payload: vector<BurnValidatorPayload>,
     tokens: vector<Coin<ISUI>>,
     token_value: u64,
     validator_address: address,
@@ -77,7 +76,6 @@ module interest_lst::sdk {
       wrapper,
       storage,
       interest_sui_storage,
-      validator_payload,
       handle_coin_vector(tokens, token_value, ctx),
       validator_address,
       ctx
@@ -119,13 +117,12 @@ module interest_lst::sdk {
     storage: &mut PoolStorage,
     sui_principal_storage: &mut SuiPrincipalStorage,
     sui_yield_storage: &mut SuiYieldStorage,
-    validator_payload: vector<BurnValidatorPayload>,
     sft_principal_vector: vector<SemiFungibleToken<SUI_PRINCIPAL>>,
     sft_yield_vector: vector<SuiYield>,
     principal_value: u64,
     yield_value: u64,
-    validator_address: address,
     maturity: u64,
+    validator_address: address,
     ctx: &mut TxContext,
   ) {
     public_transfer_coin(
@@ -134,11 +131,10 @@ module interest_lst::sdk {
         storage,
         sui_principal_storage,
         sui_yield_storage,
-        validator_payload,
         handle_principal_vector(sft_principal_vector, principal_value, ctx),
         handle_yield_vector(sft_yield_vector, yield_value, ctx),
-        validator_address,
         maturity,
+        validator_address,
         ctx
       ),
       tx_context::sender(ctx)
@@ -149,7 +145,6 @@ module interest_lst::sdk {
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     sui_principal_storage: &mut SuiPrincipalStorage,
-    validator_payload: vector<BurnValidatorPayload>,
     sft_principal_vector: vector<SemiFungibleToken<SUI_PRINCIPAL>>,
     principal_value: u64,
     validator_address: address,
@@ -160,7 +155,6 @@ module interest_lst::sdk {
         wrapper,
         storage,
         sui_principal_storage,
-        validator_payload,
         handle_principal_vector(sft_principal_vector, principal_value, ctx),
         validator_address,
         ctx
@@ -171,7 +165,6 @@ module interest_lst::sdk {
   public fun claim_yield(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    validator_payload: vector<BurnValidatorPayload>,
     sft_yield_vector: vector<SuiYield>,
     yield_value: u64,
     validator_address: address,
@@ -181,7 +174,6 @@ module interest_lst::sdk {
     let (yield, coin_sui) = pool::claim_yield(
       wrapper,
       storage,
-      validator_payload,
       handle_yield_vector(sft_yield_vector, yield_value, ctx),
       validator_address,
       maturity,
@@ -192,71 +184,6 @@ module interest_lst::sdk {
 
     public_transfer_yield(yield, sender);
     public_transfer_coin(coin_sui, sender);
-  }
-
-  public fun create_burn_validator_payload(
-    storage: &PoolStorage,
-    amount: u64,
-    ctx: &mut TxContext
-  ): vector<BurnValidatorPayload> {
-     let (_, _, validators_table, _, _, _, _) = pool::read_pool_storage(storage);
-
-    let total_value = 0;
-    let data = vector::empty();
-
-    // Get the first validator in the linked_table
-    let next_validator = linked_table::front(validators_table);
-
-        // We iterate through all validators. This can grow to 1000+
-    while (option::is_some(next_validator)) {
-      // Save the validator address in memory. We first check that it exists above.
-      let validator_address = *option::borrow(next_validator);
-
-       let (staked_sui_table, total_principal) = pool::read_validator_data(linked_table::borrow(validators_table, validator_address));
-
-      // If the validator does not have any sui staked, we to the next validator
-      if (total_principal != 0) {
-        let next_key = linked_table::front(staked_sui_table);
-
-        while (option::is_some(next_key)) {
-          let activation_epoch = *option::borrow(next_key);
-          
-          let staked_sui = linked_table::borrow(staked_sui_table, activation_epoch);
-
-          let activation_epoch = staking_pool::stake_activation_epoch(staked_sui);
-
-          // It is not possible to unstake before the activation epoch
-          if (activation_epoch > tx_context::epoch(ctx)) continue;
-          
-          let value = staking_pool::staked_sui_amount(staked_sui);
-
-          let amount_left = amount - total_value;
-
-          // We add the different and break;
-          if (value >= amount_left + MIN_STAKING_THRESHOLD) {
-            vector::push_back(&mut data, pool::create_burn_validator_payload(validator_address, activation_epoch, amount_left));
-            total_value = total_value + amount_left;
-            break
-          } else {
-            total_value = total_value + value;
-            vector::push_back(&mut data, pool::create_burn_validator_payload(validator_address, activation_epoch, value));
-          };
-
-
-          if (total_value >= amount) break;
-
-          next_key = linked_table::next(staked_sui_table, activation_epoch);
-        };
-
-      };
-
-      if (total_value >= amount) break;
-      
-      // Point the next_validator to the next one
-      next_validator = linked_table::next(validators_table, validator_address);
-    };
-
-    data
   }
 
   // @dev It allows the frontend to find the current fee of a specific validator

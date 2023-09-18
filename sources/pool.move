@@ -45,17 +45,8 @@ module interest_lst::pool {
   const EInvalidMaturity: u64 = 4; // Sender tried to create a bond with an outdated maturity
   const EInvalidBackupMaturity: u64 = 5; // Sender tried to abuse the maturity 
   const EMistmatchedSlots: u64 = 6; // Sender tried to call a bond with SFTs with different slots
-  const EInvalidUnstakeAmount: u64 = 7; // User tried to unstake more than he is owed
 
   // ** Structs
-
-  // This struct compacts the data sent to burn_isui
-  // We will remove the {principal} amount of StakedSui from the {validator_address} stored at staked_sui_table with the key {epoch}
-  struct BurnValidatorPayload has drop, store {
-    epoch: u64,
-    validator_address: address,
-    principal: u64
-  }
 
   struct ValidatorData has key, store {
     id: UID, // front end to grab and display data,
@@ -108,7 +99,6 @@ module interest_lst::pool {
   struct CallBond has copy, drop {
     sender: address,
     sui_amount: u64,
-    validator: address,
     maturity: u64    
   }
 
@@ -209,21 +199,6 @@ module interest_lst::pool {
     update_pool(wrapper, storage, ctx);
 
     get_pending_yield_logic(storage, sft, maturity, ctx)
-  }
-
-  // @dev Utility function to create {BurnValidatorPayload} Object for other modules
-  /*
-  * @param validator_address The validator to which we will unstake
-  * @param epoch The action_epoch of the {StakedSui} we will unstake
-  * @param principal How much of the {StakedSui} to unstake
-  * @return {BurnValidatorPayload} to use on {burn_isui}, {burn_interest_staked_sui} and {burn_isui_yc}
-  */
-  public fun create_burn_validator_payload(validator_address: address, epoch: u64, principal: u64): BurnValidatorPayload {
-    BurnValidatorPayload {
-      validator_address,
-      epoch, 
-      principal
-    }
   }
 
   // @dev This function costs a lot of gas and must be called before any interaction with Interest lst because it updates the pool. The pool is needed to ensure all 3 Coins' exchange rate is accurate.
@@ -352,16 +327,14 @@ module interest_lst::pool {
   * @param wrapper The Sui System Shared Object
   * @param storage The Pool Storage Shared Object (this module)
   * @param interest_sui_storage The shared object of ISUI, contains the treasury_cap. We need it to mint ISUI
-  * @param validator_payload A vector containing the information about which StakedSui to unstake
   * @param token The iSui Coin, the sender wishes to burn
-  * @param validator_address The validator is to re-stake any remaining Sui if any
+  * @param validator_address The address of a validator to stake any leftover Sui
   * @return Coin<SUI> in exchange for the iSui burned
   */
   public fun burn_isui(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     interest_sui_storage: &mut InterestSuiStorage,
-    validator_payload: vector<BurnValidatorPayload>,
     token: Coin<ISUI>,
     validator_address: address,
     ctx: &mut TxContext,
@@ -377,14 +350,10 @@ module interest_lst::pool {
     // Burn the iSUI
     let sui_value_to_return = rebase::sub_base(&mut storage.pool, isui_amount, false);
 
-    let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
-
-    assert!(total_principal_unstaked == sui_value_to_return, EInvalidUnstakeAmount);
-
     emit(BurnISui { sender: tx_context::sender(ctx), sui_amount: sui_value_to_return, isui_amount });
 
     // Unstake Sui
-    unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_value_to_return, ctx)
+    remove_staked_sui(wrapper, storage, sui_value_to_return, validator_address, ctx)
   }
 
   // @dev This function stakes Sui in a validator chosen by the sender and mints a stripped bond (SuiPrincipal + Sui Yield). 
@@ -414,14 +383,14 @@ module interest_lst::pool {
     assert!(maturity > tx_context::epoch(ctx), EInvalidMaturity);
 
     let token_amount = coin::value(&token);
-    let shares_amount = mint_isui_logic(wrapper, storage,token, validator_address, ctx);
+    mint_isui_logic(wrapper, storage, token, validator_address, ctx);
 
 
     let sui_amount = if (is_whitelisted(storage, validator_address)) { 
       token_amount
     } else {
       let validator_principal = linked_table::borrow(&storage.validators_table, validator_address).total_principal;
-      charge_interest_staked_sui_mint(
+      charge_stripped_bond_mint(
         storage, 
         interest_sui_storage, 
         validator_principal, 
@@ -429,6 +398,8 @@ module interest_lst::pool {
         ctx        
       )
     };
+
+    let shares_amount = rebase::to_base(&storage.pool, sui_amount, false);
 
     // mint_isui_logic will update the pool
     let sft_yield = sui_yield::new( 
@@ -461,11 +432,10 @@ module interest_lst::pool {
   * @param storage The Pool Storage Shared Object (this module)
   * @param sui_principal_storage The shared object of Sui Principal, it contains the treasury_cap. We need it to mint.
   * @param sui_yield_storage The shared object of Sui Yield, it contains the treasury_cap. We need it to mint.
-  * @param validator_payload A vector containing the information about which StakedSui to unstake
   * @param sft_principal The residue portion of the bond
   * @param sft_yield The yield portion of the bond
-  * @param validator_address The Sui Coin will be staked in this validator
   * @param maturity Back up maturity in case we missed an pool update call (should not happen)
+  * @param validator_address A validator to stake any leftover
   * @return Coin<SUI> in exchange for the Sui Principal burned
   */
   public fun call_bond(
@@ -473,11 +443,10 @@ module interest_lst::pool {
     storage: &mut PoolStorage,
     sui_principal_storage: &mut SuiPrincipalStorage,
     sui_yield_storage: &mut SuiYieldStorage,
-    validator_payload: vector<BurnValidatorPayload>,
     sft_principal: SemiFungibleToken<SUI_PRINCIPAL>,
     sft_yield: SuiYield,
-    validator_address: address,
     maturity: u64,
+    validator_address: address,
     ctx: &mut TxContext,
   ): Coin<SUI> {
     let slot = (sui_yield::slot(&sft_yield) as u64);
@@ -501,19 +470,12 @@ module interest_lst::pool {
       sui_value_to_return, 
       sender: tx_context::sender(ctx), 
       maturity: slot,
-      validator: validator_address
     });
-
-    let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
-
-    // Sender must Unstake a bit above his principal because it is possible that the unstaked left over rewards wont meet the min threshold
-    assert!(total_principal_unstaked == sui_value_to_return, EInvalidUnstakeAmount);
-
     // We need to update the pool
     rebase::sub_elastic(&mut storage.pool, sui_value_to_return, false);
 
     // Unstake Sui
-    unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_value_to_return, ctx)
+    remove_staked_sui(wrapper, storage, sui_value_to_return, validator_address, ctx)
   }
 
   // @dev This function burns Sui Principal in exchange for SUI at 1:1 rate
@@ -521,7 +483,6 @@ module interest_lst::pool {
   * @param wrapper The Sui System Shared Object
   * @param storage The Pool Storage Shared Object (this module)
   * @param sui_principal_storage The shared object of Sui Principal, it contains the treasury_cap. We need it to burn Sui Principal
-  * @param validator_payload A vector containing the information about which StakedSui to unstake
   * @param token The Sui Principal, the sender wishes to burn
   * @param validator_address The validator to re stake any remaining Sui if any
   * @return Coin<SUI> in exchange for the Sui Principal burned
@@ -530,7 +491,6 @@ module interest_lst::pool {
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     sui_principal_storage: &mut SuiPrincipalStorage,
-    validator_payload: vector<BurnValidatorPayload>,
     token: SemiFungibleToken<SUI_PRINCIPAL>,
     validator_address: address,
     ctx: &mut TxContext,
@@ -545,24 +505,19 @@ module interest_lst::pool {
     // Burn the Sui Principal
     let sui_value_to_return = sui_principal::burn_destroy(sui_principal_storage, token);
 
-    let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
-
-    assert!(total_principal_unstaked == sui_value_to_return, EInvalidUnstakeAmount);
-
     // We need to update the pool
     rebase::sub_elastic(&mut storage.pool, sui_value_to_return, false);
 
     emit(BurnSuiPrincipal { sui_amount: sui_value_to_return, sender: tx_context::sender(ctx) });
 
     // Unstake Sui
-    unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_value_to_return, ctx)
+    remove_staked_sui(wrapper, storage, sui_value_to_return, validator_address, ctx)
   }
 
   // @dev This function allows a sender to claim his accrued yield
   /*
   * @param wrapper The Sui System Shared Object
   * @param storage The Pool Storage Shared Object (this module)
-  * @param validator_payload A vector containing the information about which StakedSui to unstake
   * @param sft_yield The SuiYield to burn in exchange for rewards
   * @param validator_address The validator to re stake any remaining Sui if any
   * @param maturity The back up maturity in case we missed a {update_pool} call
@@ -571,7 +526,6 @@ module interest_lst::pool {
   public fun claim_yield(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
-    validator_payload: vector<BurnValidatorPayload>,
     sft_yield: SuiYield,
     validator_address: address,
     maturity: u64,
@@ -588,15 +542,10 @@ module interest_lst::pool {
     // We need to update the pool
     rebase::sub_elastic(&mut storage.pool, sui_amount, false);
 
-    let (staked_sui_vector, total_principal_unstaked) = remove_staked_sui(storage, validator_payload, ctx);
-
-    // Sender must Unstake more than his principal to ensure that the leftover is above the threshold of 1 Sui
-    assert!(total_principal_unstaked == sui_amount, EInvalidUnstakeAmount);
-
     emit(ClaimYield { sui_yield_id: object::id(&sft_yield), sui_amount, sender: tx_context::sender(ctx) });
 
     // Unstake Sui
-    (sft_yield, unstake_staked_sui(wrapper, storage, staked_sui_vector, validator_address, sui_amount, ctx))
+    (sft_yield, remove_staked_sui(wrapper, storage, sui_amount, validator_address, ctx))
   }
 
   // ** Functions to handle Whitelist validators
@@ -751,118 +700,115 @@ module interest_lst::pool {
   }
   
 
-  // @dev This function safely removes Staked Sui from our storage
-  /*
-  * @param storage The Pool Storage Shared Object (this module)
-  * @param validator_payload A vector containing the information about which StakedSui to unstake
-  * @return (Vector of Staked Sui, total principal of Staked Sui Removed)
-  */
-  fun remove_staked_sui(
-      storage: &mut PoolStorage,
-      validator_payload: vector<BurnValidatorPayload>, 
-      ctx: &mut TxContext
-    ): (vector<StakedSui>, u64) {
-    
-    let length = vector::length(&validator_payload);
-    let i = 0;
-    let total_principal_unstaked = 0;
-    let staked_sui_vector = vector::empty<StakedSui>();
-
-    while (i < length) {
-
-      let payload = vector::borrow(&validator_payload, i);
-
-      // Save the validator data in memory
-      let validator_data = linked_table::borrow_mut(&mut storage.validators_table, payload.validator_address);
-
-    
-      // Remove the StakedSui from the {LinkedTable}
-      // It is important that we shrink this table to make the {update_pool} run less iterations
-      let staked_sui = linked_table::remove(&mut validator_data.staked_sui_table, payload.epoch);
-
-      let staked_sui_amount = staking_pool::staked_sui_amount(&staked_sui);
-
-      // We do not need to split the Sui so we can simply save it in the vector
-      if (staked_sui_amount == payload.principal) {
-        vector::push_back(&mut staked_sui_vector, staked_sui);     
-      } else {
-        // We need to split the StakedSui
-        // Save the desired amount in the vector
-        // Store the remaining Sui in the Storage
-        vector::push_back(&mut staked_sui_vector, staking_pool::split(&mut staked_sui, payload.principal, ctx));
-        store_staked_sui(validator_data, staked_sui);
-      };
-
-      // Update the validator data to reflect the unstaked Sui
-      validator_data.total_principal =  validator_data.total_principal - payload.principal;
-      // Update the total principal unstaked to make sure we do not unstake too much Sui and lose unnecessary rewards
-      total_principal_unstaked = total_principal_unstaked + payload.principal;   
-
-      i = i + 1;
-    };
-    storage.total_principal = storage.total_principal - total_principal_unstaked;
-    (staked_sui_vector, total_principal_unstaked)
-  }
-
-  // @dev This function unstakes StakedSui from the validators
+  // @dev This function safely unstakes Sui
   /*
   * @param wrapper The Sui System Shared Object
   * @param storage The Pool Storage Shared Object (this module)
-  * @param staked_sui_vector The vector of StakedSui to unstake
-  * @param validator_address The validator is to re-stake any remaining Sui if any
-  * @param sui_value_to_return The desired amount of Sui to unstake
-  * @return Coin<SUI> The unstaked Sui
+  * @param amount The amount of Sui to unstake
+  * @param validator_address The validator to restake
+  * @return (Vector of Staked Sui, total principal of Staked Sui Removed)
   */
-  fun unstake_staked_sui(
-    wrapper: &mut SuiSystemState, 
-    storage: &mut PoolStorage,
-    staked_sui_vector: vector<StakedSui>, 
-    validator_address: address,
-    sui_value_to_return: u64,
-    ctx: &mut TxContext
-  ): Coin<SUI> {
-    let total_sui_coin = coin::zero<SUI>(ctx);
+  fun remove_staked_sui(
+      wrapper: &mut SuiSystemState, 
+      storage: &mut PoolStorage,
+      amount: u64,
+      validator_address: address,
+      ctx: &mut TxContext
+    ): Coin<SUI> {
+    
+    // Create Zero Coin<SUI>, which we will join all Sui to return
+    let coin_sui_unstaked = coin::zero<SUI>(ctx);
 
-    let i = 0;
-    let length = vector::length(&staked_sui_vector);
+    // Get the first validator in the linked_table
+    let next_validator = linked_table::front(&storage.validators_table);
 
-    // Unstake and merge into one coin
-    while(i < length) {
-      coin::join(&mut total_sui_coin, coin::from_balance(sui_system::request_withdraw_stake_non_entry(wrapper, vector::pop_back(&mut staked_sui_vector), ctx), ctx));
-      i = i + 1;
+    // While there is a next validator, we keep looping
+    while(option::is_some(next_validator)) {
+      // Save the validator address in memory
+      let validator_address = *option::borrow(next_validator);
+
+      // Borrow Mut the validator data
+      let validator_data = linked_table::borrow_mut(&mut storage.validators_table, validator_address);
+
+      // If the validator has no staked Sui, we move unto the next one
+      if (validator_data.total_principal != 0) {
+        let next_key = linked_table::front(&validator_data.staked_sui_table);
+
+        while(option::is_some(next_key)) {
+          // Save the first key (epoch) on the staked sui table in memory
+          let activation_epoch = *option::borrow(next_key);
+
+          // We are only allowed to unstake if the Staked Suis are active
+          if (tx_context::epoch(ctx) >= activation_epoch) {
+            // Remove the Staked Sui - to make the table shorter for future iterations
+            let staked_sui = linked_table::remove(&mut validator_data.staked_sui_table, activation_epoch);
+
+            // Save the principal in Memory
+            let value = staking_pool::staked_sui_amount(&staked_sui);
+
+            // Find out how much amount we have left to unstake
+            let amount_left = amount - coin::value(&coin_sui_unstaked);
+
+            /*
+            * If we can split the Staked Sui to get the amount left. We split and store the remaining amount in the table. This is to avoid unstaking large amounts and lose rewards.
+            */
+            if (value >= amount_left + MIN_STAKING_THRESHOLD) {
+              // Split the Staked Sui -> Unstake -> Join with the Return Coin
+              coin::join(&mut coin_sui_unstaked, coin::from_balance(sui_system::request_withdraw_stake_non_entry(wrapper, staking_pool::split(&mut staked_sui, amount_left, ctx), ctx), ctx));
+
+              // Store the left over Staked Sui
+              store_staked_sui(validator_data, staked_sui);
+              // Update the validator data
+              validator_data.total_principal =  validator_data.total_principal - amount_left;
+              // We have unstaked enough
+              break;
+            } else {
+              // If we cannot split, we simply unstake the whole Staked Sui
+              coin::join(&mut coin_sui_unstaked, coin::from_balance(sui_system::request_withdraw_stake_non_entry(wrapper, staked_sui, ctx), ctx));
+              // Update the validator data
+              validator_data.total_principal =  validator_data.total_principal - value;
+            };
+          };
+
+          // Insanity check to make sure we d not keep looping for no reason
+          if (coin::value(&coin_sui_unstaked) >= amount) break;
+          // Move in the next epoch
+          next_key = linked_table::next(&validator_data.staked_sui_table, activation_epoch);
+        };
+      };
+
+      // No point to keep going if we have unstaked enough      
+      if (coin::value(&coin_sui_unstaked) >= amount) break;
+      // Get the next validator to keep looping
+      next_validator = linked_table::next(&storage.validators_table, validator_address);
     };
 
-    // This should be empty
-    vector::destroy_empty(staked_sui_vector);
+    // Check how much we unstaked
+    let total_value_unstaked = coin::value(&coin_sui_unstaked);
 
-    // Split the coin with the right value to repay the user
-    let sui_to_return = coin::split(&mut total_sui_coin, sui_value_to_return, ctx);
+    // If we unstaked more than the desired amount, we need to restake the different
+    if (total_value_unstaked > amount) {
+      // Split the different in a new coin
+      let extra_coin_sui = coin::split(&mut coin_sui_unstaked, amount - total_value_unstaked, ctx);
+      // Save the current dust in storage
+      let dust_value = balance::value(&storage.dust);
 
-    // Save the ValidatorData in memory so we can store any remaining Sui
-    let validator_data = linked_table::borrow_mut(&mut storage.validators_table, validator_address);
-
-    let left_over_amount = coin::value(&total_sui_coin);
-
-    // Update the data
-    // Rewards will increase the principals
-    validator_data.total_principal = validator_data.total_principal + left_over_amount;
-    storage.total_principal = storage.total_principal + left_over_amount;
-
-    let dust_value = balance::value(&storage.dust);
-
-    if (coin::value(&total_sui_coin) + dust_value >= MIN_STAKING_THRESHOLD) {
-      // Add Dust to the restake
-      coin::join(&mut total_sui_coin, coin::take(&mut storage.dust, dust_value, ctx));
-        // Stake the Sui and store the Staked Sui in memory
-      store_staked_sui(
-        validator_data, 
-        sui_system::request_add_stake_non_entry(wrapper, total_sui_coin, validator_address, ctx)
-      );
-    } else {
-      coin::put(&mut storage.dust, total_sui_coin);
+      // If we have enough dust and extra sui to stake -> we stake and store in the table
+      if (coin::value(&extra_coin_sui) + dust_value >= MIN_STAKING_THRESHOLD) {
+        // Join Dust and extra coin
+        coin::join(&mut extra_coin_sui, coin::take(&mut storage.dust, dust_value, ctx));
+        // Stake and store
+        store_staked_sui(linked_table::borrow_mut(&mut storage.validators_table, validator_address), sui_system::request_add_stake_non_entry(wrapper, extra_coin_sui, validator_address, ctx));
+      } else {
+        // If we do not have enough to stake we save in the dust to be staked later on
+        coin::put(&mut storage.dust, extra_coin_sui);
+      };
     };
 
-    sui_to_return
+    // Update the total principal
+    storage.total_principal = storage.total_principal - amount;
+    // Return the Sui Coin
+    coin_sui_unstaked
   }
 
   // If there is a fee, it mints iSUi for the Admin
@@ -901,7 +847,7 @@ module interest_lst::pool {
   * @amount The amount of Interest Sui Staked Amount being minted
   * @return the amount of ISUI to mint to the sender
   */
-  fun charge_interest_staked_sui_mint(
+  fun charge_stripped_bond_mint(
     storage: &mut PoolStorage,
     interest_sui_storage: &mut InterestSuiStorage,
     validator_principal: u64,
