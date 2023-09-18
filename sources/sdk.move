@@ -63,7 +63,7 @@ module interest_lst::sdk {
     ), tx_context::sender(ctx));
   }
 
-  public fun burn_isui(
+  public entry fun burn_isui(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     interest_sui_storage: &mut InterestSuiStorage,
@@ -112,7 +112,7 @@ module interest_lst::sdk {
     public_transfer_yield(yield, sender);
   }
 
-  public fun call_bond(
+  public entry fun call_bond(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     sui_principal_storage: &mut SuiPrincipalStorage,
@@ -141,7 +141,7 @@ module interest_lst::sdk {
     );
   }
 
-  public fun burn_sui_principal(
+  public entry fun burn_sui_principal(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     sui_principal_storage: &mut SuiPrincipalStorage,
@@ -162,7 +162,7 @@ module interest_lst::sdk {
       tx_context::sender(ctx))
   }
 
-  public fun claim_yield(
+  public entry fun claim_yield(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     sft_yield_vector: vector<SuiYield>,
