@@ -219,9 +219,7 @@ module interest_lst::pool {
     storage: &mut PoolStorage,
     ctx: &mut TxContext,
   ) {
-    // Save current epoch -1 in memory
-    // Rewards are given at the end of each epoch
-    // If users withdraw coins in the current epoch the rewards will change, therefore, we only calculate rewards once they are fully finalized
+    // Save the current epoch in memory
     let epoch = tx_context::epoch(ctx);
 
     //If the function has been called this epoch, we do not need to do anything else
@@ -277,8 +275,7 @@ module interest_lst::pool {
     rebase::set_elastic(&mut storage.pool, total_rewards + storage.total_principal);
     // Update the last_epoch
     storage.last_epoch = epoch;
-    // We save the epoch => exchange rate for iSui => Sui
-    // Today's exchange rate is always yesterdays
+    // We save the epoch => Pool Rebase
     linked_table::push_back(
       &mut storage.pool_history, 
       epoch, 
