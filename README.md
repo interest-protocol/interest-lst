@@ -14,7 +14,11 @@ Make sure you have the latest version of the Sui binaries installed on your mach
 
 ```bash
 
+
+
 sui  move  test
+
+
 
 ```
 
@@ -22,7 +26,11 @@ sui  move  test
 
 ```bash
 
+
+
 sui  client  publish  --gas-budget  500000000
+
+
 
 ```
 
@@ -33,9 +41,13 @@ Interest Liquid Staking Derivative allows users to stake and unstake Sui in thei
 **First Option**
 
 ```mermaid
+
 graph LR
+
 A((10 Sui)) --> B((iSui))
+
 B -- Principal + Yield --> C((12 Sui))
+
 ```
 
 - iSui (Interest Sui): It tracks the pool's principal and rewards. Therefore, its value is always higher than Sui.
@@ -43,26 +55,30 @@ B -- Principal + Yield --> C((12 Sui))
 **Second Option**
 
 ```mermaid
+
 graph LR
-A((10 Sui)) -- Principal --> B((isSui))
-A -- Yield --> C[SuiYield]
+
+A((10 Sui)) -- Principal --> B((iSUIP))
+
+A -- Yield --> C[iSUIY]
+
 B --> D((10 Sui))
+
 C --> E((2 Sui))
+
 ```
 
-- isSUI (Interest Staked Sui Coin): It tracks the principal of a Native Staked Sui Object. This coin is always equal to Sui.
+- iSUIP (Interest Sui Principal): It tracks the principal of a Native Staked Sui Object. This coin is always equal to Sui.
 
-- SuiYield: It is a fungible yield bearing asset that tracks the yield portion of a Native Staked Sui Object.
+- iSUIY (Interest Sui Yield): It is a fungible yield bearing asset that tracks the yield portion of a Native Staked Sui Object.
 
-> Selling any of these assets, means selling the entire position. They
-> do not require any other object to mint/burn and are the module does not keep track of addresses. Therefore, they are
-> composable with DeFi.
+> Selling any of these assets, means selling the entire position. They do not require any other object to mint/burn and the module does not keep track of addresses. Therefore, they are composable with DeFi.
 
 ## Core Values
 
 - **Decentralized:** Users can deposit/withdraw from any validator
 
-- **Non-custodial:** The admin does not have any access to the funds. It uses a Coin + NFT accounting system to keep track of deposits/rewards
+- **Non-custodial:** The admin does not have any access to the funds. It uses a Coin + SFT accounting system to keep track of deposits/rewards
 
 - **Fair:** The deposit fee increases as a validator gets a higher stake compared to others. It incentivizes users to deposit in other validators.
 
@@ -82,71 +98,112 @@ C --> E((2 Sui))
 
 ## Portfolio Logic
 
-The Interest LSD portfolio is managed by the **Rebase struct**. It is stored in the **PoolStorage** shared object under **pool**.
+The Interest LST portfolio is managed by the **Rebase struct**. It is stored in the **PoolStorage** shared object under **pool**.
 
 - **base** It represents the shares of the portfolio (iSui)
+
 - **elastic** It represents the assets held by the portfolio (Sui)
 
 > Interest LSD Portfolio:
+
 > Base: 1000
+
 > Elastic: 1200
+
 >
+
 > 10 iSui is worth 12 Sui - _10 \* 1200 / 1000_
+
 >
+
 > 10 Sui is worth ~8.3 iSui - _10 \* 1000 / 1200_
 
-## Sui Yield
+## SFT (Semi Fungible Tokens)
 
 ```move
 
-  struct SuiYield has key, store {
+
+
+  struct SemiFungibleToken<phantom T> has key, store {
     id: UID,
-    principal: u64,
-    shares: u64,
-    is_clean: bool
+    slot: u256,
+    value: u64,
   }
+
+
 
 ```
 
-The SuiYield is a fungible asset. It can be redeemed to Sui, therefore, it can be merged and split. We can easily build an AMM by merging all SuiYield into one and relying on the function join and split for all other operations:
+Semi-fungible tokens can exchange value if they have the same slot as a coin. SFTs with the same slot can be joined together or split apart. iSUIP and iSUIY are SFTs. Their maturity is saved in the slot attribute.
 
-Join:
-
-- Swap in SuiYield for WETH
-- Add Liquidity
-
-Split:
-
-- Swap WETH for SuiYield
-- Remove Liquidity
+### Fungible with the same slot
 
 **Join**
 
 ```mermaid
 
+
+
 graph LR
 
-A[SuiYield - 10 Sui] --> C
 
-B[SuiYield - 2 Sui] --> C
-C[SuiYield - 12 Sui]
+
+A[SFT - Value: 10 & Slot: 1] --> C
+
+
+
+B[SFT - Value: 2 & Slot: 1] --> C
+
+C[SFT - Value: 12 & Slot: 1]
+
 ```
 
 **Split**
 
 ```mermaid
 
+
+
 graph LR
 
-A[SuiYield - 10 Sui]
 
-A --> B[SuiYield - 8 Sui]
-A --> C[SuiYield - 2 Sui]
+
+A[SFT - Value: 10 & Slot: 1]
+
+
+
+A --> B[SFT - Value: 8 & Slot: 1]
+
+A --> C[SFT - Value: 2 & Slot: 1]
+
+```
+
+### Non-Fungible different slots
+
+**Join**
+
+```mermaid
+
+
+
+graph LR
+
+
+
+A[SFT - Value: 10 & Slot: 1] --> C
+
+
+
+B[SFT - Value: 2 & Slot: 2] --> C
+
+C[NOT ALLOWED]
+
 ```
 
 ## Authors
 
 - [JMVC](https://twitter.com/josemvcerqueira)
+
 - [Thouny](https://twitter.com/BL0CKRUNNER)
 
 ## Contact Us
