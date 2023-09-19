@@ -159,6 +159,7 @@ module interest_lst::sdk {
   entry fun claim_yield(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
+    sui_yield_storage: &mut SuiYieldStorage,
     sft_yield_vector: vector<SuiYield>,
     yield_value: u64,
     validator_address: address,
@@ -168,6 +169,7 @@ module interest_lst::sdk {
     let (yield, coin_sui) = pool::claim_yield(
       wrapper,
       storage,
+      sui_yield_storage,
       handle_yield_vector(sft_yield_vector, yield_value, ctx),
       validator_address,
       maturity,

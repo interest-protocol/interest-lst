@@ -603,6 +603,7 @@ module interest_lst::pool_tests {
       let (coupon_returned, rewards) = pool::claim_yield(
         &mut wrapper,
         &mut pool_storage,
+        &mut interest_sui_yield_Storage,
         coupon,
         MYSTEN_LABS, 
         99,

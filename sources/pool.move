@@ -525,6 +525,7 @@ module interest_lst::pool {
   /*
   * @param wrapper The Sui System Shared Object
   * @param storage The Pool Storage Shared Object (this module)
+  * @param sui_yield_storage The Shared Object of Sui Yield
   * @param sft_yield The SuiYield to burn in exchange for rewards
   * @param validator_address The validator to re stake any remaining Sui if any
   * @param maturity The back up maturity in case we missed a {update_pool} call
@@ -533,11 +534,18 @@ module interest_lst::pool {
   public fun claim_yield(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
+    sui_yield_storage: &mut SuiYieldStorage,
     sft_yield: SuiYield,
     validator_address: address,
     maturity: u64,
     ctx: &mut TxContext,
   ): (SuiYield, Coin<SUI>) {
+
+    if (tx_context::epoch(ctx) > (sui_yield::slot(&sft_yield) as u64)) {
+      sui_yield::expire(sui_yield_storage, &mut sft_yield);
+
+      return (sft_yield, coin::zero(ctx));
+    };
     
     // Destroy both tokens
     // Calculate how much Sui they are worth
