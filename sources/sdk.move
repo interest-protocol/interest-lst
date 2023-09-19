@@ -44,7 +44,7 @@ module interest_lst::sdk {
     epoch: u64
   }
 
-  public entry fun mint_isui(
+  entry fun mint_isui(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     interest_sui_storage: &mut InterestSuiStorage,
@@ -63,7 +63,7 @@ module interest_lst::sdk {
     ), tx_context::sender(ctx));
   }
 
-  public entry fun burn_isui(
+  entry fun burn_isui(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     interest_sui_storage: &mut InterestSuiStorage,
@@ -82,7 +82,7 @@ module interest_lst::sdk {
     ), tx_context::sender(ctx));
   }
 
-  public entry fun mint_stripped_bond(
+  entry fun mint_stripped_bond(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     interest_sui_storage: &mut InterestSuiStorage,
@@ -112,7 +112,7 @@ module interest_lst::sdk {
     public_transfer_yield(yield, sender);
   }
 
-  public entry fun call_bond(
+  entry fun call_bond(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     sui_principal_storage: &mut SuiPrincipalStorage,
@@ -141,7 +141,7 @@ module interest_lst::sdk {
     );
   }
 
-  public entry fun burn_sui_principal(
+  entry fun burn_sui_principal(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     sui_principal_storage: &mut SuiPrincipalStorage,
@@ -162,7 +162,7 @@ module interest_lst::sdk {
       tx_context::sender(ctx))
   }
 
-  public entry fun claim_yield(
+  entry fun claim_yield(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     sft_yield_vector: vector<SuiYield>,
