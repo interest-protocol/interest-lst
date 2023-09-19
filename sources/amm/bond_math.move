@@ -5,7 +5,7 @@ module interest_lst::bond_math {
   use sui::tx_context::{Self, TxContext};
 
   use interest_lst::math::pow;
-  use interest_lst:sui_yield::{Self as y, SuiYield};
+  use interest_lst::sui_yield::{Self as y, SuiYield};
   use interest_lst::semi_fungible_token::SemiFungibleToken;
   use interest_lst::sui_principal::{Self as p, SUI_PRINCIPAL};
 
