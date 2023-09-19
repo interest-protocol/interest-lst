@@ -6,13 +6,15 @@
 module interest_lst::pool_tests {
   use std::option;
 
+  use sui::balance;
+  use sui::sui::SUI;
   use sui::linked_table;
-  use sui::coin::{Self, mint_for_testing, burn_for_testing as burn};
+  use sui::test_utils::assert_eq;
+  use sui::coin::{mint_for_testing, burn_for_testing as burn};
   use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
-  use sui::test_utils::{assert_eq};
-  use sui::sui::{SUI};
 
-  use sui_system::sui_system::{SuiSystemState};
+  use sui_system::staking_pool;
+  use sui_system::sui_system::SuiSystemState;
   use sui_system::governance_test_utils::{
     create_sui_system_state_for_testing, 
     create_validator_for_testing, 
@@ -20,14 +22,13 @@ module interest_lst::pool_tests {
     assert_validator_total_stake_amounts, 
     advance_epoch_with_reward_amounts
   };
-  use sui_system::staking_pool;
   
+  use interest_lst::rebase;
+  use interest_lst::fee_utils::read_fee;
   use interest_lst::pool::{Self, PoolStorage};
+  use interest_lst::sui_yield::{Self, SuiYieldStorage};
   use interest_lst::isui::{Self, ISUI, InterestSuiStorage};
   use interest_lst::sui_principal::{Self, SuiPrincipalStorage};
-  use interest_lst::sui_yield::{Self, SuiYieldStorage};
-  use interest_lst::rebase;
-  use interest_lst::fee_utils::{read_fee};
   use interest_lst::test_utils::{people, scenario, mint, add_decimals}; 
 
   const MYSTEN_LABS: address = @0x4;
@@ -50,7 +51,7 @@ module interest_lst::pool_tests {
     {
       let pool_storage = test::take_shared<PoolStorage>(test);
 
-      let (pool_rebase, last_epoch, validators_table, total_principal, fee, dao_coin, _) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, last_epoch, validators_table, total_principal, fee, dao_balance, _) = pool::read_pool_storage(&pool_storage);
 
       let (base, kink, jump) = read_fee(fee);
 
@@ -65,7 +66,7 @@ module interest_lst::pool_tests {
       assert_eq(base, 0);
       assert_eq(kink, 0);
       assert_eq(jump, 0);
-      assert_eq(coin::value(dao_coin), 0);
+      assert_eq(balance::value(dao_balance), 0);
 
       // First deposit should update the data correctly
       let wrapper = test::take_shared<SuiSystemState>(test);
@@ -82,7 +83,7 @@ module interest_lst::pool_tests {
 
       assert_eq(burn(coin_isui), add_decimals(1000, 9));
 
-      let (pool_rebase, last_epoch, validators_table, total_principal, _, dao_coin, _) = pool::read_pool_storage(&pool_storage);
+      let (pool_rebase, last_epoch, validators_table, total_principal, _, dao_balance, _) = pool::read_pool_storage(&pool_storage);
 
       // The first deposit gets all shares
       assert_eq(rebase::base(pool_rebase), add_decimals(1000, 9));
@@ -94,7 +95,7 @@ module interest_lst::pool_tests {
       // Update the total_principal
       assert_eq(total_principal, add_decimals(1000, 9));
       // No fees
-      assert_eq(coin::value(dao_coin), 0);
+      assert_eq(balance::value(dao_balance), 0);
 
       let mysten_labs_data = linked_table::borrow(validators_table, MYSTEN_LABS);
 

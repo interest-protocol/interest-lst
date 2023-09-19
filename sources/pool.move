@@ -67,10 +67,10 @@ module interest_lst::pool {
     validators_table: LinkedTable<address, ValidatorData>, // We need a linked table to iterate through all validators once every epoch to ensure all pool data is accurate
     total_principal: u64, // Total amount of StakedSui principal deposited in Interest lst Package
     fee: Fee, // Holds the data to calculate the stake fee
-    dao_coin: Coin<ISUI>, // Fees collected by the protocol in ISUI
     whitelist_validators: vector<address>,
     pool_history: LinkedTable<u64, Rebase>, // Epoch => Pool Data
-    dust: Balance<SUI> // If there is less than 1 Sui from unstaking (rewards)
+    dust: Balance<SUI>, // If there is less than 1 Sui from unstaking (rewards)
+    dao_balance: Balance<ISUI>, // Fees collected by the protocol in ISUI
   }
 
   // ** Events
@@ -142,10 +142,10 @@ module interest_lst::pool {
         validators_table: linked_table::new(ctx),
         total_principal: 0,
         fee: new_fee(),
-        dao_coin: coin::zero<ISUI>(ctx),
         whitelist_validators: vector::empty(),
         pool_history: linked_table::new(ctx),
-        dust: balance::zero()
+        dust: balance::zero(),
+        dao_balance: balance::zero()
       }
     );
   }
@@ -253,7 +253,7 @@ module interest_lst::pool {
           
           let staked_sui = linked_table::borrow(&validator_data.staked_sui_table, activation_epoch);
           
-          // We only update the rewards if the {epoch} is greater than the {activation_epoch}
+          // We only update the rewards if the {epoch} is equal or greater than the {activation_epoch}
           // Otherwise, these sui have not accrued any rewards
           // We update the total rewards
           if (epoch >= activation_epoch)
@@ -627,7 +627,7 @@ module interest_lst::pool {
     emit(DaoWithdraw<ISUI> {amount, sender: tx_context::sender(ctx) });
 
     // Split the Fees and send the desired amount
-    coin::split(&mut storage.dao_coin, amount, ctx)
+    coin::take(&mut storage.dao_balance, amount, ctx)
   }
 
   // ** CORE OPERATIONS
@@ -843,7 +843,7 @@ module interest_lst::pool {
     if (fee_amount == 0) return shares;
 
     // Mint the ISUI for the DAO. We need to make sure the total supply of ISUI is consistent with the pool shares
-    coin::join(&mut storage.dao_coin, isui::mint(interest_sui_storage, fee_amount, ctx));
+    coin::put(&mut storage.dao_balance, isui::mint(interest_sui_storage, fee_amount, ctx));
     // Return the shares amount to mint to the sender
     shares - fee_amount
   }
@@ -871,7 +871,7 @@ module interest_lst::pool {
     if (fee_amount == 0) return amount;
 
     // Mint the ISUI for the DAO. We need to make sure the total supply of ISUI is consistent with the pool shares
-    coin::join(&mut storage.dao_coin, isui::mint(
+    coin::put(&mut storage.dao_balance, isui::mint(
       interest_sui_storage, 
       rebase::to_base(&storage.pool, fee_amount, false), 
       ctx
@@ -976,14 +976,14 @@ module interest_lst::pool {
 
  // ** SDK Functions
   
- public fun read_pool_storage(storage: &PoolStorage): (&Rebase, u64, &LinkedTable<address, ValidatorData>, u64, &Fee, &Coin<ISUI>, &LinkedTable<u64, Rebase>) {
+ public fun read_pool_storage(storage: &PoolStorage): (&Rebase, u64, &LinkedTable<address, ValidatorData>, u64, &Fee, &Balance<ISUI>, &LinkedTable<u64, Rebase>) {
     (
       &storage.pool, 
       storage.last_epoch, 
       &storage.validators_table, 
       storage.total_principal, 
       &storage.fee, 
-      &storage.dao_coin,
+      &storage.dao_balance,
       &storage.pool_history
     ) 
   }
