@@ -21,7 +21,7 @@ module interest_lst::pool {
 
   use interest_lst::admin::AdminCap;
   use interest_lst::rebase::{Self, Rebase};
-  use interest_lst::math::{fmul, scalar};
+  use interest_lst::math::{fmul, fdiv, scalar};
   use interest_lst::semi_fungible_token::SemiFungibleToken;
   use interest_lst::isui::{Self, ISUI, InterestSuiStorage};
   use interest_lst::sui_yield::{Self, SuiYield, SuiYieldStorage};
@@ -71,6 +71,7 @@ module interest_lst::pool {
     pool_history: LinkedTable<u64, Rebase>, // Epoch => Pool Data
     dust: Balance<SUI>, // If there is less than 1 Sui from unstaking (rewards)
     dao_balance: Balance<ISUI>, // Fees collected by the protocol in ISUI
+    rate: u256 // APY Arithmetic mean
   }
 
   // ** Events
@@ -145,7 +146,8 @@ module interest_lst::pool {
         whitelist_validators: vector::empty(),
         pool_history: linked_table::new(ctx),
         dust: balance::zero(),
-        dao_balance: balance::zero()
+        dao_balance: balance::zero(),
+        rate: 0
       }
     );
   }
@@ -281,6 +283,8 @@ module interest_lst::pool {
       epoch, 
       storage.pool
     );
+    let current_rate = fdiv((total_rewards as u256), (storage.total_principal as u256));
+    storage.rate = if (storage.rate == 0) { current_rate } else { (current_rate + storage.rate) / 2 };
     emit(UpdatePool { principal: storage.total_principal, rewards: total_rewards  });
   }
 
@@ -709,7 +713,7 @@ module interest_lst::pool {
   * @param storage The Pool Storage Shared Object (this module)
   * @param amount The amount of Sui to unstake
   * @param validator_address The validator to restake
-  * @return (Vector of Staked Sui, total principal of Staked Sui Removed)
+  * @return Coin<SUI>
   */
   fun remove_staked_sui(
       wrapper: &mut SuiSystemState, 
@@ -801,7 +805,7 @@ module interest_lst::pool {
       let dust_value = balance::value(&storage.dust);
 
       // If we have enough dust and extra sui to stake -> we stake and store in the table
-      if (coin::value(&extra_coin_sui) + dust_value >= MIN_STAKING_THRESHOLD) {
+      if (extra_value + dust_value >= MIN_STAKING_THRESHOLD) {
         // Join Dust and extra coin
         coin::join(&mut extra_coin_sui, coin::take(&mut storage.dust, dust_value, ctx));
         let validator_data = linked_table::borrow_mut(&mut storage.validators_table, validator_address);
