@@ -20,8 +20,8 @@ module interest_lst::pool {
   use sui_system::sui_system::{Self, SuiSystemState};
 
   use interest_lst::admin::AdminCap;
+  use interest_lst::math::{fmul, scalar};
   use interest_lst::rebase::{Self, Rebase};
-  use interest_lst::math::{fmul, fdiv, scalar};
   use interest_lst::semi_fungible_token::SemiFungibleToken;
   use interest_lst::isui::{Self, ISUI, InterestSuiStorage};
   use interest_lst::sui_yield::{Self, SuiYield, SuiYieldStorage};
@@ -71,7 +71,7 @@ module interest_lst::pool {
     pool_history: LinkedTable<u64, Rebase>, // Epoch => Pool Data
     dust: Balance<SUI>, // If there is less than 1 Sui from unstaking (rewards)
     dao_balance: Balance<ISUI>, // Fees collected by the protocol in ISUI
-    rate: u256 // APY Arithmetic mean
+    rate: u64 // APY Arithmetic mean
   }
 
   // ** Events
@@ -283,7 +283,7 @@ module interest_lst::pool {
       epoch, 
       storage.pool
     );
-    let current_rate = fdiv((total_rewards as u256), (storage.total_principal as u256));
+    let current_rate = (((total_rewards as u256) * (MIN_STAKING_THRESHOLD as u256)) / (storage.total_principal as u256) as u64);
     storage.rate = if (storage.rate == 0) { current_rate } else { (current_rate + storage.rate) / 2 };
     emit(UpdatePool { principal: storage.total_principal, rewards: total_rewards  });
   }
