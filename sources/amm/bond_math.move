@@ -12,6 +12,10 @@ module interest_lst::bond_math {
   const ONE: u64 = 1_000_000_000; // 1 
 
   // Zero-Coupon Price = Par Value / (1+r)^n
+  /*
+  * @param asset The Zero Coupon Bond
+  * @param r The risk-free rate per epoch
+  */
   public fun get_isuip_price(asset: &SemiFungibleToken<SUI_PRINCIPAL>, r: u64, ctx: &mut TxContext): u64 {
     // The maturity epoch
     let maturity = (p::slot(asset) as u64);
@@ -28,14 +32,25 @@ module interest_lst::bond_math {
   }
 
   // Par Value = Zero-Coupon Price * (1 + r)^n
+  /*
+  * @param asset The Zero Coupon Bond
+  * @param r The risk-free rate per epoch 
+  * @param n The number of epochs until maturity
+  */
   public fun get_isuip_amount(sui_amount: u64, r: u64, n: u64): u64 {
     (((sui_amount as u256) * pow(((ONE + r) as u256), (n as u256))) / (ONE as u256) as u64)
   }
 
+  // Price = C * (1-(1+r)^n) / r
+  /*
+  * @param asset The Coupon of a bond
+  * @param coupon_rate The coupon rate per epoch
+  * @param r The risk-free rate per epoch 
+  */
   public fun get_isuiy_price(asset: &SuiYield, coupon_rate: u64, r: u64, ctx: &mut TxContext): u64 {
     // The maturity epoch
     let maturity = (y::slot(asset) as u64);
-    // Par value of the bond in Sui
+    // Par value of the bond this Coupon was stripped from in Sui
     let value = y::value(asset);
     // How many epochs until maturity
     let n = maturity - tx_context::epoch(ctx);
@@ -50,7 +65,13 @@ module interest_lst::bond_math {
     (((coupon * (((one - x) * one) / (r as u256))) / one) as u64)
   }
 
-  public fun get_isuiy_amount(sui_amount: u64, r: u64, n: u64): u64 {
+  // Par Value = (Price / ((1-(1+r)^n) / r)) / coupon rate
+  /*
+  * @param asset The Coupon of a bond
+  * @param coupon_rate The coupon rate per epoch
+  * @param r The risk-free rate per epoch 
+  */
+  public fun get_isuiy_amount(sui_amount: u64, coupon_rate: u64, r: u64, n: u64): u64 {
     let one = (ONE as u256);   
 
     // (1+r)^-n
@@ -58,6 +79,7 @@ module interest_lst::bond_math {
     // 1-(1+r)^n / r
     let d = ((one - x) * one) / (r as u256);
     
-    ((((sui_amount as u256) * one) / d) as u64)
+    // (Price / ((1-(1+r)^n) / r)) / coupon rate
+    ((((((sui_amount as u256) * one) / d) * one) / (coupon_rate as u256)) as u64)
   }
 }
