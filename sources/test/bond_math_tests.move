@@ -9,7 +9,7 @@ module interest_lst::bond_math_tests {
   use interest_lst::sui_yield::{Self, SuiYieldStorage};
   use interest_lst::sui_principal::{Self, SuiPrincipalStorage};
   use interest_lst::test_utils::{people, scenario, add_decimals}; 
-  use interest_lst::bond_math::{get_isuip_price, get_isuip_amount};
+  use interest_lst::bond_math::{get_isuip_price, get_isuip_amount, get_isuiy_price};
 
   #[test]
   fun test_get_isuip_price() {
@@ -107,6 +107,70 @@ module interest_lst::bond_math_tests {
         get_isuip_amount(999890422967, fixed_point64::create_from_rational(40,  1000 * 365), 1510 - 1509),
         add_decimals(1000, 9) - 1 // rounded down
       );
+    };
+    test::end(scenario); 
+  }
+
+    #[test]
+  fun test_get_isuiy_price() {
+    let scenario = scenario();
+
+    let test = &mut scenario;
+
+    init_test(test);
+
+    let (alice, _) = people();
+
+    // We use the values returned from {get_isuip_price}
+    // So we can convert Sui to Sui Naked Bond and vice versa
+    next_tx(test, alice);
+    {
+      let storage = test::take_shared<SuiYieldStorage>(test);
+
+      let sft = sui_yield::new_for_testing(
+        &mut storage,
+        1510,
+        add_decimals(1000, 9),
+        0,
+        0,
+        ctx(test)
+      );
+
+      assert_eq(
+        get_isuiy_price(
+          &sft, 
+          add_decimals(5, 7) / 365, 
+          fixed_point64::create_from_rational(40,  1000 * 365),
+          &mut make_ctx(50)
+          ),
+        184810519665 // ~ 184
+      );
+
+      // Worth less the closer it gets to maturity
+      assert_eq(
+        get_isuiy_price(
+          &sft, 
+          add_decimals(5, 7) / 365, 
+          fixed_point64::create_from_rational(40,  1000 * 365),
+          &mut make_ctx(1200)
+          ),
+        41750176899 // ~ less than a dollar
+      );
+
+      // Worth less the closer it gets to maturity
+      assert_eq(
+        get_isuiy_price(
+          &sft, 
+          add_decimals(5, 7) / 365, 
+          fixed_point64::create_from_rational(40,  1000 * 365),
+          &mut make_ctx(1509)
+          ),
+        136972198 // ~ less than a dollar
+      );
+
+      sui_yield::burn_destroy(&mut storage, sft);
+
+      test::return_shared(storage);
     };
     test::end(scenario); 
   }
