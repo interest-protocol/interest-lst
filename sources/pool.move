@@ -544,7 +544,7 @@ module interest_lst::pool {
     if (tx_context::epoch(ctx) > (sui_yield::slot(&sft_yield) as u64)) {
       sui_yield::expire(sui_yield_storage, &mut sft_yield);
 
-      return (sft_yield, coin::zero(ctx));
+      return (sft_yield, coin::zero(ctx))
     };
     
     // Destroy both tokens
