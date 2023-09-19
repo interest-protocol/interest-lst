@@ -1,8 +1,8 @@
 #[test_only]
 module interest_lst::bond_math_tests {
 
-  use sui::tx_context;
   use sui::test_utils::assert_eq;
+  use sui::tx_context::{Self, TxContext};
   use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
 
   use interest_lst::fixed_point64;
@@ -32,16 +32,9 @@ module interest_lst::bond_math_tests {
         ctx(test)
       );
 
-      let ctx = tx_context::new(
-        alice,
-        x"3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532",
-        50,
-        0,
-        0
-      );
+      let ctx = make_ctx(50);
       // One epoch is roughly 1 day
       let r = fixed_point64::create_from_rational(40,  1000 * 365);
-      let periods = 1510 - 50; // Compounded semi-annually
 
       assert_eq(
         get_isuip_price(
@@ -53,13 +46,7 @@ module interest_lst::bond_math_tests {
       );
 
       // rounded to 0
-      let ctx = tx_context::new(
-        alice,
-        x"3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532",
-        1509,
-        0,
-        0
-      );
+      let ctx = make_ctx(1509);
 
 
       assert_eq(
@@ -106,5 +93,15 @@ module interest_lst::bond_math_tests {
       sui_yield::init_for_testing(ctx(test));
       sui_principal::init_for_testing(ctx(test));
     };
+  }
+
+  fun make_ctx(epoch: u64): TxContext {
+    tx_context::new(
+        @0x0,
+        x"3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532",
+        epoch,
+        0,
+        0
+      )
   }
 }

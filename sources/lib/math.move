@@ -20,23 +20,12 @@ module interest_lst::math {
     (x * y) / z
   }
 
-  public fun scalar(): u256 {
-    SCALAR
+  public fun mul_div_u64(x: u64, y: u64, z: u64): u64 {
+    assert!(z != 0, EZeroDivision);
+    (((x as u256) * (y as u256)) / (z as u256) as u64)
   }
 
-  public fun pow(n: u256, e: u256): u256 {
-      if (e == 0) {
-          1
-      } else {
-          let p = 1;
-          while (e > 1) {
-              if (e % 2 == 1) {
-                  p = p * n;
-              };
-              e = e / 2;
-              n = n * n;
-          };
-          p * n
-      }
+  public fun scalar(): u256 {
+    SCALAR
   }
 }

@@ -20,8 +20,8 @@ module interest_lst::pool {
   use sui_system::sui_system::{Self, SuiSystemState};
 
   use interest_lst::admin::AdminCap;
-  use interest_lst::math::{fmul, scalar};
   use interest_lst::rebase::{Self, Rebase};
+  use interest_lst::math::{fmul, mul_div_u64, scalar};
   use interest_lst::semi_fungible_token::SemiFungibleToken;
   use interest_lst::isui::{Self, ISUI, InterestSuiStorage};
   use interest_lst::sui_yield::{Self, SuiYield, SuiYieldStorage};
@@ -71,7 +71,7 @@ module interest_lst::pool {
     pool_history: LinkedTable<u64, Rebase>, // Epoch => Pool Data
     dust: Balance<SUI>, // If there is less than 1 Sui from unstaking (rewards)
     dao_balance: Balance<ISUI>, // Fees collected by the protocol in ISUI
-    rate: u64 // APY Arithmetic mean
+    rate: u64 // Weighted APY Arithmetic mean
   }
 
   // ** Events
@@ -277,14 +277,21 @@ module interest_lst::pool {
     rebase::set_elastic(&mut storage.pool, total_rewards + storage.total_principal);
     // Update the last_epoch
     storage.last_epoch = epoch;
+
+    // We calculate a weighted rate to avoid manipulations (average_rate * days_elapsed) + current_rate / days_elapsed + 1
+    let num_of_epochs = (linked_table::length(&storage.pool_history) as u256);
+    let current_rate = mul_div_u64(total_rewards, MIN_STAKING_THRESHOLD, storage.total_principal);
+    storage.rate = if (storage.rate == 0) 
+    { current_rate } 
+    else 
+    { ((((current_rate as u256) * num_of_epochs) + (storage.rate as u256)) / (num_of_epochs + 1) as u64) };
+
     // We save the epoch => Pool Rebase
     linked_table::push_back(
       &mut storage.pool_history, 
       epoch, 
       storage.pool
     );
-    let current_rate = (((total_rewards as u256) * (MIN_STAKING_THRESHOLD as u256)) / (storage.total_principal as u256) as u64);
-    storage.rate = if (storage.rate == 0) { current_rate } else { (current_rate + storage.rate) / 2 };
     emit(UpdatePool { principal: storage.total_principal, rewards: total_rewards  });
   }
 
