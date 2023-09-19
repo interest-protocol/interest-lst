@@ -35,13 +35,11 @@ module interest_lst::bond_math {
 
     // Find out how many more periods to compound
     let periods = maturity - current_epoch;
-    // Save 1 in fixed64
-    let fixed64_one = fixed_point64::create_from_rational(1,1);
     
     // (1 + r)^n
     let d = pow(
       fixed_point64::add(
-        fixed64_one, 
+        fixed_point64::create_from_rational(1,1), 
           r
         ), 
       periods
@@ -51,18 +49,33 @@ module interest_lst::bond_math {
     (fixed_point64::divide_u128((value as u128), d) as u64)
   }
 
-  // // Par Value = Zero-Coupon Price * (1 + r)^n
-  // /*
-  // * @param asset The Zero Coupon Bond
-  // * @param r The risk-free rate per epoch 
-  // * @param n The number of epochs until maturity
-  // */
-  // public fun get_isuip_amount(sui_amount: u64, r: u64, n: u64): u64 {
-  //   // If the Bond has matured, it can be redeemed by its par value
-  //   if (n == 0) return sui_amount;
+  // Par Value = Zero-Coupon Price * (1 + r)^n
+  /*
+  * @param sui_amount The desired sui amount one wishes to buy
+  * @param r The risk-free rate per epoch 
+  * @param n The number of epochs until maturity 
+  * @return u64 Amount of naked bond sui_amount can buy
+  */
+  public fun get_isuip_amount(sui_amount: u64, r: FixedPoint64, n: u64): u64 {
+    // If the Bond has matured, it can be redeemed by its par value
+    if (n == 0) return sui_amount;
+
+    pow(
+      fixed_point64::add(
+        fixed_point64::create_from_rational(1,1), 
+          r
+        ), 
+      n
+    );
     
-  //   (fmul((sui_amount as u256), pow(((ONE + r) as u256), (n as u256))) as u64)
-  // }
+    (fixed_point64::multiply_u128((sui_amount as u128), pow(
+      fixed_point64::add(
+        fixed_point64::create_from_rational(1,1), 
+          r
+        ), 
+      n
+    )) as u64)
+  }
 
   // // Price = C * (1-(1+r)^n) / r
   // /*

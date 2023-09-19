@@ -6,10 +6,10 @@ module interest_lst::bond_math_tests {
   use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
 
   use interest_lst::fixed_point64;
-  use interest_lst::bond_math::{get_isuip_price};
   use interest_lst::sui_yield::{Self, SuiYieldStorage};
   use interest_lst::sui_principal::{Self, SuiPrincipalStorage};
   use interest_lst::test_utils::{people, scenario, add_decimals}; 
+  use interest_lst::bond_math::{get_isuip_price, get_isuip_amount};
 
   #[test]
   fun test_get_isuip_price() {
@@ -80,6 +80,33 @@ module interest_lst::bond_math_tests {
       sui_principal::burn_destroy(&mut interest_sui_principal_storage, big_sft);
 
       test::return_shared(interest_sui_principal_storage);
+    };
+    test::end(scenario); 
+  }
+
+  #[test]
+  fun test_get_isuip_amount() {
+    let scenario = scenario();
+
+    let test = &mut scenario;
+
+    init_test(test);
+
+    let (alice, _) = people();
+
+    // We use the values returned from {get_isuip_price}
+    // So we can convert Sui to Sui Naked Bond and vice versa
+    next_tx(test, alice);
+    {
+      assert_eq(
+        get_isuip_amount(852151259302, fixed_point64::create_from_rational(40,  1000 * 365), 1510 - 50),
+        add_decimals(1000, 9) - 1 // rounded down
+      );
+
+      assert_eq(
+        get_isuip_amount(999890422967, fixed_point64::create_from_rational(40,  1000 * 365), 1510 - 1509),
+        add_decimals(1000, 9) - 1 // rounded down
+      );
     };
     test::end(scenario); 
   }
