@@ -11,6 +11,9 @@ module interest_lst::bond_math {
 
   const ONE: u64 = 1_000_000_000; // 1 
 
+
+  const EZeroDivision: u64 = 0;
+
   // Zero-Coupon Price = Par Value / (1+r)^n
   /*
   * @param asset The Zero Coupon Bond
@@ -22,7 +25,14 @@ module interest_lst::bond_math {
     // Par value of the bond in Sui
     let value = p::value(asset);
     // How many epochs until maturity
-    let n = maturity - tx_context::epoch(ctx);
+
+    let current_epoch = tx_context::epoch(ctx);
+
+    // If the Bond has matured, it can be redeemed by its par value
+    if (current_epoch >= maturity) return value;
+
+    let n = maturity - current_epoch;
+    
     // (1 + r)^n
     // r is the low risk interest rate per epoch
     let d = pow(((ONE + r) as u256), (n as u256));
@@ -38,6 +48,9 @@ module interest_lst::bond_math {
   * @param n The number of epochs until maturity
   */
   public fun get_isuip_amount(sui_amount: u64, r: u64, n: u64): u64 {
+    // If the Bond has matured, it can be redeemed by its par value
+    if (n == 0) return sui_amount;
+    
     (fmul((sui_amount as u256), pow(((ONE + r) as u256), (n as u256))) as u64)
   }
 
@@ -52,8 +65,14 @@ module interest_lst::bond_math {
     let maturity = (y::slot(asset) as u64);
     // Par value of the bond this Coupon was stripped from in Sui
     let value = y::value(asset);
+
+    let current_epoch = tx_context::epoch(ctx);
+
+    // If the Bond has matured, the coupon is worth 0. All payments have been made
+    if (current_epoch >= maturity) return 0;
+
     // How many epochs until maturity
-    let n = maturity - tx_context::epoch(ctx);
+    let n = maturity - current_epoch;
 
     // coupon rate * par value
     let coupon = fmul((coupon_rate as u256), (value as u256)); 
@@ -71,6 +90,9 @@ module interest_lst::bond_math {
   * @param r The risk-free rate per epoch 
   */
   public fun get_isuiy_amount(sui_amount: u64, coupon_rate: u64, r: u64, n: u64): u64 {
+    // If the Bond has matured, the coupon is worth 0. There is no point to buy it.
+    if (n == 0) return 0;
+
     let one = (ONE as u256);   
 
     // (1+r)^-n
@@ -82,12 +104,14 @@ module interest_lst::bond_math {
     (fdiv(fdiv((sui_amount as u256), d), (coupon_rate as u256)) as u64)
   }
 
+  // * Fixed Point Math operations to maintain 9 decimal houses
+
   fun fmul(x: u256, y: u256): u256 {
     (x * y) / (ONE as u256)
   }
 
   fun fdiv(x: u256, y: u256): u256 {
-    assert!(y != 0, 0);
+    assert!(y != 0, EZeroDivision);
     (x * (ONE as u256)) / y
   }
 }

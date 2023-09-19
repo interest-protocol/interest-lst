@@ -387,7 +387,7 @@ module interest_lst::pool {
     ctx: &mut TxContext,
   ):(SemiFungibleToken<SUI_PRINCIPAL>, SuiYield) {
     // It makes no sense to create an expired bond
-    assert!(maturity > tx_context::epoch(ctx), EInvalidMaturity);
+    assert!(maturity >= tx_context::epoch(ctx), EInvalidMaturity);
 
     let token_amount = coin::value(&token);
     mint_isui_logic(wrapper, storage, token, validator_address, ctx);
