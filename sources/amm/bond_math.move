@@ -28,7 +28,7 @@ module interest_lst::bond_math {
     let d = pow(((ONE + r) as u256), (n as u256));
 
     // Par Value / (1 + r)^n
-    ((((value as u256) * (ONE as u256)) / d) as u64)
+    (fdiv((value as u256), d) as u64)
   }
 
   // Par Value = Zero-Coupon Price * (1 + r)^n
@@ -38,7 +38,7 @@ module interest_lst::bond_math {
   * @param n The number of epochs until maturity
   */
   public fun get_isuip_amount(sui_amount: u64, r: u64, n: u64): u64 {
-    (((sui_amount as u256) * pow(((ONE + r) as u256), (n as u256))) / (ONE as u256) as u64)
+    (fmul((sui_amount as u256), pow(((ONE + r) as u256), (n as u256))) as u64)
   }
 
   // Price = C * (1-(1+r)^n) / r
@@ -54,15 +54,14 @@ module interest_lst::bond_math {
     let value = y::value(asset);
     // How many epochs until maturity
     let n = maturity - tx_context::epoch(ctx);
-    let one = (ONE as u256);    
 
     // coupon rate * par value
-    let coupon = ((coupon_rate as u256) * (value as u256)) / one; 
+    let coupon = fmul((coupon_rate as u256), (value as u256)); 
     // (1+r)^-n
-    let x = one * one / pow(((ONE + r) as u256), (n as u256));
+    let x = fdiv((ONE as u256), pow(((ONE + r) as u256), (n as u256)));
 
     // C * ((1 - (1 +r)^-n) / r)
-    (((coupon * (((one - x) * one) / (r as u256))) / one) as u64)
+    (fmul(coupon, fdiv((ONE as u256) - x, (r as u256))) as u64)
   }
 
   // Par Value = (Price / ((1-(1+r)^n) / r)) / coupon rate
@@ -75,11 +74,20 @@ module interest_lst::bond_math {
     let one = (ONE as u256);   
 
     // (1+r)^-n
-    let x = one * one / pow(((ONE + r) as u256), (n as u256));
+    let x = fdiv(one, pow(((ONE + r) as u256), (n as u256)));
     // 1-(1+r)^n / r
-    let d = ((one - x) * one) / (r as u256);
+    let d = fmul((one - x), (r as u256));
     
     // (Price / ((1-(1+r)^n) / r)) / coupon rate
-    ((((((sui_amount as u256) * one) / d) * one) / (coupon_rate as u256)) as u64)
+    (fdiv(fdiv((sui_amount as u256), d), (coupon_rate as u256)) as u64)
+  }
+
+  fun fmul(x: u256, y: u256): u256 {
+    (x * y) / (ONE as u256)
+  }
+
+  fun fdiv(x: u256, y: u256): u256 {
+    assert!(y != 0, 0);
+    (x * (ONE as u256)) / y
   }
 }
