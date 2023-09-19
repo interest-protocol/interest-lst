@@ -1,5 +1,5 @@
 // Helper Functions to calculate iSUIP and iSUIY prices in Sui
-// Bond Price = C* (1-(1+r)^n/r) + Par Value / (1+r)^n
+// Bond Price = C * (1-(1+r)^n/r) + Par Value / (1+r)^n
 module interest_lst::bond_math {
 
   use sui::tx_context::{Self, TxContext};
@@ -98,7 +98,7 @@ module interest_lst::bond_math {
     // (1+r)^-n
     let x = fdiv(one, pow(((ONE + r) as u256), (n as u256)));
     // 1-(1+r)^n / r
-    let d = fmul((one - x), (r as u256));
+    let d = fdiv((one - x), (r as u256));
     
     // (Price / ((1-(1+r)^n) / r)) / coupon rate
     (fdiv(fdiv((sui_amount as u256), d), (coupon_rate as u256)) as u64)
