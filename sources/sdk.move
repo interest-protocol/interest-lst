@@ -250,33 +250,6 @@ module interest_lst::sdk {
     data
   }
 
-  // @dev It allows the frontend to gather the past balances of the pool to estimate an yearly reward rate
-  /*
-  * @param pool_storage The shared object of the interest_lst::pool module
-  * @param total The number of records to fetch from the last one
-  * @return vector<Rebase> - reverse order
-  */
-  public fun get_pool_history(storage: &PoolStorage, total: u64): vector<PoolHistory> {
-    let data = vector::empty();
-
-    let (_, _, _, _, _, _, pool_history) = pool::read_pool_storage(storage);
-
-    let last = linked_table::back(pool_history);
-    let index = 0;
-
-    while(option::is_some(last)) {
-      if (index > total) break;
-      let key = *option::borrow(last);
-
-      vector::push_back(&mut data, PoolHistory {epoch: key, pool: *linked_table::borrow(pool_history, key) });
-
-      last = linked_table::prev(pool_history, key);
-      index = index + 1;
-    };
-
-    data
-  }
-
   fun push_stake_position(data: &mut vector<ValidatorStakePosition>, validators_table: &LinkedTable<address, ValidatorData>, validator_address: address) {
     let validator_data = linked_table::borrow(validators_table, validator_address);
 
