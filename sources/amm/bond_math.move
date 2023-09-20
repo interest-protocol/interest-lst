@@ -101,15 +101,13 @@ module interest_lst::bond_math {
 
   // Par Value = (Price / ((1-(1+r)^n) / r)) / coupon rate
   /*
-  * @param asset The Coupon of a bond
+  * @param amount of asset to convert to coupon
   * @param coupon_rate The coupon rate per epoch
   * @param r The risk-free rate per epoch 
   */
-  public fun get_coupon_amount(sui_amount: u64, coupon_rate: u64, r: FixedPoint64, n: u64): u64 {
+  public fun get_coupon_amount(amount: u64, coupon_rate: u64, r: FixedPoint64, n: u64): u64 {
     // If the Bond has matured, the coupon is worth 0. There is no point to buy it.
     if (n == 0) return 0;
-
-    let one = (ONE as u256);   
 
     // 1 - (1+r)^-n
     let x = ONE - (fixed_point64::divide_u128(
@@ -125,7 +123,7 @@ module interest_lst::bond_math {
     let d = (fixed_point64::divide_u128((x as u128), r) as u256);
     
     // (Price / ((1-(1+r)^n) / r)) / coupon rate
-    (fdiv(fdiv((sui_amount as u256), d), (coupon_rate as u256)) as u64)
+    (fdiv(fdiv((amount as u256), d), (coupon_rate as u256)) as u64)
   }
 
 

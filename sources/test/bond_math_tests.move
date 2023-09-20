@@ -6,13 +6,20 @@ module interest_lst::bond_math_tests {
   use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
 
   use interest_lst::fixed_point64;
-  use interest_lst::sui_yield::{Self, SuiYieldStorage};
+  use interest_lst::semi_fungible_token as sft;
   use interest_lst::sui_principal::{Self, SuiPrincipalStorage};
   use interest_lst::test_utils::{people, scenario, add_decimals}; 
-  use interest_lst::bond_math::{get_isuip_price, get_isuip_amount, get_isuiy_price};
+  use interest_lst::bond_math::{
+    get_coupon_price, 
+    get_coupon_amount,
+    get_zero_coupon_bond_price, 
+    get_zero_coupon_bond_amount, 
+  };
+
+  struct Test has drop {}
 
   #[test]
-  fun test_get_isuip_price() {
+  fun test_get_zero_coupon_bond_price() {
     let scenario = scenario();
 
     let test = &mut scenario;
@@ -37,7 +44,7 @@ module interest_lst::bond_math_tests {
       let r = fixed_point64::create_from_rational(40,  1000 * 365);
 
       assert_eq(
-        get_isuip_price(
+        get_zero_coupon_bond_price(
             &sft,
             r,
             &mut ctx
@@ -50,7 +57,7 @@ module interest_lst::bond_math_tests {
 
 
       assert_eq(
-        get_isuip_price(
+        get_zero_coupon_bond_price(
             &sft,
             r,
             &mut ctx
@@ -68,7 +75,7 @@ module interest_lst::bond_math_tests {
       );
       
       assert_eq(
-        get_isuip_price(
+        get_zero_coupon_bond_price(
             &big_sft,
             r,
             &mut ctx
@@ -85,7 +92,7 @@ module interest_lst::bond_math_tests {
   }
 
   #[test]
-  fun test_get_isuip_amount() {
+  fun test_get_zero_coupon_bond_amount() {
     let scenario = scenario();
 
     let test = &mut scenario;
@@ -99,19 +106,19 @@ module interest_lst::bond_math_tests {
     next_tx(test, alice);
     {
       assert_eq(
-        get_isuip_amount(852151259302, fixed_point64::create_from_rational(40,  1000 * 365), 1510 - 50),
+        get_zero_coupon_bond_amount(852151259302, fixed_point64::create_from_rational(40,  1000 * 365), 1510 - 50),
         add_decimals(1000, 9) - 1 // rounded down
       );
 
       assert_eq(
-        get_isuip_amount(999890422967, fixed_point64::create_from_rational(40,  1000 * 365), 1510 - 1509),
+        get_zero_coupon_bond_amount(999890422967, fixed_point64::create_from_rational(40,  1000 * 365), 1510 - 1509),
         add_decimals(1000, 9) - 1 // rounded down
       );
     };
     test::end(scenario); 
   }
 
-    #[test]
+  #[test]
   fun test_get_isuiy_price() {
     let scenario = scenario();
 
@@ -125,19 +132,14 @@ module interest_lst::bond_math_tests {
     // So we can convert Sui to Sui Naked Bond and vice versa
     next_tx(test, alice);
     {
-      let storage = test::take_shared<SuiYieldStorage>(test);
-
-      let sft = sui_yield::new_for_testing(
-        &mut storage,
+      let sft = sft::create_for_testing<Test>(
         1510,
         add_decimals(1000, 9),
-        0,
-        0,
         ctx(test)
       );
 
       assert_eq(
-        get_isuiy_price(
+        get_coupon_price(
           &sft, 
           add_decimals(5, 7) / 365, 
           fixed_point64::create_from_rational(40,  1000 * 365),
@@ -148,7 +150,7 @@ module interest_lst::bond_math_tests {
 
       // Worth less the closer it gets to maturity
       assert_eq(
-        get_isuiy_price(
+        get_coupon_price(
           &sft, 
           add_decimals(5, 7) / 365, 
           fixed_point64::create_from_rational(40,  1000 * 365),
@@ -159,7 +161,7 @@ module interest_lst::bond_math_tests {
 
       // Worth less the closer it gets to maturity
       assert_eq(
-        get_isuiy_price(
+        get_coupon_price(
           &sft, 
           add_decimals(5, 7) / 365, 
           fixed_point64::create_from_rational(40,  1000 * 365),
@@ -168,9 +170,56 @@ module interest_lst::bond_math_tests {
         136972198 // ~ less than a dollar
       );
 
-      sui_yield::burn_destroy(&mut storage, sft);
+      sft::destroy_for_testing( sft);
 
-      test::return_shared(storage);
+    };
+    test::end(scenario); 
+  }
+
+
+    #[test]
+  fun test_get_coupon_amount() {
+    let scenario = scenario();
+
+    let test = &mut scenario;
+
+    init_test(test);
+
+    let (alice, _) = people();
+
+    next_tx(test, alice);
+    {
+      let r = fixed_point64::create_from_rational(40,  1000 * 365);
+      
+      assert_eq(
+        get_coupon_amount(
+          184810519665, 
+          add_decimals(5, 7) / 365,
+        r, 
+        1510 - 50
+        ),
+        999999992699 // ~ 999 some precision loss due to fixed point math as it should be 1000. 
+      );
+
+      assert_eq(
+        get_coupon_amount(
+          41750176899, 
+          add_decimals(5, 7) / 365,
+        r, 
+        1510 - 1200
+        ),
+        999999992699 // ~ 999 some precision loss due to fixed point math as it should be 1000. 
+      );
+
+      assert_eq(
+        get_coupon_amount(
+          136972198, 
+          add_decimals(5, 7) / 365,
+        r, 
+        1510 - 1509
+        ),
+        999999992699 // ~ 999 some precision loss due to fixed point math as it should be 1000. 
+      );
     };
     test::end(scenario); 
   }
@@ -181,7 +230,6 @@ module interest_lst::bond_math_tests {
 
     next_tx(test, alice);
     {
-      sui_yield::init_for_testing(ctx(test));
       sui_principal::init_for_testing(ctx(test));
     };
   }
