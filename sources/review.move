@@ -4,7 +4,7 @@
 
 module interest_lst::review {
   use std::vector;
-  use std::string::{Self, String};
+  use std::ascii::{Self, String};
 
   use sui::transfer;
   use sui::event::{emit};
@@ -88,6 +88,7 @@ module interest_lst::review {
   // @dev create a review and emit it
   // takes a YN nft to gate review access and limit their creation 
   /*
+  * @param system: Sui system state (with validators data)
   * @param reviews: global storage 
   * @param nft: Sui Yield nft to verify cooldown
   * @param validator_address: the validator to review
@@ -360,7 +361,7 @@ module interest_lst::review {
   * @return the review
   */
   fun create_review(vote: bool, reputation: u64, comment: String): Review {
-    assert!(string::length(&comment) <= 140, ECommentTooLong);
+    assert!(ascii::length(&comment) <= 140, ECommentTooLong);
     // return review
     Review { vote, reputation, comment }
   }

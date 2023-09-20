@@ -259,10 +259,10 @@ module interest_lst::sdk {
   public fun get_pool_history(storage: &PoolStorage, total: u64): vector<PoolHistory> {
     let data = vector::empty();
 
-   let (_, _, _, _, _, _, pool_history) = pool::read_pool_storage(storage);
+    let (_, _, _, _, _, _, pool_history) = pool::read_pool_storage(storage);
 
-   let last = linked_table::back(pool_history);
-   let index = 0;
+    let last = linked_table::back(pool_history);
+    let index = 0;
 
     while(option::is_some(last)) {
       if (index > total) break;
@@ -302,4 +302,5 @@ module interest_lst::sdk {
 
     vector::push_back(data, validator_stake);
   }
+
 }

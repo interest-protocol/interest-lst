@@ -103,6 +103,10 @@ module interest_lst::soulbound_token {
     table::borrow<String, u64>(&sbt.points, package_id)
   }
 
+  public fun contains_points<Witness: drop>(_: Witness, sbt: &Interestore): bool {
+    table::contains<String, u64>(&sbt.points, package_id<Witness>())
+  }
+
   // ** Lock assets
 
   // @dev lock an asset for a specific number of epochs 

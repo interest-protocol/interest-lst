@@ -1,7 +1,7 @@
 #[test_only]
 module interest_lst::review_tests {
   use std::vector;
-  use std::string;
+  use std::ascii;
 
   use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
   use sui::test_utils::{assert_eq};
@@ -56,7 +56,7 @@ module interest_lst::review_tests {
       // get a nft to create reviews, reputation = 10 sqrt(100SUI)
       let nft = sui_yield::new_for_testing(&mut interest_sui_yield_Storage, 10, 100_000_000_000, 0, 0, test::ctx(test));
       
-      review::create(&mut system, &mut reviews, &nft, MYSTEN_LABS, true, string::utf8(b"random"), test::ctx(test));
+      review::create(&mut system, &mut reviews, &nft, MYSTEN_LABS, true, ascii::string(b"random"), test::ctx(test));
       
       let (total_reviews, total_reputation, validators, max_top, _, top, cooldown, nft_epochs) = review::read_storage(&reviews);
       assert_eq(total_reviews, 1);
@@ -74,7 +74,7 @@ module interest_lst::review_tests {
       let (vote, reputation, comment) = review::get_review_data(&reviews, alice, MYSTEN_LABS);
       assert_eq(vote, true);
       assert_eq(reputation, 10);
-      assert_eq(comment, string::utf8(b"random"));
+      assert_eq(comment, ascii::string(b"random"));
 
       let (upvotes, downvotes, reputation) = review::get_validator_data(&reviews, MYSTEN_LABS);
       assert_eq(upvotes, 1);
@@ -98,7 +98,7 @@ module interest_lst::review_tests {
       let reviews = test::take_shared<Reviews>(test);      
       let nft = test::take_from_sender<SuiYield>(test);
 
-      review::update(&mut reviews, &nft, MYSTEN_LABS, true, string::utf8(b"different"), test::ctx(test));
+      review::update(&mut reviews, &nft, MYSTEN_LABS, true, ascii::string(b"different"), test::ctx(test));
       
       let (total_reviews, total_reputation, validators, max_top, _, top, cooldown, nft_epochs) = review::read_storage(&reviews);
       assert_eq(total_reviews, 1);
@@ -116,7 +116,7 @@ module interest_lst::review_tests {
       let (vote, reputation, comment) = review::get_review_data(&reviews, alice, MYSTEN_LABS);
       assert_eq(vote, true);
       assert_eq(reputation, 10);
-      assert_eq(comment, string::utf8(b"different"));
+      assert_eq(comment, ascii::string(b"different"));
 
       let (upvotes, downvotes, reputation) = review::get_validator_data(&reviews, MYSTEN_LABS);
       assert_eq(upvotes, 1);
@@ -137,7 +137,7 @@ module interest_lst::review_tests {
       let reviews = test::take_shared<Reviews>(test);      
       let nft = test::take_from_sender<SuiYield>(test);
 
-      review::update(&mut reviews, &nft, MYSTEN_LABS, false, string::utf8(b"another"), test::ctx(test));
+      review::update(&mut reviews, &nft, MYSTEN_LABS, false, ascii::string(b"another"), test::ctx(test));
       
       let (total_reviews, total_reputation, validators, max_top, _, top, cooldown, nft_epochs) = review::read_storage(&reviews);
       assert_eq(total_reviews, 1);
@@ -155,7 +155,7 @@ module interest_lst::review_tests {
       let (vote, reputation, comment) = review::get_review_data(&reviews, alice, MYSTEN_LABS);
       assert_eq(vote, false);
       assert_eq(reputation, 10);
-      assert_eq(comment, string::utf8(b"another"));
+      assert_eq(comment, ascii::string(b"another"));
 
       let (upvotes, downvotes, reputation) = review::get_validator_data(&reviews, MYSTEN_LABS);
       assert_eq(upvotes, 0);
