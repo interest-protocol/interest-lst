@@ -154,7 +154,7 @@ module interest_lst::bond_math_tests {
           fixed_point64::create_from_rational(40,  1000 * 365),
           &mut make_ctx(1200)
           ),
-        41750176899 // ~ less than a dollar
+        41750176899 // ~ 40 
       );
 
       // Worth less the closer it gets to maturity

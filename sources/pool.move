@@ -123,7 +123,7 @@ module interest_lst::pool {
 
   // Emitted when the DAO withdraws some rewards
   // Most likely to cover the {updatePools} calls
-  struct DaoWithdraw<phantom T> has copy, drop {
+  struct DaoWithdraw has copy, drop {
     sender: address,
     amount: u64
   }
@@ -509,7 +509,7 @@ module interest_lst::pool {
     validator_address: address,
     ctx: &mut TxContext,
   ): Coin<SUI> {
-    assert!(tx_context::epoch(ctx) > (sui_principal::slot(&token) as u64), ETooEarly);
+    assert!(tx_context::epoch(ctx) >= (sui_principal::slot(&token) as u64), ETooEarly);
 
     // Need to update the entire state of Sui/Sui Rewards once every epoch
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
@@ -547,16 +547,14 @@ module interest_lst::pool {
     maturity: u64,
     ctx: &mut TxContext,
   ): (SuiYield, Coin<SUI>) {
-
-    if (tx_context::epoch(ctx) > (sui_yield::slot(&sft_yield) as u64)) {
-      sui_yield::expire(sui_yield_storage, &mut sft_yield);
-
-      return (sft_yield, coin::zero(ctx))
-    };
     
     // Destroy both tokens
     // Calculate how much Sui they are worth
     let sui_amount = get_pending_yield(wrapper, storage, &sft_yield, maturity, ctx);
+
+    // SuiYield has expired
+    if (sui_amount == 0) 
+      sui_yield::expire(sui_yield_storage, &mut sft_yield);
 
     // Consider yield paid
     sui_yield::add_rewards_paid(&mut sft_yield, sui_amount);
@@ -643,7 +641,7 @@ module interest_lst::pool {
   ): Coin<ISUI> {
     
     // Emit the event
-    emit(DaoWithdraw<ISUI> {amount, sender: tx_context::sender(ctx) });
+    emit(DaoWithdraw {amount, sender: tx_context::sender(ctx) });
 
     // Split the Fees and send the desired amount
     coin::take(&mut storage.dao_balance, amount, ctx)
