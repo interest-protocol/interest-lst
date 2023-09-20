@@ -21,7 +21,7 @@ module interest_lst::pool {
 
   use interest_lst::admin::AdminCap;
   use interest_lst::rebase::{Self, Rebase};
-  use interest_lst::math::{fmul, fdiv, scalar};
+  use interest_lst::math::{fmul, mul_div_u64, scalar};
   use interest_lst::semi_fungible_token::SemiFungibleToken;
   use interest_lst::isui::{Self, ISUI, InterestSuiStorage};
   use interest_lst::sui_yield::{Self, SuiYield, SuiYieldStorage};
@@ -71,7 +71,7 @@ module interest_lst::pool {
     pool_history: LinkedTable<u64, Rebase>, // Epoch => Pool Data
     dust: Balance<SUI>, // If there is less than 1 Sui from unstaking (rewards)
     dao_balance: Balance<ISUI>, // Fees collected by the protocol in ISUI
-    rate: u256 // APY Arithmetic mean
+    rate: u64 // Weighted APY Arithmetic mean
   }
 
   // ** Events
@@ -123,7 +123,7 @@ module interest_lst::pool {
 
   // Emitted when the DAO withdraws some rewards
   // Most likely to cover the {updatePools} calls
-  struct DaoWithdraw<phantom T> has copy, drop {
+  struct DaoWithdraw has copy, drop {
     sender: address,
     amount: u64
   }
@@ -277,14 +277,21 @@ module interest_lst::pool {
     rebase::set_elastic(&mut storage.pool, total_rewards + storage.total_principal);
     // Update the last_epoch
     storage.last_epoch = epoch;
+
+    // We calculate a weighted rate to avoid manipulations (average_rate * days_elapsed) + current_rate / days_elapsed + 1
+    let num_of_epochs = (linked_table::length(&storage.pool_history) as u256);
+    let current_rate = mul_div_u64(total_rewards, MIN_STAKING_THRESHOLD, storage.total_principal);
+    storage.rate = if (storage.rate == 0) 
+    { current_rate } 
+    else 
+    { ((((current_rate as u256) * num_of_epochs) + (storage.rate as u256)) / (num_of_epochs + 1) as u64) };
+
     // We save the epoch => Pool Rebase
     linked_table::push_back(
       &mut storage.pool_history, 
       epoch, 
       storage.pool
     );
-    let current_rate = fdiv((total_rewards as u256), (storage.total_principal as u256));
-    storage.rate = if (storage.rate == 0) { current_rate } else { (current_rate + storage.rate) / 2 };
     emit(UpdatePool { principal: storage.total_principal, rewards: total_rewards  });
   }
 
@@ -387,7 +394,7 @@ module interest_lst::pool {
     ctx: &mut TxContext,
   ):(SemiFungibleToken<SUI_PRINCIPAL>, SuiYield) {
     // It makes no sense to create an expired bond
-    assert!(maturity > tx_context::epoch(ctx), EInvalidMaturity);
+    assert!(maturity >= tx_context::epoch(ctx), EInvalidMaturity);
 
     let token_amount = coin::value(&token);
     mint_isui_logic(wrapper, storage, token, validator_address, ctx);
@@ -502,7 +509,7 @@ module interest_lst::pool {
     validator_address: address,
     ctx: &mut TxContext,
   ): Coin<SUI> {
-    assert!(tx_context::epoch(ctx) > (sui_principal::slot(&token) as u64), ETooEarly);
+    assert!(tx_context::epoch(ctx) >= (sui_principal::slot(&token) as u64), ETooEarly);
 
     // Need to update the entire state of Sui/Sui Rewards once every epoch
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
@@ -525,6 +532,7 @@ module interest_lst::pool {
   /*
   * @param wrapper The Sui System Shared Object
   * @param storage The Pool Storage Shared Object (this module)
+  * @param sui_yield_storage The Shared Object of Sui Yield
   * @param sft_yield The SuiYield to burn in exchange for rewards
   * @param validator_address The validator to re stake any remaining Sui if any
   * @param maturity The back up maturity in case we missed a {update_pool} call
@@ -533,6 +541,7 @@ module interest_lst::pool {
   public fun claim_yield(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
+    sui_yield_storage: &mut SuiYieldStorage,
     sft_yield: SuiYield,
     validator_address: address,
     maturity: u64,
@@ -542,6 +551,10 @@ module interest_lst::pool {
     // Destroy both tokens
     // Calculate how much Sui they are worth
     let sui_amount = get_pending_yield(wrapper, storage, &sft_yield, maturity, ctx);
+
+    // SuiYield has expired
+    if (sui_amount == 0) 
+      sui_yield::expire(sui_yield_storage, &mut sft_yield);
 
     // Consider yield paid
     sui_yield::add_rewards_paid(&mut sft_yield, sui_amount);
@@ -628,7 +641,7 @@ module interest_lst::pool {
   ): Coin<ISUI> {
     
     // Emit the event
-    emit(DaoWithdraw<ISUI> {amount, sender: tx_context::sender(ctx) });
+    emit(DaoWithdraw {amount, sender: tx_context::sender(ctx) });
 
     // Split the Fees and send the desired amount
     coin::take(&mut storage.dao_balance, amount, ctx)

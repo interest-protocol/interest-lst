@@ -192,6 +192,13 @@ module interest_lst::sui_yield {
     token.rewards_paid =  rewards_paid;
   }
 
+  public(friend) fun expire(storage: &mut SuiYieldStorage, token: &mut SuiYield) {
+    token.rewards_paid = 0;
+    token.shares = 0;
+    let burn_value = value(token);
+    burn(storage, token, burn_value);
+  }
+
   // === ADMIN ONLY Functions ===
 
   public entry fun update_name(

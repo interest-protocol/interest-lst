@@ -10,7 +10,6 @@ module interest_lst::sdk {
   use sui_system::staking_pool;
   use sui_system::sui_system::SuiSystemState;
   
-  use interest_lst::rebase::Rebase;
   use interest_lst::isui::{ISUI, InterestSuiStorage};
   use interest_lst::fee_utils::{calculate_fee_percentage};
   use interest_lst::sui_yield::{SuiYieldStorage, SuiYield};
@@ -37,11 +36,6 @@ module interest_lst::sdk {
     validator: address,
     total_principal: u64,
     stakes: vector<StakePosition>
-  }
-
-  struct PoolHistory has store {
-    pool: Rebase,
-    epoch: u64
   }
 
   entry fun mint_isui(
@@ -165,6 +159,7 @@ module interest_lst::sdk {
   entry fun claim_yield(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
+    sui_yield_storage: &mut SuiYieldStorage,
     sft_yield_vector: vector<SuiYield>,
     yield_value: u64,
     validator_address: address,
@@ -174,6 +169,7 @@ module interest_lst::sdk {
     let (yield, coin_sui) = pool::claim_yield(
       wrapper,
       storage,
+      sui_yield_storage,
       handle_yield_vector(sft_yield_vector, yield_value, ctx),
       validator_address,
       maturity,
