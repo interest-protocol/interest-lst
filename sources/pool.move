@@ -281,7 +281,7 @@ module interest_lst::pool {
     // We calculate a weighted rate to avoid manipulations (average_rate * days_elapsed) + current_rate / days_elapsed + 1
     let num_of_epochs = (linked_table::length(&storage.pool_history) as u256);
     let current_rate = (fdiv((total_rewards as u128),(storage.total_principal as u128)) as u64);
-    
+
     storage.rate = if (storage.rate == 0) 
     { current_rate } 
     else 
@@ -554,14 +554,14 @@ module interest_lst::pool {
     let sui_amount = get_pending_yield(wrapper, storage, &sft_yield, maturity, ctx);
 
     // SuiYield has expired
-    if (sui_amount == 0) 
+    if (sui_amount == 0) {
       sui_yield::expire(sui_yield_storage, &mut sft_yield);
-
-    // Consider yield paid
-    sui_yield::add_rewards_paid(&mut sft_yield, sui_amount);
-
-    // We need to update the pool
-    rebase::sub_elastic(&mut storage.pool, sui_amount, false);
+    } else {
+      // Consider yield paid
+      sui_yield::add_rewards_paid(&mut sft_yield, sui_amount);
+      // We need to update the pool
+      rebase::sub_elastic(&mut storage.pool, sui_amount, false);
+    };
 
     emit(ClaimYield { sui_yield_id: object::id(&sft_yield), sui_amount, sender: tx_context::sender(ctx) });
 
