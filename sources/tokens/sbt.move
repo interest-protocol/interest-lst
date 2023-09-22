@@ -244,13 +244,25 @@ module interest_lst::soulbound_token {
   // @dev Allows a user to read how many assets he locked and the lock period
   /*
   * @param sbt: soulbound token  
-  * @param asset: asset to lock
-  * @param number_of_epochs: duration during which the asset should be locked
+  * @return (locked_assets, unlock_epoch)
   */
   public fun read_locked_asset<Asset: key + store>(sbt: &InterestSBT): (&vector<Asset>, u64) {
     let type = type_name::get<Asset>();
     let lock = bag::borrow<TypeName, LockedAsset<Asset>>(&sbt.locked_assets, type);
     (&lock.assets, lock.unlock_epoch)
+  }
+
+  // @dev Allows a user to check if he has locked assets
+  /*
+  * @param sbt: soulbound token  
+  * @return bool true if he has
+  */
+  public fun has_locked_asset<Asset: key + store>(sbt: &InterestSBT): bool {
+    let type = type_name::get<Asset>();
+    if (!bag::contains<TypeName>(&sbt.locked_assets, type)) return false;
+
+    let lock = bag::borrow<TypeName, LockedAsset<Asset>>(&sbt.locked_assets, type);
+    !vector::is_empty(&lock.assets)
   }
 
   // ** Arbitrary dynamic fields
