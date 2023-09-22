@@ -53,7 +53,7 @@ module interest_lst::admin {
       AdminCap {
         id: object::new(ctx)
       },
-      tx_context::sender(ctx)
+      sender
     );
 
     transfer::share_object(
