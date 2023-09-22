@@ -7,21 +7,27 @@
 
 module interest_lst::soulbound_token {
   use std::vector;
+  use std::string;
   use std::ascii::String;
   use std::type_name::{Self, TypeName};
-  
+
   use sui::transfer;
   use sui::event::emit;
   use sui::bag::{Self, Bag};
   use sui::table::{Self, Table};
   use sui::object::{Self, UID, ID};
+  use sui::display::{Self, Display};
   use sui::tx_context::{Self, TxContext};
-  use sui::package::{published_package, Publisher};
+  use sui::package::{Self, published_package, Publisher};
+
+  use interest_lst::admin::AdminCap;
 
   const TEN_YEARS: u64 = 3_650;
 
   const EStillLocked: u64 = 0;
   const ETooLong: u64 = 1;
+
+  struct SOULBOUND_TOKEN has drop {}
 
   // only one instance of an asset can be locked at the same time
   struct LockedAsset<Asset: key + store> has store {
@@ -38,6 +44,12 @@ module interest_lst::soulbound_token {
     // package_id => object (dynamic object field for additional rewards, doesn't prevent sbt deletion if not empty)
   }
 
+  struct Storage has key {
+    id: UID,
+    display: Display<InterestSBT>,
+    publisher: Publisher
+  }
+
   // ** Events
 
   struct MintSBT has drop, copy {
@@ -47,6 +59,32 @@ module interest_lst::soulbound_token {
 
   struct DestroySBT has drop, copy {
     sender: address,
+  }
+
+  fun init(otw: SOULBOUND_TOKEN, ctx: &mut TxContext) {
+    let keys = vector[
+      string::utf8(b"name"),
+      string::utf8(b"image_url"),
+      string::utf8(b"description"),
+      string::utf8(b"project_url"),
+    ];
+
+    let values = vector[
+      string::utf8(b"Interest Protocol Soulbound Token"),
+      string::utf8(b"https://interestprotocol.infura-ipfs.io/ipfs/QmSG6xHk6hiaCur3AifAXV1ZaMfPpARn2xqCsBP9sWEYHg"),
+      string::utf8(b"This Soulbound token allows users to attain points in various DeFi protocols by locking up assets."),
+      string::utf8(b"https://www.interestprotocol.com/"),      
+    ];
+
+    // Claim the `Publisher` for the package!
+    let publisher = package::claim(otw, ctx);
+
+    let display = display::new_with_fields<InterestSBT>(&publisher, keys, values, ctx);
+
+    // Commit first version of `Display` to apply changes.
+    display::update_version(&mut display);
+
+    transfer::share_object(Storage {id: object::new(ctx), display, publisher });
   }
 
    // ** CREATE/DESTROY SBTs
@@ -224,4 +262,22 @@ module interest_lst::soulbound_token {
   public fun borrow_uid(sbt: &InterestSBT): &UID {
     &sbt.id
   }
+
+  // ** Display API Admin Only
+
+  /// Sets multiple fields at once
+  public fun add_multiple(_: &AdminCap, storage: &mut Storage, keys: vector<string::String>, values: vector<string::String>) { 
+    display::add_multiple(&mut storage.display, keys, values)    
+  }
+
+  /// Edit a single field
+  public fun edit(_: &AdminCap, storage: &mut Storage, key: string::String, value: string::String) { 
+    display::edit(&mut storage.display, key, value);  
+  }
+
+  /// Remove a key from Display
+  public fun remove(_: &AdminCap, storage: &mut Storage, key: string::String) { 
+    display::remove(&mut storage.display, key);
+  }
+
 } 
