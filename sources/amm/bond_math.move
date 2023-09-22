@@ -5,6 +5,7 @@ module interest_lst::bond_math {
   use sui::tx_context::{Self, TxContext};
 
   use interest_lst::math_fixed64::pow;
+  use interest_lst::math::{fmul, fdiv};
   use interest_lst::fixed_point64::{Self, FixedPoint64};
   use interest_lst::semi_fungible_token::{Self as sft, SemiFungibleToken};
 
@@ -83,7 +84,7 @@ module interest_lst::bond_math {
     let periods = maturity - current_epoch;
 
     // coupon rate * par value
-    let coupon = (fmul((coupon_rate as u256), (sft::value(asset) as u256)) as u64); 
+    let coupon = (fmul((coupon_rate as u128), (sft::value(asset) as u128)) as u64); 
 
     // 1 - (1+r)^-n
     let x = ONE - (fixed_point64::divide_u128(
@@ -96,7 +97,7 @@ module interest_lst::bond_math {
     as u64);
 
     // C * ((1 - (1 +r)^-n) / r)
-    (fmul((coupon as u256), (fixed_point64::divide_u128((x as u128), r) as u256)) as u64)
+    (fmul((coupon as u128), (fixed_point64::divide_u128((x as u128), r) as u128)) as u64)
   }
 
   // Par Value = (Price / ((1-(1+r)^n) / r)) / coupon rate
@@ -120,19 +121,9 @@ module interest_lst::bond_math {
     as u64);
 
     // 1-(1+r)^n / r
-    let d = (fixed_point64::divide_u128((x as u128), r) as u256);
+    let d = (fixed_point64::divide_u128((x as u128), r) as u128);
     
     // (Price / ((1-(1+r)^n) / r)) / coupon rate
-    (fdiv(fdiv((amount as u256), d), (coupon_rate as u256)) as u64)
-  }
-
-
-  fun fmul(x: u256, y: u256): u256 {
-    (x * y) / (ONE as u256)
-  }
-
-  fun fdiv(x: u256, y: u256): u256 {
-    assert!(y != 0, EZeroDivision);
-    (x * (ONE as u256)) / y
+    (fdiv(fdiv((amount as u128), d), (coupon_rate as u128)) as u64)
   }
 }

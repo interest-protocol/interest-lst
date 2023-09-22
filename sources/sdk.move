@@ -188,13 +188,13 @@ module interest_lst::sdk {
   * @param validator_address The address of a validator
   * @return The fee in 1e18
   */
-  public fun get_validator_fee(storage: &PoolStorage, validator_address: address): u256 {
+  public fun get_validator_fee(storage: &PoolStorage, validator_address: address): u128 {
     if (pool::is_whitelisted(storage, validator_address)) return 0;
     
     let (_, _, validator_table, total_principal, fee, _, _) = pool::read_pool_storage(storage);
     let (_, validator_principal) = pool::read_validator_data(linked_table::borrow(validator_table, validator_address));
 
-    calculate_fee_percentage(fee, (validator_principal as u256), (total_principal as u256))
+    calculate_fee_percentage(fee, (validator_principal as u128), (total_principal as u128))
   }
 
   // @dev It allows the frontend to find the current fee for all validators
@@ -203,7 +203,7 @@ module interest_lst::sdk {
   * @param validators A vector with the address of all validators
   * @return The fee in 1e18
   */
-  public fun get_validators_fee_vector(storage: &PoolStorage, validators: vector<address>): vector<u256> {
+  public fun get_validators_fee_vector(storage: &PoolStorage, validators: vector<address>): vector<u128> {
     let len = vector::length(&validators);
     let i = 0;
     let result = vector::empty();

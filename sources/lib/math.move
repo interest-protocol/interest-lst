@@ -1,28 +1,19 @@
-// Fixed Point Math using 1e18 to mimic ERC20s 
+// Fixed Point Math using 1e9
 // It should give enough precision as Sui Coins have 9 decimals
 module interest_lst::math {
 
-  const SCALAR: u256 = 1000000000000000000; // 1e18 - More accuracy
+  const SCALAR: u128 = 1_000_000_000; // 1e9 - Sui accuracy
   const U128_MAX: u128 = 340282366920938463463374607431768211455;
   
   const EZeroDivision: u64 = 0;
 
-  public fun fmul(x: u256, y: u256): u256 {
-    ((x * y ) / SCALAR)
+  public fun fmul(x: u128, y: u128): u128 {
+     mul_div(x, y, SCALAR)
   }
 
-  public fun fdiv(x: u256, y: u256): u256 {
+  public fun fdiv(x: u128, y: u128): u128 {
     assert!(y != 0, EZeroDivision);
-    (x * SCALAR ) / y
-  }
-
-  public fun mul_div_u64(x: u64, y: u64, z: u64): u64 {
-    assert!(z != 0, EZeroDivision);
-    (mul_div((x as u128), (y as u128), (z as u128)) as u64)
-  }
-
-  public fun scalar(): u256 {
-    SCALAR
+    mul_div(x, SCALAR, y)
   }
 
   /// https://medium.com/coinmonks/math-in-solidity-part-3-percents-and-proportions-4db014e080b1

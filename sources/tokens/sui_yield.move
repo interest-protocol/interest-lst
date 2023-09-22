@@ -90,12 +90,12 @@ module interest_lst::sui_yield {
     split_amount: u64,
     ctx: &mut TxContext     
   ): SuiYield {
-    let v = (value(token) as u256);
+    let v = (value(token) as u128);
     let a = sft::split(&mut token.sft, split_amount, ctx);
     // 1e18
-    let split_percentage = fdiv((split_amount as u256), v);
-    let split_shares = (fmul(split_percentage, (token.shares as u256)) as u64);
-    let split_rewards_paid = (fmul(split_percentage, (token.rewards_paid as u256)) as u64);
+    let split_percentage = fdiv((split_amount as u128), v);
+    let split_shares = (fmul(split_percentage, (token.shares as u128)) as u64);
+    let split_rewards_paid = (fmul(split_percentage, (token.rewards_paid as u128)) as u64);
     let x = SuiYield {
       id: object::new(ctx),
       sft: a,

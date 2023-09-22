@@ -20,8 +20,8 @@ module interest_lst::pool {
   use sui_system::sui_system::{Self, SuiSystemState};
 
   use interest_lst::admin::AdminCap;
+  use interest_lst::math::{fmul, fdiv};
   use interest_lst::rebase::{Self, Rebase};
-  use interest_lst::math::{fmul, mul_div_u64, scalar};
   use interest_lst::semi_fungible_token::SemiFungibleToken;
   use interest_lst::isui::{Self, ISUI, InterestSuiStorage};
   use interest_lst::sui_yield::{Self, SuiYield, SuiYieldStorage};
@@ -116,9 +116,9 @@ module interest_lst::pool {
 
   // Emitted when the DAO updates the fee
   struct NewFee has copy, drop {
-    base: u256,
-    kink: u256,
-    jump: u256
+    base: u128,
+    kink: u128,
+    jump: u128
   }
 
   // Emitted when the DAO withdraws some rewards
@@ -280,7 +280,8 @@ module interest_lst::pool {
 
     // We calculate a weighted rate to avoid manipulations (average_rate * days_elapsed) + current_rate / days_elapsed + 1
     let num_of_epochs = (linked_table::length(&storage.pool_history) as u256);
-    let current_rate = mul_div_u64(total_rewards, MIN_STAKING_THRESHOLD, storage.total_principal);
+    let current_rate = (fdiv((total_rewards as u128),(storage.total_principal as u128)) as u64);
+    
     storage.rate = if (storage.rate == 0) 
     { current_rate } 
     else 
@@ -611,11 +612,11 @@ module interest_lst::pool {
   entry public fun update_fee(
     _: &AdminCap,
     storage: &mut PoolStorage, 
-    base: u256, 
-    kink: u256, 
-    jump: u256
+    base: u128, 
+    kink: u128, 
+    jump: u128
   ) {
-    let max = scalar();
+    let max = (MIN_STAKING_THRESHOLD as u128);
     // scalar represents 100% - the protocol does not allow a fee higher than that.
     assert!(max >= base && max >= kink && max >= jump, EInvalidFee);
 
@@ -983,12 +984,12 @@ module interest_lst::pool {
     // Find the fee % based on the validator dominance and fee parameters.  
     let fee = calculate_fee_percentage(
       &storage.fee,
-      (validator_principal as u256),
-      (storage.total_principal as u256)
+      (validator_principal as u128),
+      (storage.total_principal as u128)
     );
 
     // Calculate fee
-    (fmul((amount as u256), fee) as u64)
+    (fmul((amount as u128), fee) as u64)
   }
 
  // ** SDK Functions
