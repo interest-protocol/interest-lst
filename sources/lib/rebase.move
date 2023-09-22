@@ -25,16 +25,16 @@ module interest_lst::rebase {
 
   public fun to_base(rebase: &Rebase, elastic: u64, round_up: bool): u64 {
     if (rebase.elastic == 0) { elastic } else {
-      let base = mul_div((elastic as u128), rebase.base, rebase.elastic); 
-      if (round_up && (mul_div(base, rebase.elastic, rebase.base) < (elastic as u128))) base = base + 1;
+      let base = mul_div((elastic as u256), (rebase.base as u256), (rebase.elastic as u256)); 
+      if (round_up && (mul_div(base, (rebase.elastic as u256), (rebase.base as u256)) < (elastic as u256))) base = base + 1;
       (base as u64)
     }
   }
 
   public fun to_elastic(rebase: &Rebase, base: u64, round_up: bool): u64 {
     if (rebase.base == 0) { base } else {
-        let elastic = mul_div((base as u128), rebase.elastic, rebase.base); 
-        if (round_up && (mul_div(elastic, rebase.base, rebase.elastic) < (base as u128))) elastic = elastic + 1;
+        let elastic = mul_div((base as u256), (rebase.elastic as u256), (rebase.base as u256)); 
+        if (round_up && (mul_div(elastic, (rebase.base as u256), (rebase.elastic as u256)) < (base as u256))) elastic = elastic + 1;
         (elastic as u64)
     }
   }
