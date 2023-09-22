@@ -6,6 +6,7 @@
 /// while providing additional quests and rewards
 
 module interest_lst::soulbound_token {
+
   use std::vector;
   use std::string;
   use std::ascii::String;
@@ -201,6 +202,7 @@ module interest_lst::soulbound_token {
     // We add a maximum of ten years
     assert!(TEN_YEARS >= number_of_epochs, ETooLong);
     let type = type_name::get<Asset>();
+
     let unlock_epoch = tx_context::epoch(ctx) + number_of_epochs;
     bag::add(&mut sbt.locked_assets, type, LockedAsset { unlock_epoch, assets: vector::singleton(asset) });
   } 
@@ -259,9 +261,11 @@ module interest_lst::soulbound_token {
   */
   public fun has_locked_asset<Asset: key + store>(sbt: &InterestSBT): bool {
     let type = type_name::get<Asset>();
+
     if (!bag::contains<TypeName>(&sbt.locked_assets, type)) return false;
 
     let lock = bag::borrow<TypeName, LockedAsset<Asset>>(&sbt.locked_assets, type);
+
     !vector::is_empty(&lock.assets)
   }
 
@@ -290,6 +294,13 @@ module interest_lst::soulbound_token {
   /// Remove a key from Display
   public fun remove(_: &AdminCap, storage: &mut Storage, key: string::String) { 
     display::remove(&mut storage.display, key);
+  }
+
+  // ** TEST ONLY
+
+  #[test_only]
+  public fun init_for_testing(ctx: &mut TxContext) {
+    init(SOULBOUND_TOKEN {}, ctx);
   }
 
 } 

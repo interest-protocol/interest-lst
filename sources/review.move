@@ -6,18 +6,20 @@ module interest_lst::review {
   use std::vector;
   use std::ascii::{Self, String};
 
+  use sui::math;
   use sui::transfer;
   use sui::event::{emit};
+  use sui::coin::{Self, Coin};
+  use sui::table::{Self, Table};
   use sui::object::{Self, UID, ID};
   use sui::tx_context::{Self, TxContext};
-  use sui::table::{Self, Table};
-  use sui::math;
 
   use sui_system::sui_system::{Self, SuiSystemState};
 
-  use interest_lst::sui_yield::{Self, SuiYield};
+  use interest_lst::isui::ISUI;
   use interest_lst::admin::AdminCap;
   use interest_lst::pool::{Self, PoolStorage};
+  use interest_lst::soulbound_token::{Self as sbt, InterestSBT};
 
   const ECannotReviewWithNft: u64 = 0;
   const EWrongStarNumber: u64 = 1;
@@ -25,6 +27,7 @@ module interest_lst::review {
   const EAlreadyReviewed: u64 = 3;
   const ENotReviewed: u64 = 4;
   const ENotValidator: u64 = 5;
+  const ENoLockedAssets: u64 = 6;
 
   struct Review has store, drop {
     vote: bool,
@@ -90,7 +93,7 @@ module interest_lst::review {
   /*
   * @param system: Sui system state (with validators data)
   * @param reviews: global storage 
-  * @param nft: Sui Yield nft to verify cooldown
+  * @param sbt: Interest Soul Bound Token to verify cooldown
   * @param validator_address: the validator to review
   * @param vote: up/down vote
   * @param comment: maximum 140 characters explaining the choice
@@ -99,7 +102,7 @@ module interest_lst::review {
   public fun create(
     system: &mut SuiSystemState,
     reviews: &mut Reviews, 
-    nft: &SuiYield, 
+    sbt: &InterestSBT, 
     validator_address: address,
     vote: bool,
     comment: String,
@@ -118,20 +121,20 @@ module interest_lst::review {
 
     // verify that nft isn't being cooled down
     let current_epoch = tx_context::epoch(ctx);
-    let nft_id = object::id(nft);
+    let sbt_id = object::id(sbt);
     // check if the nft is not being cooldowned, if it has already been used to review
-    if (table::contains(&reviews.nft_review_epoch, nft_id)) {
-      let prev_epoch = table::borrow_mut(&mut reviews.nft_review_epoch, nft_id);
+    if (table::contains(&reviews.nft_review_epoch, sbt_id)) {
+      let prev_epoch = table::borrow_mut(&mut reviews.nft_review_epoch, sbt_id);
       assert!(current_epoch > *prev_epoch + reviews.cooldown_epochs, ECannotReviewWithNft);
       // update nft review epoch for cooldown
       *prev_epoch = current_epoch;
     } else {
-      table::add(&mut reviews.nft_review_epoch, nft_id, current_epoch);
+      table::add(&mut reviews.nft_review_epoch, sbt_id, current_epoch);
     };
     
     // store the previous reputation of the validator
     let prev_validator_reputation = validator.reputation;
-    let reputation = get_reputation_from_nft(nft);
+    let reputation = get_reputation_from_sbt(sbt);
 
     // update stats
     if (vote) { validator.upvotes = validator.upvotes + 1 } else { validator.downvotes = validator.downvotes + 1 };
@@ -151,7 +154,7 @@ module interest_lst::review {
   // takes a YN nft to gate review access and limit their creation 
   /*
   * @param reviews: global storage 
-  * @param nft: Sui Yield nft to verify cooldown
+  * @param sbt: Interest Soul Bound Token to verify cooldown
   * @param validator_address: the validator to review
   * @param vote: up/down vote
   * @param comment: maximum 140 characters explaining the choice
@@ -159,7 +162,7 @@ module interest_lst::review {
   */
   public fun update(
     reviews: &mut Reviews, 
-    nft: &SuiYield, 
+    sbt: &InterestSBT,  
     validator_address: address,
     vote: bool,
     comment: String,
@@ -172,8 +175,8 @@ module interest_lst::review {
 
     // verify that nft isn't being cooled down
     let current_epoch = tx_context::epoch(ctx);
-    let nft_id = object::id(nft);
-    let prev_epoch = table::borrow_mut(&mut reviews.nft_review_epoch, nft_id);
+    let sbt_id = object::id(sbt);
+    let prev_epoch = table::borrow_mut(&mut reviews.nft_review_epoch, sbt_id);
 
     assert!(current_epoch > *prev_epoch + reviews.cooldown_epochs, ECannotReviewWithNft);
     // update nft review epoch for cooldown
@@ -185,7 +188,7 @@ module interest_lst::review {
     // save the previous vote before updating the review 
     let prev_vote = prev_review.vote;
 
-    let reputation = get_reputation_from_nft(nft);
+    let reputation = get_reputation_from_sbt(sbt);
     // create a new review to replace the previous one
     *prev_review = create_review(vote, reputation, comment);
 
@@ -434,8 +437,20 @@ module interest_lst::review {
   * @param nft: SuiYield nft the user send to review
   * @return the reputation
   */
-  fun get_reputation_from_nft(nft: &SuiYield): u64 {
-    math::sqrt(sui_yield::value(nft) / 1_000_000_000)
+  fun get_reputation_from_sbt(sbt: &InterestSBT): u64 {
+    assert!(sbt::has_locked_asset<Coin<ISUI>>(sbt), ENoLockedAssets);
+    let (coins, duration) = sbt::read_locked_asset<Coin<ISUI>>(sbt);
+    
+    let total_value = 0;
+    let i = 0;
+    let len = vector::length(coins);
+    
+    while (len > i) {
+      total_value = total_value + coin::value(vector::borrow(coins, i));
+      i = i + 1;
+    };
+
+    math::sqrt((total_value / 1_000_000_000) * duration)
   }
 
   // ** Tests only

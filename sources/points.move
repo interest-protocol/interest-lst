@@ -1,20 +1,20 @@
 module interest_lst::points {
   use std::ascii::String;
 
+  use sui::package::{Self, Publisher};
   use sui::sui::SUI;
-  use sui::coin::{Self, Coin};
-  use sui::tx_context::{Self, TxContext};
   use sui::transfer;
-  use sui::balance::{Self, Balance};
+  use sui::coin::{Self, Coin};
   use sui::object::{Self, UID};
+  use sui::balance::{Self, Balance};
+  use sui::tx_context::{Self, TxContext};
 
   use sui_system::sui_system::SuiSystemState;
   
-  use interest_lst::sui_yield::SuiYield;
   use interest_lst::review::{Self, Reviews};
   use interest_lst::soulbound_token::{Self as sbt, InterestSBT};
 
-  struct Witness has drop {}
+  struct POINTS has drop {}
 
   struct Admin has key {id: UID}
 
@@ -32,10 +32,16 @@ module interest_lst::points {
     max_claimable_rewards: u64,
     rewards: Balance<SUI>,
   }
+
+  struct PublisherWrapper has key {
+    id: UID,
+    publisher: Publisher
+  }
   
-  fun init(ctx: &mut TxContext) {
+  fun init(otw: POINTS, ctx: &mut TxContext) {
     transfer::share_object(Actions {id: object::new(ctx), creation: 0, update: 0, deletion: 0});
     transfer::share_object(Rewards {id: object::new(ctx), rewards_per_point: 0, max_claimable_rewards: 0, rewards: balance::zero()});
+    transfer::share_object(PublisherWrapper{ id: object::new(ctx), publisher: package::claim(otw, ctx)});
     transfer::transfer(Admin {id: object::new(ctx)}, tx_context::sender(ctx));
   }
 
@@ -45,8 +51,8 @@ module interest_lst::points {
   /*
   * @param system: Sui system state (with validators data)
   * @param reviews: global storage 
+  * @param publisher_wrapper A shared object with the publisher from this module
   * @param points: storage for points depending on action
-  * @param sy: Sui Yield sft to verify cooldown
   * @param sbt: soulbound token 
   * @param validator_address: the validator to review
   * @param vote: up/down vote
@@ -55,42 +61,43 @@ module interest_lst::points {
   public fun create_review(
     system: &mut SuiSystemState,
     reviews: &mut Reviews, 
+    publisher_wrapper: &PublisherWrapper,
     points: &Actions,
-    sy: &SuiYield, 
     sbt: &mut InterestSBT,
     validator_address: address,
     vote: bool,
     comment: String,
     ctx: &mut TxContext
   ) {
-    review::create(system, reviews, sy, validator_address, vote, comment, ctx);
+    review::create(system, reviews, sbt, validator_address, vote, comment, ctx);
 
-    if (sbt::contains_points(Witness {}, sbt)) {
-      sbt::create_points(Witness {}, sbt, 0);
+    if (sbt::contains_points(*package::published_package(&publisher_wrapper.publisher), sbt)) {
+      sbt::create_points(&publisher_wrapper.publisher, sbt, 0);
     };
 
-    sbt::add_points(Witness {}, sbt, points.creation);
+    sbt::add_points(&publisher_wrapper.publisher, sbt, points.creation);
   }
 
   // @dev update a review by adding points to the SBT
   public fun update_review(
     reviews: &mut Reviews, 
+    publisher_wrapper: &PublisherWrapper,
     points: &Actions,
-    sy: &SuiYield, 
     sbt: &mut InterestSBT,
     validator_address: address,
     vote: bool,
     comment: String,
     ctx: &mut TxContext
   ) {
-    review::update(reviews, sy, validator_address, vote, comment, ctx);
+    review::update(reviews, sbt, validator_address, vote, comment, ctx);
 
-    sbt::add_points(Witness {}, sbt, points.update);
+    sbt::add_points(&publisher_wrapper.publisher, sbt, points.update);
   }
 
   // @dev delete a review by adding points to the SBT, no need for the SuiYield sft
   public fun delete_review(
     reviews: &mut Reviews, 
+    publisher_wrapper: &PublisherWrapper,
     points: &Actions,
     sbt: &mut InterestSBT,
     validator_address: address,
@@ -98,7 +105,7 @@ module interest_lst::points {
   ) {
     review::delete(reviews, validator_address, ctx);
 
-    sbt::add_points(Witness {}, sbt, points.deletion);
+    sbt::add_points(&publisher_wrapper.publisher, sbt, points.deletion);
   }
 
   // @dev claim the rewards depending on the points in the sbt and params
@@ -107,15 +114,15 @@ module interest_lst::points {
   * @param sbt: soulbound token with points
   * @return the rewards 
   */
-  public fun claim_rewards(pool: &mut Rewards, sbt: &mut InterestSBT, ctx: &mut TxContext): Coin<SUI> {
-    let points = sbt::borrow_mut_points(Witness {}, sbt);
+  public fun claim_rewards(pool: &mut Rewards, publisher_wrapper: &PublisherWrapper, sbt: &mut InterestSBT, ctx: &mut TxContext): Coin<SUI> {
+    let points = sbt::read_points(*package::published_package(&publisher_wrapper.publisher), sbt);
     let rewards = *points * pool.rewards_per_point;
 
     if (rewards > pool.max_claimable_rewards) {
-      *points =  *points - pool.max_claimable_rewards / pool.rewards_per_point;
+      sbt::remove_points(&publisher_wrapper.publisher, sbt, *points - pool.max_claimable_rewards / pool.rewards_per_point);
       coin::take(&mut pool.rewards, pool.max_claimable_rewards, ctx)
     } else {
-      *points =  0;
+      sbt::remove_points(&publisher_wrapper.publisher, sbt, *points);
       coin::take(&mut pool.rewards, rewards, ctx)
     }
   }
