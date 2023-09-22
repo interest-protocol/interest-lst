@@ -19,7 +19,7 @@ module interest_lst::soulbound_token {
   use sui::object::{Self, UID, ID};
   use sui::display::{Self, Display};
   use sui::tx_context::{Self, TxContext};
-  use sui::package::{Self, published_package, Publisher};
+  use sui::package::{Self, Publisher};
 
   use interest_lst::admin::AdminCap;
 
@@ -126,8 +126,8 @@ module interest_lst::soulbound_token {
   * @param package_id A package id
   * @param sbt The SBT we will read its points
   */
-  public fun read_points(package_id: String, sbt: &InterestSBT): &u64 {
-    table::borrow<String, u64>(&sbt.points, package_id)
+  public fun read_points<Type: drop>(sbt: &InterestSBT): &u64 {
+    table::borrow<String, u64>(&sbt.points, package_id<Type>())
   }
 
   // @dev Check if the SBT contains points from a {package_id}
@@ -135,8 +135,8 @@ module interest_lst::soulbound_token {
   * @param package_id A package id
   * @param sbt The SBT we will check its points
   */
-  public fun contains_points(package_id: String, sbt: &InterestSBT): bool {
-    table::contains<String, u64>(&sbt.points, package_id)
+  public fun contains_points<Type: drop>(sbt: &InterestSBT): bool {
+    table::contains<String, u64>(&sbt.points, package_id<Type>())
   }
 
   // ** WRITE Points API
@@ -147,8 +147,8 @@ module interest_lst::soulbound_token {
   * @param sbt: soulbound token  
   * @param points: number of points to initialize the field (can be 0) 
   */
-  public fun create_points(publisher: &Publisher, sbt: &mut InterestSBT, points: u64) {
-    table::add(&mut sbt.points, *published_package(publisher), points);
+  public fun create_points<Type: drop>(sbt: &mut InterestSBT, points: u64) {
+    table::add(&mut sbt.points, package_id<Type>(), points);
   }
 
   // @dev adds Points to the SBT for a {package}
@@ -157,8 +157,8 @@ module interest_lst::soulbound_token {
   * @param sbt: soulbound token  
   * @param points: number of points to add
   */
-  public fun add_points(publisher: &Publisher, sbt: &mut InterestSBT, points: u64) {
-    let prev_points = borrow_mut_points(publisher, sbt);
+  public fun add_points<Type: drop>(sbt: &mut InterestSBT, points: u64) {
+    let prev_points = borrow_mut_points<Type>(sbt);
     *prev_points = *prev_points + points;
   }
 
@@ -168,8 +168,8 @@ module interest_lst::soulbound_token {
   * @param sbt: soulbound token  
   * @param points: number of points to remove
   */
-  public fun remove_points(publisher: &Publisher, sbt: &mut InterestSBT, points: u64) {
-    let prev_points = borrow_mut_points(publisher, sbt);
+  public fun remove_points<Type: drop>(sbt: &mut InterestSBT, points: u64) {
+    let prev_points = borrow_mut_points<Type>(sbt);
     *prev_points = if (*prev_points > points) { *prev_points - points } else { 0 };
   }
 
@@ -185,9 +185,14 @@ module interest_lst::soulbound_token {
   // ** Private Functions
 
   // @dev The publisher should use the available API to manage points
-  fun borrow_mut_points(publisher: &Publisher, sbt: &mut InterestSBT): &mut u64 {
-    table::borrow_mut<String, u64>(&mut sbt.points, *published_package(publisher))
+  fun borrow_mut_points<Type: drop>(sbt: &mut InterestSBT): &mut u64 {
+    table::borrow_mut<String, u64>(&mut sbt.points, package_id<Type>())
   }
+
+  // @dev It returns the address of a package. 
+  fun package_id<Type: drop>(): String {
+    type_name::get_address(&type_name::get<Type>())
+  } 
 
   // ** Lock assets
 
