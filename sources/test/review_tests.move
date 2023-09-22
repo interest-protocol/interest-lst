@@ -3,18 +3,19 @@ module interest_lst::review_tests {
   use std::vector;
   use std::ascii;
 
-  use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
-  use sui::test_utils::{assert_eq};
   use sui::table;
+  use sui::test_utils::assert_eq;
+  use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
 
   use sui_system::sui_system::{SuiSystemState};
   use sui_system::governance_test_utils::{advance_epoch, create_validator_for_testing, create_sui_system_state_for_testing};
 
   use interest_lst::pool;
+  use interest_lst::isui::ISUI;
   use interest_lst::admin::{Self, AdminCap};
   use interest_lst::review::{Self, Reviews};
-  use interest_lst::sui_yield::{Self, SuiYield, SuiYieldStorage};
-  use interest_lst::test_utils::{people, scenario}; 
+  use interest_lst::test_utils::{people, scenario, mint}; 
+  use interest_lst::soulbound_token::{Self as sbt, InterestSBT};
 
   const MYSTEN_LABS: address = @0x4;
   const FIGMENT: address = @0x5;
@@ -33,7 +34,7 @@ module interest_lst::review_tests {
     // create review
     next_tx(test, alice); {
       let reviews = test::take_shared<Reviews>(test);
-      let interest_sui_yield_Storage = test::take_shared<SuiYieldStorage>(test);
+
       // verify set up storage
       let (total_reviews, total_reputation, validators, max_top, _, top, cooldown, nft_epochs) = review::read_storage(&reviews);
       assert_eq(total_reviews, 0);
@@ -53,10 +54,12 @@ module interest_lst::review_tests {
       review::set_max_top_len(&admin_cap, &mut reviews, 2);
 
       let system = test::take_shared<SuiSystemState>(test);
-      // get a nft to create reviews, reputation = 10 sqrt(100SUI)
-      let nft = sui_yield::new_for_testing(&mut interest_sui_yield_Storage, 10, 100_000_000_000, 0, 0, test::ctx(test));
+
+      let interest_sbt = test::take_from_sender<InterestSBT>(test);
+
+      sbt::lock_asset(&mut interest_sbt, mint<ISUI>(10, 9, ctx(test)), 10, ctx(test));
       
-      review::create(&mut system, &mut reviews, &nft, MYSTEN_LABS, true, ascii::string(b"random"), test::ctx(test));
+      review::create(&mut system, &mut reviews, &interest_sbt, MYSTEN_LABS, true, ascii::string(b"random"), test::ctx(test));
       
       let (total_reviews, total_reputation, validators, max_top, _, top, cooldown, nft_epochs) = review::read_storage(&reviews);
       assert_eq(total_reviews, 1);
@@ -85,10 +88,9 @@ module interest_lst::review_tests {
       assert_eq(validator_addr, MYSTEN_LABS);
       assert_eq(reputation, 10);
 
-      sui::transfer::public_transfer(nft, alice);
+      test::return_to_sender(test, interest_sbt);
       test::return_to_sender(test, admin_cap);
       test::return_shared(reviews);
-      test::return_shared(interest_sui_yield_Storage);
       test::return_shared(system);
     }; 
 
@@ -96,9 +98,9 @@ module interest_lst::review_tests {
     advance_epoch(test);
     next_tx(test, alice); {
       let reviews = test::take_shared<Reviews>(test);      
-      let nft = test::take_from_sender<SuiYield>(test);
+      let interest_sbt = test::take_from_sender<InterestSBT>(test);
 
-      review::update(&mut reviews, &nft, MYSTEN_LABS, true, ascii::string(b"different"), test::ctx(test));
+      review::update(&mut reviews, &interest_sbt, MYSTEN_LABS, true, ascii::string(b"different"), test::ctx(test));
       
       let (total_reviews, total_reputation, validators, max_top, _, top, cooldown, nft_epochs) = review::read_storage(&reviews);
       assert_eq(total_reviews, 1);
@@ -127,7 +129,7 @@ module interest_lst::review_tests {
       assert_eq(validator_addr, MYSTEN_LABS);
       assert_eq(reputation, 10);
 
-      test::return_to_sender(test, nft);
+      test::return_to_sender(test, interest_sbt);
       test::return_shared(reviews);
     }; 
 
@@ -135,9 +137,9 @@ module interest_lst::review_tests {
     advance_epoch(test);
     next_tx(test, alice); {
       let reviews = test::take_shared<Reviews>(test);      
-      let nft = test::take_from_sender<SuiYield>(test);
+      let interest_sbt = test::take_from_sender<InterestSBT>(test);
 
-      review::update(&mut reviews, &nft, MYSTEN_LABS, false, ascii::string(b"another"), test::ctx(test));
+      review::update(&mut reviews, &interest_sbt, MYSTEN_LABS, false, ascii::string(b"another"), test::ctx(test));
       
       let (total_reviews, total_reputation, validators, max_top, _, top, cooldown, nft_epochs) = review::read_storage(&reviews);
       assert_eq(total_reviews, 1);
@@ -166,7 +168,7 @@ module interest_lst::review_tests {
       assert_eq(validator_addr, MYSTEN_LABS);
       assert_eq(reputation, 0);
 
-      test::return_to_sender(test, nft);
+      test::return_to_sender(test, interest_sbt);
       test::return_shared(reviews);
     }; 
 
@@ -223,7 +225,12 @@ module interest_lst::review_tests {
       review::init_for_testing(ctx(test));
       admin::init_for_testing(ctx(test));
       pool::init_for_testing(ctx(test));
-      sui_yield::init_for_testing(ctx(test));
+      sbt::init_for_testing(ctx(test));
+    };
+
+    next_tx(test, alice);
+    {
+      sbt::mint_sbt(test::ctx(test));
     };
     advance_epoch(test);
   }
