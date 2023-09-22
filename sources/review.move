@@ -27,7 +27,6 @@ module interest_lst::review {
   const EAlreadyReviewed: u64 = 3;
   const ENotReviewed: u64 = 4;
   const ENotValidator: u64 = 5;
-  const ENoLockedAssets: u64 = 6;
 
   struct Review has store, drop {
     vote: bool,
@@ -438,7 +437,8 @@ module interest_lst::review {
   * @return the reputation
   */
   fun get_reputation_from_sbt(sbt: &InterestSBT): u64 {
-    assert!(sbt::has_locked_asset<Coin<ISUI>>(sbt), ENoLockedAssets);
+    if (!sbt::has_locked_asset<Coin<ISUI>>(sbt)) return 0;
+
     let (coins, duration) = sbt::read_locked_asset<Coin<ISUI>>(sbt);
     
     let total_value = 0;
