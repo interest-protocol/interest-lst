@@ -12,7 +12,7 @@ module interest_lst::points {
   
   use interest_lst::sui_yield::SuiYield;
   use interest_lst::review::{Self, Reviews};
-  use interest_lst::soulbound_token::{Self as sbt, Interestore};
+  use interest_lst::soulbound_token::{Self as sbt, InterestSBT};
 
   struct Witness has drop {}
 
@@ -57,7 +57,7 @@ module interest_lst::points {
     reviews: &mut Reviews, 
     points: &Actions,
     sy: &SuiYield, 
-    sbt: &mut Interestore,
+    sbt: &mut InterestSBT,
     validator_address: address,
     vote: bool,
     comment: String,
@@ -77,7 +77,7 @@ module interest_lst::points {
     reviews: &mut Reviews, 
     points: &Actions,
     sy: &SuiYield, 
-    sbt: &mut Interestore,
+    sbt: &mut InterestSBT,
     validator_address: address,
     vote: bool,
     comment: String,
@@ -92,7 +92,7 @@ module interest_lst::points {
   public fun delete_review(
     reviews: &mut Reviews, 
     points: &Actions,
-    sbt: &mut Interestore,
+    sbt: &mut InterestSBT,
     validator_address: address,
     ctx: &mut TxContext
   ) {
@@ -107,7 +107,7 @@ module interest_lst::points {
   * @param sbt: soulbound token with points
   * @return the rewards 
   */
-  public fun claim_rewards(pool: &mut Rewards, sbt: &mut Interestore, ctx: &mut TxContext): Coin<SUI> {
+  public fun claim_rewards(pool: &mut Rewards, sbt: &mut InterestSBT, ctx: &mut TxContext): Coin<SUI> {
     let points = sbt::borrow_mut_points(Witness {}, sbt);
     let rewards = *points * pool.rewards_per_point;
 
