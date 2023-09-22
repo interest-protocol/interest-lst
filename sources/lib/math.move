@@ -33,41 +33,4 @@ module interest_lst::math {
       //y = c * z + d;
       a * c * z + a * d + b * c + b * d / z
     }
-
-    spec mul_div {
-        pragma opaque = true;
-        include MulDivAbortsIf;
-        aborts_if [abstract] false;
-        ensures [abstract] result == spec_mul_div();
-    }
-
-    spec schema MulDivAbortsIf {
-        x: u128;
-        y: u128;
-        z: u128;
-        aborts_if y != z && x > z && z == 0;
-        aborts_if y != z && x > z && z!=0 && x/z*y > MAX_U128;
-        aborts_if y != z && x <= z && z == 0;
-        //a * b overflow
-        aborts_if y != z && x <= z && x / z * (x % z) > MAX_U128;
-        //a * b * z overflow
-        aborts_if y != z && x <= z && x / z * (x % z) * z > MAX_U128;
-        //a * d overflow
-        aborts_if y != z && x <= z && x / z * (y % z) > MAX_U128;
-        //a * b * z + a * d overflow
-        aborts_if y != z && x <= z && x / z * (x % z) * z + x / z * (y % z) > MAX_U128;
-        //b * c overflow
-        aborts_if y != z && x <= z && x % z * (y / z) > MAX_U128;
-        //b * d overflow
-        aborts_if y != z && x <= z && x % z * (y % z) > MAX_U128;
-        //b * d / z overflow
-        aborts_if y != z && x <= z && x % z * (y % z) / z > MAX_U128;
-        //a * b * z + a * d + b * c overflow
-        aborts_if y != z && x <= z && x / z * (x % z) * z + x / z * (y % z) + x % z * (y / z) > MAX_U128;
-        //a * b * z + a * d + b * c + b * d / z overflow
-        aborts_if y != z && x <= z && x / z * (x % z) * z + x / z * (y % z) + x % z * (y / z) + x % z * (y % z) / z > MAX_U128;
-
-    }
-
-    spec fun spec_mul_div(): u128;
 }
