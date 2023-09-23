@@ -54,5 +54,4 @@ module interest_lst::fee_utils {
   public fun read_fee(fee:&Fee): (u128, u128, u128) {
     (fee.base, fee.kink, fee.jump)
   }
-
 }

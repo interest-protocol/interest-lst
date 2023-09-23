@@ -71,7 +71,7 @@ module interest_lst::admin {
   * @param admin_cap The AdminCap that will be transferred
   * @recipient the new admin address
   */
-  entry public fun start_transfer_admin(_: AdminCap, storage: &mut AdminStorage, recipient: address) {
+  entry public fun start_transfer_admin(_: &AdminCap, storage: &mut AdminStorage, recipient: address) {
     assert!(recipient != @0x0, ENoZeroAddress);
     storage.pending_admin = recipient;
     storage.accepted = false;
@@ -87,7 +87,7 @@ module interest_lst::admin {
   * @param admin_cap The AdminCap that will be transferred
   * @recipient the new admin address
   */
-  entry public fun cancel_transfer_admin(_: AdminCap, storage: &mut AdminStorage) {
+  entry public fun cancel_transfer_admin(_: &AdminCap, storage: &mut AdminStorage) {
     storage.pending_admin = @0x0;
     storage.accepted = false;
 
@@ -134,5 +134,4 @@ module interest_lst::admin {
   public fun init_for_testing(ctx: &mut TxContext) {
     init(ctx);
   }
-
 }

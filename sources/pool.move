@@ -16,12 +16,14 @@ module interest_lst::pool {
   use sui::balance::{Self, Balance};
   use sui::tx_context::{Self, TxContext};
   use sui::linked_table::{Self, LinkedTable};
+
   use sui_system::staking_pool::{Self, StakedSui};
   use sui_system::sui_system::{Self, SuiSystemState};
 
   use interest_lst::admin::AdminCap;
   use interest_lst::math::{fmul, fdiv};
   use interest_lst::rebase::{Self, Rebase};
+  use interest_lst::constants::{one_sui_value};
   use interest_lst::semi_fungible_token::SemiFungibleToken;
   use interest_lst::isui::{Self, ISUI, InterestSuiStorage};
   use interest_lst::sui_yield::{Self, SuiYield, SuiYieldStorage};
@@ -30,11 +32,6 @@ module interest_lst::pool {
   use interest_lst::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
 
   friend interest_lst::review;
-  
-  // ** Constants
-
-  // StakedSui objects cannot be split to below this amount.
-  const MIN_STAKING_THRESHOLD: u64 = 1_000_000_000; // 1 
 
   // ** Errors
 
@@ -616,7 +613,7 @@ module interest_lst::pool {
     kink: u128, 
     jump: u128
   ) {
-    let max = (MIN_STAKING_THRESHOLD as u128);
+    let max = (one_sui_value() as u128);
     // scalar represents 100% - the protocol does not allow a fee higher than that.
     assert!(max >= base && max >= kink && max >= jump, EInvalidFee);
 
@@ -670,7 +667,7 @@ module interest_lst::pool {
     let stake_value = coin::value(&token);
 
     // Will save gas since the sui_system will throw
-    assert!(stake_value >= MIN_STAKING_THRESHOLD, EInvalidStakeAmount);
+    assert!(stake_value >= one_sui_value(), EInvalidStakeAmount);
     
     // Need to update the entire state of Sui/Sui Rewards once every epoch
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
@@ -773,7 +770,7 @@ module interest_lst::pool {
             /*
             * If we can split the Staked Sui to get the amount left. We split and store the remaining amount in the table. This is to avoid unstaking large amounts and lose rewards.
             */
-            if (value >= amount_left + MIN_STAKING_THRESHOLD) {
+            if (value >= amount_left + one_sui_value()) {
               // Split the Staked Sui -> Unstake -> Join with the Return Coin
               coin::join(&mut coin_sui_unstaked, coin::from_balance(sui_system::request_withdraw_stake_non_entry(wrapper, staking_pool::split(&mut staked_sui, amount_left, ctx), ctx), ctx));
 
@@ -819,7 +816,7 @@ module interest_lst::pool {
       let dust_value = balance::value(&storage.dust);
 
       // If we have enough dust and extra sui to stake -> we stake and store in the table
-      if (extra_value + dust_value >= MIN_STAKING_THRESHOLD) {
+      if (extra_value + dust_value >= one_sui_value()) {
         // Join Dust and extra coin
         coin::join(&mut extra_coin_sui, coin::take(&mut storage.dust, dust_value, ctx));
         let validator_data = linked_table::borrow_mut(&mut storage.validators_table, validator_address);
@@ -930,7 +927,7 @@ module interest_lst::pool {
   * @return u64 the exchange rate
   */
   fun get_pending_yield_logic(
-    storage: &mut PoolStorage, 
+    storage: &PoolStorage, 
     sft_yield: &SuiYield,
     maturity: u64,
     ctx: &mut TxContext

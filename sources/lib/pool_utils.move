@@ -54,5 +54,4 @@ module interest_lst::staking_pool_utils {
       total_sui_withdraw_amount - amount
     else 0
   }
-
 }

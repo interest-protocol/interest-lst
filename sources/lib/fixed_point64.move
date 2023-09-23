@@ -5,6 +5,8 @@
 
 module interest_lst::fixed_point64 {
 
+    use interest_lst::constants::{u256_max_u128};
+
     /// Define a fixed-point numeric type with 64 fractional bits.
     /// This is just a u128 integer but it is wrapped in a struct to
     /// make a unique type. This is a binary representation, so decimal
@@ -15,8 +17,6 @@ module interest_lst::fixed_point64 {
     /// be careful about using floating-point to convert these values to
     /// decimal.
     struct FixedPoint64 has copy, drop, store { value: u128 }
-
-    const MAX_U128: u256 = 340282366920938463463374607431768211455;
 
     /// The denominator provided was zero
     const EDENOMINATOR: u64 = 0x10001;
@@ -49,7 +49,7 @@ module interest_lst::fixed_point64 {
         let x_raw = get_raw_value(x);
         let y_raw = get_raw_value(y);
         let result = (x_raw as u256) + (y_raw as u256);
-        assert!(result <= MAX_U128, ERATIO_OUT_OF_RANGE);
+        assert!(result <= u256_max_u128(), ERATIO_OUT_OF_RANGE);
         create_from_raw_value((result as u128))
     }
     spec add {
@@ -70,7 +70,7 @@ module interest_lst::fixed_point64 {
         // so rescale it by shifting away the low bits.
         let product = unscaled_product >> 64;
         // Check whether the value is too large.
-        assert!(product <= MAX_U128, EMULTIPLICATION);
+        assert!(product <= u256_max_u128(), EMULTIPLICATION);
         (product as u128)
     }
     spec multiply_u128 {
@@ -98,7 +98,7 @@ module interest_lst::fixed_point64 {
         let scaled_value = (val as u256) << 64;
         let quotient = scaled_value / (divisor.value as u256);
         // Check whether the value is too large.
-        assert!(quotient <= MAX_U128, EDIVISION);
+        assert!(quotient <= u256_max_u128(), EDIVISION);
         // the value may be too large, which will cause the cast to fail
         // with an arithmetic error.
         (quotient as u128)
@@ -138,7 +138,7 @@ module interest_lst::fixed_point64 {
         assert!(quotient != 0 || numerator == 0, ERATIO_OUT_OF_RANGE);
         // Return the quotient as a fixed-point number. We first need to check whether the cast
         // can succeed.
-        assert!(quotient <= MAX_U128, ERATIO_OUT_OF_RANGE);
+        assert!(quotient <= u256_max_u128(), ERATIO_OUT_OF_RANGE);
         FixedPoint64 { value: (quotient as u128) }
     }
     spec create_from_rational {

@@ -19,6 +19,7 @@ module interest_lst::review {
   use interest_lst::isui::ISUI;
   use interest_lst::admin::AdminCap;
   use interest_lst::pool::{Self, PoolStorage};
+  use interest_lst::constants::{one_sui_value};
   use interest_lst::soulbound_token::{Self as sbt, InterestSBT};
 
   const ECannotReviewWithNft: u64 = 0;
@@ -450,7 +451,7 @@ module interest_lst::review {
       i = i + 1;
     };
 
-    math::sqrt((total_value / 1_000_000_000) * duration)
+    math::sqrt((total_value / one_sui_value()) * duration)
   }
 
   // ** Tests only

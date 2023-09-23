@@ -2,18 +2,17 @@
 // It should give enough precision as Sui Coins have 9 decimals
 module interest_lst::math {
 
-  const SCALAR: u128 = 1_000_000_000; // 1e9 - Sui accuracy
-  const U128_MAX: u128 = 340282366920938463463374607431768211455;
+  use interest_lst::constants::{one_sui_value};
   
   const EZeroDivision: u64 = 0;
 
   public fun fmul(x: u128, y: u128): u128 {
-     (mul_div(x, y, SCALAR) as u128)
+     (mul_div(x, y, (one_sui_value() as u128)) as u128)
   }
 
   public fun fdiv(x: u128, y: u128): u128 {
     assert!(y != 0, EZeroDivision);
-    (mul_div(x, SCALAR, y) as u128)
+    (mul_div(x, (one_sui_value() as u128), y) as u128)
   }
 
   /// https://medium.com/coinmonks/math-in-solidity-part-3-percents-and-proportions-4db014e080b1

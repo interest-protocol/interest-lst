@@ -144,5 +144,4 @@ module interest_lst::points {
     storage.max_claimable_rewards = max_claimable_rewards;
     coin::put(&mut storage.rewards, rewards);
   }
-
 }

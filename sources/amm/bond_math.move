@@ -6,10 +6,9 @@ module interest_lst::bond_math {
 
   use interest_lst::math_fixed64::pow;
   use interest_lst::math::{fmul, fdiv};
+  use interest_lst::constants::{one_sui_value};
   use interest_lst::fixed_point64::{Self, FixedPoint64};
   use interest_lst::semi_fungible_token::{Self as sft, SemiFungibleToken};
-
-  const ONE: u64 = 1_000_000_000; // 1 
 
   const EZeroDivision: u64 = 0;
 
@@ -86,9 +85,11 @@ module interest_lst::bond_math {
     // coupon rate * par value
     let coupon = (fmul((coupon_rate as u128), (sft::value(asset) as u128)) as u64); 
 
+    let one = one_sui_value();
+
     // 1 - (1+r)^-n
-    let x = ONE - (fixed_point64::divide_u128(
-      (ONE as u128)
+    let x = one - (fixed_point64::divide_u128(
+      (one as u128)
       , pow(fixed_point64::add(
         fixed_point64::create_from_rational(1,1), 
           r
@@ -110,9 +111,11 @@ module interest_lst::bond_math {
     // If the Bond has matured, the coupon is worth 0. There is no point to buy it.
     if (n == 0) return 0;
 
+    let one = one_sui_value();
+
     // 1 - (1+r)^-n
-    let x = ONE - (fixed_point64::divide_u128(
-      (ONE as u128)
+    let x = one - (fixed_point64::divide_u128(
+      (one as u128)
       , pow(fixed_point64::add(
         fixed_point64::create_from_rational(1,1), 
           r
