@@ -1,6 +1,5 @@
 // Access Control for Interest LSD package
 module interest_lst::admin {
-
   use sui::transfer;
   use sui::event::emit;
   use sui::object::{Self, UID};
