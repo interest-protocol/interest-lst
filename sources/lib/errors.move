@@ -56,4 +56,10 @@ module interest_lst::errors {
   public fun validator_not_reviewed(): u64 { 24 }
 
   public fun not_active_validator(): u64 { 25 }
+
+  public fun sft_balance_mismatched_slot(): u64 { 26 }
+
+  public fun sft_balance_invalid_split_amount(): u64 { 27 }
+
+  public fun sft_balance_has_value(): u64 { 28 }
 }
