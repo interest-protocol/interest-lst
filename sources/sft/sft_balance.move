@@ -4,12 +4,18 @@
 * Balance representation of a Semi Fungible Token
 */
 module interest_lst::semi_fungible_balance {
+  use sui::table::{Self, Table};
+  use sui::tx_context::TxContext;
 
   use interest_lst::errors;
 
+  struct SFTSupply<phantom T> has store {
+    data: Table<u256, u64>
+  }
+
   struct SFTBalance<phantom T> has store {
-      slot: u256,
-      value: u64,
+    slot: u256, // Provides fungibility between the NFTs
+    value: u64,
   }
 
   public fun slot<T>(self: &SFTBalance<T>): u256 {
@@ -20,7 +26,38 @@ module interest_lst::semi_fungible_balance {
     self.value
   }
 
-  public fun zero<T>(slot: u256): SFTBalance<T> {
+  public fun supply_value<T>(s: &SFTSupply<T>, slot: u256): u64 {
+    if (!table::contains(&s.data, slot)) return 0;
+    *table::borrow(&s.data, slot)
+  }
+
+  public fun create_supply<T: drop>(ctx: &mut TxContext): SFTSupply<T> {
+    SFTSupply { data: table::new(ctx) }
+  }
+
+  public fun increase_supply<T>(self: &mut SFTSupply<T>, slot: u256, value: u64): SFTBalance<T> {
+    new_slot(self, slot);
+    
+    let current_supply = table::borrow_mut(&mut self.data, slot);
+    assert!(value < (18446744073709551615u64 - *current_supply),errors::sft_supply_overflow());
+    
+    *current_supply = *current_supply + value;
+
+    SFTBalance {
+      slot,
+      value
+    }   
+  }
+
+  public fun decrease_supply<T>(self: &mut SFTSupply<T>, balance: SFTBalance<T>): u64 {
+    let SFTBalance  { value, slot } = balance;
+    let current_supply = table::borrow_mut(&mut self.data, slot);
+    *current_supply = *current_supply - value;
+    value
+  }
+
+  public fun zero<T>(supply: &mut SFTSupply<T>, slot: u256): SFTBalance<T> {
+    new_slot(supply, slot);
     SFTBalance { slot, value: 0 }
   }
 
@@ -75,6 +112,12 @@ module interest_lst::semi_fungible_balance {
   spec destroy_zero {
     aborts_if self.value != 0 with errors::sft_balance_has_value();
   }
+
+  fun new_slot<T>(self: &mut SFTSupply<T>, slot: u256) {
+    if (table::contains(&self.data, slot)) return;
+
+    table::add(&mut self.data, slot, 0);
+  } 
 
   #[test_only]
   public fun create_for_testing<T>(slot: u256, value: u64): SFTBalance<T> {

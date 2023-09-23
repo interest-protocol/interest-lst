@@ -62,4 +62,10 @@ module interest_lst::errors {
   public fun sft_balance_invalid_split_amount(): u64 { 27 }
 
   public fun sft_balance_has_value(): u64 { 28 }
+
+  public fun sft_supply_overflow(): u64 { 29 }
+
+  public fun sft_cannot_divide_zero_value(): u64 { 30 }
+
+  public fun sft_cannot_divide_into_zero(): u64 { 31 }
 }

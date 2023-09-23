@@ -8,7 +8,7 @@ module interest_lst::semi_fungible_balance_tests {
 
     #[test]
     fun test_sft_balance() {
-        let balance = semi_fungible_balance::zero<Token>(10);
+        let balance = semi_fungible_balance::create_for_testing<Token>(10, 0);
         let another = semi_fungible_balance::create_for_testing<Token>(10, 1000);
 
         semi_fungible_balance::join(&mut balance, another);

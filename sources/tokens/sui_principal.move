@@ -49,8 +49,8 @@ module interest_lst::sui_principal {
 
   // === Open Functions ===
 
-  public fun total_supply_in_slot(storage: &SuiPrincipalStorage, slot: u256): u64 {
-    sft::total_supply_in_slot(&storage.treasury_cap, slot)
+  public fun total_supply(storage: &SuiPrincipalStorage, slot: u256): u64 {
+    sft::total_supply(&storage.treasury_cap, slot)
   }
 
   public fun value(self: &SemiFungibleToken<SUI_PRINCIPAL>): u64 {
@@ -62,41 +62,25 @@ module interest_lst::sui_principal {
   }
 
   public fun zero(storage: &mut SuiPrincipalStorage, slot: u256, ctx: &mut TxContext): SemiFungibleToken<SUI_PRINCIPAL> {
-    sft::zero(&mut storage.treasury_cap, slot, ctx)
+    sft::zero(sft::supply_mut(&mut storage.treasury_cap), slot, ctx)
   }
 
   public fun is_zero(token: &SemiFungibleToken<SUI_PRINCIPAL>): bool {
     sft::is_zero(token)
   }
 
-  public fun destroy_zero(token: SemiFungibleToken<SUI_PRINCIPAL>) {
-    sft::destroy_zero(token)
+  public fun burn_zero(token: SemiFungibleToken<SUI_PRINCIPAL>) {
+    sft::burn_zero(token)
   }
 
-  public fun burn(storage: &mut SuiPrincipalStorage, token: &mut SemiFungibleToken<SUI_PRINCIPAL>, value: u64) {
-    sft::burn(&mut storage.treasury_cap, token, value);
+  public fun burn(storage: &mut SuiPrincipalStorage, token: SemiFungibleToken<SUI_PRINCIPAL>): u64 {
+    sft::burn(&mut storage.treasury_cap, token)
   }  
-
-  public fun burn_destroy(storage: &mut SuiPrincipalStorage, token: SemiFungibleToken<SUI_PRINCIPAL>): u64 {
-    let value = value(&token);
-    burn(storage, &mut token, value);
-    destroy_zero(token);
-    value
-  } 
 
   // === FRIEND ONLY Functions ===
 
-  public(friend) fun new(
-    storage: &mut SuiPrincipalStorage, 
-    slot: u256, 
-    value: u64, 
-    ctx: &mut TxContext
-  ): SemiFungibleToken<SUI_PRINCIPAL> {
-    sft::new(&mut storage.treasury_cap, slot, value, ctx)
-  } 
-
-  public(friend) fun mint(storage: &mut SuiPrincipalStorage, token: &mut SemiFungibleToken<SUI_PRINCIPAL>, value: u64) {
-    sft::mint(&mut storage.treasury_cap, token, value);
+  public(friend) fun mint(storage: &mut SuiPrincipalStorage, slot: u256, value: u64 , ctx: &mut TxContext): SemiFungibleToken<SUI_PRINCIPAL> {
+    sft::mint(&mut storage.treasury_cap, slot, value, ctx)
   }  
 
   // === ADMIN ONLY Functions ===
@@ -132,17 +116,21 @@ module interest_lst::sui_principal {
   }
 
   #[test_only]
-  public fun new_for_testing(
-    storage: &mut SuiPrincipalStorage, 
+   public fun mint_with_supply_for_testing(storage: &mut SuiPrincipalStorage, slot: u256, value: u64 , ctx: &mut TxContext): SemiFungibleToken<SUI_PRINCIPAL> {
+    mint(storage, slot, value, ctx)
+  } 
+
+  #[test_only]
+  public fun mint_for_testing(
     slot: u256, 
     value: u64, 
     ctx: &mut TxContext
   ): SemiFungibleToken<SUI_PRINCIPAL> {
-    new(storage, slot, value, ctx)
+    sft:: mint_for_testing(slot, value, ctx)
   } 
 
   #[test_only]
-  public fun mint_for_testing(storage: &mut SuiPrincipalStorage, token: &mut SemiFungibleToken<SUI_PRINCIPAL>, value: u64) {
-    mint(storage, token, value);
+  public fun burn_for_testing(token: SemiFungibleToken<SUI_PRINCIPAL>): (u256, u64) {
+    sft::burn_for_testing(token)
   }  
 }

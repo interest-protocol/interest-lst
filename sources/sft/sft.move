@@ -2,25 +2,25 @@
 /*
 * Title - Semi Fungible Token
 *
-* Each TOken is fungible within the same slot and non-fungible accross slots
+* Each Token is fungible within the same slot and non-fungible accross slots
 */
 module interest_lst::semi_fungible_token {
   use std::ascii;
+  use std::vector;
   use std::option::{Self, Option};
   use std::string::{String, utf8};
 
   use sui::url::{Self, Url};
   use sui::object::{Self, UID};
-  use sui::table::{Self, Table};
   use sui::tx_context::TxContext;
   use sui::types::is_one_time_witness;
 
   use interest_lst::errors;
+  use interest_lst::semi_fungible_balance::{Self as balance, SFTBalance, SFTSupply};
 
   struct SemiFungibleToken<phantom T> has key, store {
-    id: UID, // Makes it into an NFT
-    slot: u256, // Provides fungibility between the NFTs
-    value: u64, // Value the NFT holds
+    id: UID, 
+    balance: SFTBalance<T>
   }
 
   struct SFTMetadata<phantom T> has key, store {
@@ -35,45 +35,147 @@ module interest_lst::semi_fungible_token {
 
   struct SFTTreasuryCap<phantom T> has key, store {
     id: UID,
-    total_supply: Table<u256, u64>
+    total_supply: SFTSupply<T>
   }
 
-  public fun total_supply_in_slot<T>(cap: &SFTTreasuryCap<T>, slot: u256): u64 {
-    *table::borrow(&cap.total_supply, slot)
+  public fun total_supply<T>(cap: &SFTTreasuryCap<T>, slot: u256): u64 {
+    balance::supply_value(&cap.total_supply, slot)
   }
 
   public fun value<T>(self: &SemiFungibleToken<T>): u64 {
-    self.value
+    balance::value(&self.balance)
+  }
+
+  public fun supply<T>(cap: &SFTTreasuryCap<T>): &SFTSupply<T> {
+    &cap.total_supply
+  }
+
+  public fun supply_mut<T>(cap: &mut SFTTreasuryCap<T>): &mut SFTSupply<T> {
+    &mut cap.total_supply
   }
 
   public fun slot<T>(self: &SemiFungibleToken<T>): u256 {
-    self.slot
-  }
-  
-  public entry fun join<T>(self: &mut SemiFungibleToken<T>, a: SemiFungibleToken<T>) {
-    let SemiFungibleToken { id, value, slot } = a;
-    assert!(self.slot == slot, errors::sft_mismatched_slots());
-    object::delete(id);
-    self.value = self.value + value
+     balance::slot(&self.balance)
   }
 
-  public fun split<T>(self: &mut SemiFungibleToken<T>, split_amount: u64, ctx: &mut TxContext): SemiFungibleToken<T> {
-    // This will throw if it underflows
-    self.value = self.value - split_amount;
+  public fun balance<T>(self: &SemiFungibleToken<T>): &SFTBalance<T> {
+    &self.balance
+  }
+
+  public fun balance_mut<T>(self: &mut SemiFungibleToken<T>): &mut SFTBalance<T> {
+    &mut self.balance
+  }
+
+  public fun from_balance<T>(balance: SFTBalance<T>, ctx: &mut TxContext): SemiFungibleToken<T> {
+    SemiFungibleToken { id: object::new(ctx), balance }
+  }
+
+  public fun into_balance<T>(self: SemiFungibleToken<T>): SFTBalance<T> {
+    let SemiFungibleToken { id, balance } = self;
+    object::delete(id);
+    balance
+  }
+
+  public fun take<T>(balance: &mut SFTBalance<T>, value: u64, ctx: &mut TxContext): SemiFungibleToken<T> {
     SemiFungibleToken {
       id: object::new(ctx),
-      value: split_amount,
-      slot: self.slot
+      balance: balance::split(balance, value)
     }
   }
 
-  public fun zero<T>(cap: &mut SFTTreasuryCap<T>, slot: u256, ctx: &mut TxContext): SemiFungibleToken<T> {
-    new_slot(cap, slot);
+  spec take {
+    let before_val = balance.value;
+    let post after_val = balance.value;
+    ensures after_val = before_val - value;
+
+    let before_slot = balance.slot;
+    let post after_slot = balance.slot;
+    ensures after_slot = before_slot;
+
+    aborts_if value > before_val;
+    aborts_if ctx.ids_created + 1 > MAX_U64;
+  }
+
+  public fun put<T>(balance: &mut SFTBalance<T>, sft: SemiFungibleToken<T>) {
+    balance::join(balance, into_balance(sft));
+  }
+
+  spec put {
+   let before_val = balance.value;
+   let post after_val = balance.value;
+   ensures after_val = before_val + sft.balance.value;
+
+   ensures balance.slot = sft.balance.slot;
+
+   aborts_if before_val + sft.balance.value > MAX_U64;
+  }
+  
+  public entry fun join<T>(self: &mut SemiFungibleToken<T>, a: SemiFungibleToken<T>) {
+    let SemiFungibleToken { id, balance } = a;
+    object::delete(id);
+    balance::join(&mut self.balance, balance);
+  }
+
+  spec join {
+    let before_val = self.balance.value;
+    let post after_val = self.balance.value;
+    ensures after_val == before_val + a.balance.value;
     
+    aborts_if self.balance.slot != a.balance.slot;
+    aborts_if before_val + c.balance.value > MAX_U64;    
+  }
+
+  public fun split<T>(self: &mut SemiFungibleToken<T>, split_amount: u64, ctx: &mut TxContext): SemiFungibleToken<T> {
+    take(&mut self.balance, split_amount, ctx)
+  }
+
+  spec split {
+    let before_val = self.balance.value;
+    let post after_val = self.balance.value;
+    ensures after_val == before_val - split_amount;
+    ensures result.balance.value = split_amount;
+    ensures resut.balance.slot = self.balance.slot;
+
+    aborts_if split_amount > before_val;
+    aborts_if ctx.ids_created + 1 > MAX_U64;
+  }
+
+  public fun divide_into_n<T>(self: &mut SemiFungibleToken<T>, n: u64, ctx: &mut TxContext): vector<SemiFungibleToken<T>> {
+        assert!(n > 0, errors::sft_cannot_divide_into_zero());
+        assert!(n <= value(self), errors::sft_cannot_divide_zero_value());
+
+        let vec = vector::empty();
+        let i = 0;
+        let split_amount = value(self) / n;
+        while ({
+            spec {
+                invariant i <= n-1;
+                invariant self.balance.value == old(self).balance.value - (i * split_amount);
+                invariant ctx.ids_created == old(ctx).ids_created + i;
+            };
+            i < n - 1
+        }) {
+            vector::push_back(&mut vec, split(self, split_amount, ctx));
+            i = i + 1;
+        };
+        vec
+  }
+
+  spec divide_into_n {
+    let before_val = self.balance.value;
+    let post after_val = self.balance.value;
+    let split_amount = before_val / n;
+    ensures after_val == before_val - ((n - 1) * split_amount);
+
+    aborts_if n == 0;
+    aborts_if self.balance.value < n;
+    aborts_if ctx.ids_created + n - 1 > MAX_U64;
+  }
+
+  public fun zero<T>(supply: &mut SFTSupply<T>, slot: u256, ctx: &mut TxContext): SemiFungibleToken<T> {    
     SemiFungibleToken {
       id: object::new(ctx),
-      slot,
-      value: 0
+      balance: balance::zero(supply, slot)
     }
   }
 
@@ -92,7 +194,7 @@ module interest_lst::semi_fungible_token {
     (
       SFTTreasuryCap {
         id: object::new(ctx),
-        total_supply: table::new(ctx)
+        total_supply: balance::create_supply(ctx)
       },  
       SFTMetadata
         {
@@ -107,39 +209,32 @@ module interest_lst::semi_fungible_token {
     )    
   }
 
-  public fun new<T>(cap: &mut SFTTreasuryCap<T>, slot: u256, value: u64, ctx: &mut TxContext): SemiFungibleToken<T> {
-    new_slot(cap, slot);
-
-    let supply = table::borrow_mut(&mut cap.total_supply, slot);
-    *supply = *supply + value;
-
+  public fun mint<T>(cap: &mut SFTTreasuryCap<T>, slot: u256, value: u64, ctx: &mut TxContext): SemiFungibleToken<T> {
     SemiFungibleToken {
       id: object::new(ctx),
-      value,
-      slot
+      balance: mint_balance(cap, slot, value)
     }
-  } 
-
-  public fun mint<T>(cap: &mut SFTTreasuryCap<T>, token: &mut SemiFungibleToken<T>, value: u64) {
-    let supply = table::borrow_mut(&mut cap.total_supply, token.slot);
-    *supply = *supply + value;
-    token.value = token.value + value;
   }
 
-  public fun burn<T>(cap: &mut SFTTreasuryCap<T>, token: &mut SemiFungibleToken<T>, value: u64) {
-    let supply = table::borrow_mut(&mut cap.total_supply, token.slot);
-    *supply = *supply - value;
-    token.value = token.value - value;
+  public fun mint_balance<T>(cap: &mut SFTTreasuryCap<T>, slot: u256, value: u64): SFTBalance<T> {
+    balance::increase_supply(&mut cap.total_supply, slot, value)
+  }
+
+
+  public fun burn<T>(cap: &mut SFTTreasuryCap<T>, token: SemiFungibleToken<T>): u64 {
+    let SemiFungibleToken {id, balance } = token;
+    object::delete(id);
+    balance::decrease_supply(&mut cap.total_supply, balance)
   }
 
   public fun is_zero<T>(token: &SemiFungibleToken<T>): bool {
-    token.value == 0
+    balance::value(&token.balance) == 0
   }
 
-  public fun destroy_zero<T>(token: SemiFungibleToken<T>) {
-    let SemiFungibleToken { id, slot: _ , value  } = token;
-    assert!(value == 0, errors::sft_invalid_witness());
+  public fun burn_zero<T>(token: SemiFungibleToken<T>) {
+    let SemiFungibleToken {id, balance } = token;
     object::delete(id);
+    balance::destroy_zero(balance);
   }
 
   // === Update Token SFTMetadata ===
@@ -212,33 +307,18 @@ module interest_lst::semi_fungible_token {
         metadata.icon_url
     }
 
-  fun new_slot<T>(cap: &mut SFTTreasuryCap<T>, slot: u256) {
-    if (table::contains(&cap.total_supply, slot)) return;
-
-    table::add(&mut cap.total_supply, slot, 0);
-  }  
-
   // === Test-only code ===
 
   #[test_only]
-  public fun create_for_testing<T>(slot: u256, value: u64, ctx: &mut TxContext): SemiFungibleToken<T> {
-    SemiFungibleToken { id: object::new(ctx), slot, value }
+  public fun mint_for_testing<T>(slot: u256, value: u64, ctx: &mut TxContext): SemiFungibleToken<T> {
+    SemiFungibleToken { id: object::new(ctx), balance: balance::create_for_testing(slot, value) }
   }
 
   #[test_only]
-  public fun destroy_for_testing<T>(token: SemiFungibleToken<T>): (u256, u64) {
-    let SemiFungibleToken { id, value, slot } = token;
+  public fun burn_for_testing<T>(token: SemiFungibleToken<T>): (u256, u64) {
+    let SemiFungibleToken { id, balance } = token;
     object::delete(id);
-    (slot, value)
-  }
-
-  #[test_only]
-  public fun mint_for_testing<T>(token: &mut SemiFungibleToken<T>, value: u64) {
-    token.value = token.value + value;
-  }
-
-  #[test_only]
-  public fun burn_for_testing<T>(token: &mut SemiFungibleToken<T>, value: u64) {
-    token.value = token.value -  value;
+    let slot = balance::slot(&balance);
+    (slot, balance::destroy_for_testing(balance))
   }
 }
