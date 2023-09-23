@@ -15,10 +15,7 @@ module interest_lst::semi_fungible_token {
   use sui::tx_context::TxContext;
   use sui::types::is_one_time_witness;
 
-  // Errors
-  const EIncompatibleSlots: u64 = 0;
-  const EBadWitness: u64 = 1;
-  const ETokenHasValue: u64 = 2;
+  use interest_lst::errors;
 
   struct SemiFungibleToken<phantom T> has key, store {
     id: UID, // Makes it into an NFT
@@ -55,7 +52,7 @@ module interest_lst::semi_fungible_token {
   
   public entry fun join<T>(self: &mut SemiFungibleToken<T>, a: SemiFungibleToken<T>) {
     let SemiFungibleToken { id, value, slot } = a;
-    assert!(self.slot == slot, EIncompatibleSlots);
+    assert!(self.slot == slot, errors::sft_mismatched_slots());
     object::delete(id);
     self.value = self.value + value
   }
@@ -90,7 +87,7 @@ module interest_lst::semi_fungible_token {
     icon_url: Option<Url>,
     ctx: &mut TxContext 
   ): (SFTTreasuryCap<T>, SFTMetadata<T>) {
-    assert!(is_one_time_witness(&witness), EBadWitness);
+    assert!(is_one_time_witness(&witness), errors::sft_invalid_witness());
     
     (
       SFTTreasuryCap {
@@ -141,7 +138,7 @@ module interest_lst::semi_fungible_token {
 
   public fun destroy_zero<T>(token: SemiFungibleToken<T>) {
     let SemiFungibleToken { id, slot: _ , value  } = token;
-    assert!(value == 0, ETokenHasValue);
+    assert!(value == 0, errors::sft_invalid_witness());
     object::delete(id);
   }
 

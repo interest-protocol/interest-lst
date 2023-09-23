@@ -16,18 +16,12 @@ module interest_lst::review {
 
   use sui_system::sui_system::{Self, SuiSystemState};
 
+  use interest_lst::errors;
   use interest_lst::isui::ISUI;
   use interest_lst::admin::AdminCap;
   use interest_lst::pool::{Self, PoolStorage};
-  use interest_lst::constants::{one_sui_value};
+  use interest_lst::constants::one_sui_value;
   use interest_lst::soulbound_token::{Self as sbt, InterestSBT};
-
-  const ECannotReviewWithNft: u64 = 0;
-  const EWrongStarNumber: u64 = 1;
-  const ECommentTooLong: u64 = 2;
-  const EAlreadyReviewed: u64 = 3;
-  const ENotReviewed: u64 = 4;
-  const ENotValidator: u64 = 5;
 
   struct Review has store, drop {
     vote: bool,
@@ -109,7 +103,7 @@ module interest_lst::review {
     ctx: &mut TxContext
   ) {
     // verify that the address matches an active validator
-    assert!(vector::contains(&sui_system::active_validator_addresses(system), &validator_address), ENotValidator);
+    assert!(vector::contains(&sui_system::active_validator_addresses(system), &validator_address), errors::not_active_validator());
     
     // if necessary add then get validator to update his stats
     if (!table::contains(&reviews.validators, validator_address)) {
@@ -117,7 +111,7 @@ module interest_lst::review {
     };
     let validator = table::borrow_mut(&mut reviews.validators, validator_address);
     // check that the user didn't review it already
-    assert!(!table::contains(&validator.reviews, tx_context::sender(ctx)), EAlreadyReviewed);
+    assert!(!table::contains(&validator.reviews, tx_context::sender(ctx)), errors::user_already_reviewed());
 
     // verify that nft isn't being cooled down
     let current_epoch = tx_context::epoch(ctx);
@@ -125,7 +119,7 @@ module interest_lst::review {
     // check if the nft is not being cooldowned, if it has already been used to review
     if (table::contains(&reviews.nft_review_epoch, sbt_id)) {
       let prev_epoch = table::borrow_mut(&mut reviews.nft_review_epoch, sbt_id);
-      assert!(current_epoch > *prev_epoch + reviews.cooldown_epochs, ECannotReviewWithNft);
+      assert!(current_epoch > *prev_epoch + reviews.cooldown_epochs, errors::review_on_cooldown());
       // update nft review epoch for cooldown
       *prev_epoch = current_epoch;
     } else {
@@ -171,14 +165,14 @@ module interest_lst::review {
     // get validator to update his stats
     let validator = table::borrow_mut(&mut reviews.validators, validator_address);
     // check that the user did review it already
-    assert!(table::contains(&validator.reviews, tx_context::sender(ctx)), ENotReviewed);
+    assert!(table::contains(&validator.reviews, tx_context::sender(ctx)), errors::validator_not_reviewed());
 
     // verify that nft isn't being cooled down
     let current_epoch = tx_context::epoch(ctx);
     let sbt_id = object::id(sbt);
     let prev_epoch = table::borrow_mut(&mut reviews.nft_review_epoch, sbt_id);
 
-    assert!(current_epoch > *prev_epoch + reviews.cooldown_epochs, ECannotReviewWithNft);
+    assert!(current_epoch > *prev_epoch + reviews.cooldown_epochs, errors::review_on_cooldown());
     // update nft review epoch for cooldown
     *prev_epoch = current_epoch;
 
@@ -230,7 +224,7 @@ module interest_lst::review {
     // get validator to update his stats
     let validator = table::borrow_mut(&mut reviews.validators, validator_address);
     // check that the user did review it already
-    assert!(table::contains(&validator.reviews, tx_context::sender(ctx)), ENotReviewed);
+    assert!(table::contains(&validator.reviews, tx_context::sender(ctx)), errors::validator_not_reviewed());
     // store the previous reputation of the validator
     let prev_validator_reputation = validator.reputation;
     // save the previous vote before deleting the review 
@@ -364,7 +358,7 @@ module interest_lst::review {
   * @return the review
   */
   fun create_review(vote: bool, reputation: u64, comment: String): Review {
-    assert!(ascii::length(&comment) <= 140, ECommentTooLong);
+    assert!(ascii::length(&comment) <= 140, errors::review_comment_too_long());
     // return review
     Review { vote, reputation, comment }
   }

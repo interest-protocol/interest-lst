@@ -1,46 +1,21 @@
 // * ALL CREDITS TO APTOS - https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/fixed_point64.move
 
-// Defines a fixed-point numeric type with a 64-bit integer part and
-/// a 64-bit fractional part.
-
 module interest_lst::fixed_point64 {
+    use interest_lst::errors;
+    use interest_lst::constants::u256_max_u128;
 
-    use interest_lst::constants::{u256_max_u128};
-
-    /// Define a fixed-point numeric type with 64 fractional bits.
-    /// This is just a u128 integer but it is wrapped in a struct to
-    /// make a unique type. This is a binary representation, so decimal
-    /// values may not be exactly representable, but it provides more
-    /// than 9 decimal digits of precision both before and after the
-    /// decimal point (18 digits total). For comparison, double precision
-    /// floating-point has less than 16 decimal digits of precision, so
-    /// be careful about using floating-point to convert these values to
-    /// decimal.
     struct FixedPoint64 has copy, drop, store { value: u128 }
-
-    /// The denominator provided was zero
-    const EDENOMINATOR: u64 = 0x10001;
-    /// The quotient value would be too large to be held in a `u128`
-    const EDIVISION: u64 = 0x20002;
-    /// The multiplied value would be too large to be held in a `u128`
-    const EMULTIPLICATION: u64 = 0x20003;
-    /// A division by zero was encountered
-    const EDIVISION_BY_ZERO: u64 = 0x10004;
-    /// The computed ratio when converting to a `FixedPoint64` would be unrepresentable
-    const ERATIO_OUT_OF_RANGE: u64 = 0x20005;
-    /// Abort code on calculation result is negative.
-    const ENEGATIVE_RESULT: u64 = 0x10006;
 
     /// Returns x - y. x must be not less than y.
     public fun sub(x: FixedPoint64, y: FixedPoint64): FixedPoint64 {
         let x_raw = get_raw_value(x);
         let y_raw = get_raw_value(y);
-        assert!(x_raw >= y_raw, ENEGATIVE_RESULT);
+        assert!(x_raw >= y_raw, errors::negative_result());
         create_from_raw_value(x_raw - y_raw)
     }
     spec sub {
         pragma opaque;
-        aborts_if x.value < y.value with ENEGATIVE_RESULT;
+        aborts_if x.value < y.value with errors::negative_result();
         ensures result.value == x.value - y.value;
     }
 
@@ -49,12 +24,12 @@ module interest_lst::fixed_point64 {
         let x_raw = get_raw_value(x);
         let y_raw = get_raw_value(y);
         let result = (x_raw as u256) + (y_raw as u256);
-        assert!(result <= u256_max_u128(), ERATIO_OUT_OF_RANGE);
+        assert!(result <= u256_max_u128(), errors::fixed_point64_out_of_range());
         create_from_raw_value((result as u128))
     }
     spec add {
         pragma opaque;
-        aborts_if (x.value as u256) + (y.value as u256) > MAX_U128 with ERATIO_OUT_OF_RANGE;
+        aborts_if (x.value as u256) + (y.value as u256) > MAX_U128 with errors::fixed_point64_out_of_range();
         ensures result.value == x.value + y.value;
     }
 
@@ -70,7 +45,7 @@ module interest_lst::fixed_point64 {
         // so rescale it by shifting away the low bits.
         let product = unscaled_product >> 64;
         // Check whether the value is too large.
-        assert!(product <= u256_max_u128(), EMULTIPLICATION);
+        assert!(product <= u256_max_u128(), errors::multiplication_u128_overflow());
         (product as u128)
     }
     spec multiply_u128 {
@@ -81,7 +56,7 @@ module interest_lst::fixed_point64 {
     spec schema MultiplyAbortsIf {
         val: num;
         multiplier: FixedPoint64;
-        aborts_if spec_multiply_u128(val, multiplier) > MAX_U128 with EMULTIPLICATION;
+        aborts_if spec_multiply_u128(val, multiplier) > MAX_U128 with errors::multiplication_u128_overflow();
     }
     spec fun spec_multiply_u128(val: num, multiplier: FixedPoint64): num {
         (val * multiplier.value) >> 64
@@ -92,13 +67,13 @@ module interest_lst::fixed_point64 {
     /// is zero or if the quotient overflows.
     public fun divide_u128(val: u128, divisor: FixedPoint64): u128 {
         // Check for division by zero.
-        assert!(divisor.value != 0, EDIVISION_BY_ZERO);
+        assert!(divisor.value != 0, errors::zero_division());
         // First convert to 256 bits and then shift left to
         // add 64 fractional zero bits to the dividend.
         let scaled_value = (val as u256) << 64;
         let quotient = scaled_value / (divisor.value as u256);
         // Check whether the value is too large.
-        assert!(quotient <= u256_max_u128(), EDIVISION);
+        assert!(quotient <= u256_max_u128(), errors::division_u128_overflow());
         // the value may be too large, which will cause the cast to fail
         // with an arithmetic error.
         (quotient as u128)
@@ -111,8 +86,8 @@ module interest_lst::fixed_point64 {
     spec schema DivideAbortsIf {
         val: num;
         divisor: FixedPoint64;
-        aborts_if divisor.value == 0 with EDIVISION_BY_ZERO;
-        aborts_if spec_divide_u128(val, divisor) > MAX_U128 with EDIVISION;
+        aborts_if divisor.value == 0 with errors::zero_division();
+        aborts_if spec_divide_u128(val, divisor) > MAX_U128 with errors::division_u128_overflow();
     }
     spec fun spec_divide_u128(val: num, divisor: FixedPoint64): num {
         (val << 64) / divisor.value
@@ -133,12 +108,12 @@ module interest_lst::fixed_point64 {
         // Scale the numerator to have 64 fractional bits, so that the quotient will have 64
         // fractional bits.
         let scaled_numerator = (numerator as u256) << 64;
-        assert!(denominator != 0, EDENOMINATOR);
+        assert!(denominator != 0, errors::zero_denominator());
         let quotient = scaled_numerator / (denominator as u256);
-        assert!(quotient != 0 || numerator == 0, ERATIO_OUT_OF_RANGE);
+        assert!(quotient != 0 || numerator == 0, errors::fixed_point64_out_of_range());
         // Return the quotient as a fixed-point number. We first need to check whether the cast
         // can succeed.
-        assert!(quotient <= u256_max_u128(), ERATIO_OUT_OF_RANGE);
+        assert!(quotient <= u256_max_u128(), errors::fixed_point64_out_of_range());
         FixedPoint64 { value: (quotient as u128) }
     }
     spec create_from_rational {
@@ -153,9 +128,9 @@ module interest_lst::fixed_point64 {
         let scaled_numerator = (numerator as u256)<< 64;
         let scaled_denominator = (denominator as u256);
         let quotient = scaled_numerator / scaled_denominator;
-        aborts_if scaled_denominator == 0 with EDENOMINATOR;
-        aborts_if quotient == 0 && scaled_numerator != 0 with ERATIO_OUT_OF_RANGE;
-        aborts_if quotient > MAX_U128 with ERATIO_OUT_OF_RANGE;
+        aborts_if scaled_denominator == 0 with errors::zero_denominator();
+        aborts_if quotient == 0 && scaled_numerator != 0 with errors::fixed_point64_out_of_range();
+        aborts_if quotient > MAX_U128 with errors::fixed_point64_out_of_range();
     }
     spec fun spec_create_from_rational(numerator: num, denominator: num): FixedPoint64 {
         FixedPoint64{value: (numerator << 128) / (denominator << 64)}

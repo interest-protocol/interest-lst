@@ -6,11 +6,7 @@ module interest_lst::admin {
   use sui::object::{Self, UID};
   use sui::tx_context::{Self, TxContext};
 
-
-  const ENoZeroAddress: u64 = 0;
-  const ENotAllowed: u64 = 1;
-  const ENotAccepted: u64 = 2;
-
+  use interest_lst::errors;
 
   // The owner of this object can add and remove minters + update the metadata
   struct AdminCap has key {
@@ -72,7 +68,7 @@ module interest_lst::admin {
   * @recipient the new admin address
   */
   entry public fun start_transfer_admin(_: &AdminCap, storage: &mut AdminStorage, recipient: address) {
-    assert!(recipient != @0x0, ENoZeroAddress);
+    assert!(recipient != @0x0, errors::zero_address());
     storage.pending_admin = recipient;
     storage.accepted = false;
 
@@ -102,7 +98,7 @@ module interest_lst::admin {
   * @recipient the new admin address
   */
   entry public fun accept_transfer_admin(storage: &mut AdminStorage, ctx: &mut TxContext) {
-    assert!(tx_context::sender(ctx) == storage.pending_admin, ENotAllowed);
+    assert!(tx_context::sender(ctx) == storage.pending_admin, errors::admin_invalid_accept_sender());
     storage.accepted = true;
 
     emit(AcceptTransferAdmin {
@@ -118,7 +114,7 @@ module interest_lst::admin {
   */
   entry public fun transfer_admin(cap: AdminCap, storage: &mut AdminStorage) {
     // New admin must accept the capability
-    assert!(storage.accepted, ENotAccepted);
+    assert!(storage.accepted, errors::admin_not_accepted());
 
     storage.accepted = false;
     let new_admin = storage.pending_admin;

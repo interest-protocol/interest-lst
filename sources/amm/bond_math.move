@@ -6,11 +6,9 @@ module interest_lst::bond_math {
 
   use interest_lst::math_fixed64::pow;
   use interest_lst::math::{fmul, fdiv};
-  use interest_lst::constants::{one_sui_value};
+  use interest_lst::constants::one_sui_value;
   use interest_lst::fixed_point64::{Self, FixedPoint64};
   use interest_lst::semi_fungible_token::{Self as sft, SemiFungibleToken};
-
-  const EZeroDivision: u64 = 0;
 
   // Zero-Coupon Price = Par Value / (1+r)^n
   /*

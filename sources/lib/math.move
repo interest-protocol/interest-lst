@@ -2,16 +2,15 @@
 // It should give enough precision as Sui Coins have 9 decimals
 module interest_lst::math {
 
-  use interest_lst::constants::{one_sui_value};
-  
-  const EZeroDivision: u64 = 0;
+  use interest_lst::errors;
+  use interest_lst::constants::one_sui_value;
 
   public fun fmul(x: u128, y: u128): u128 {
      (mul_div(x, y, (one_sui_value() as u128)) as u128)
   }
 
   public fun fdiv(x: u128, y: u128): u128 {
-    assert!(y != 0, EZeroDivision);
+    assert!(y != 0, errors::zero_division());
     (mul_div(x, (one_sui_value() as u128), y) as u128)
   }
 
@@ -46,7 +45,7 @@ module interest_lst::math {
       y: u128;
       z: u128;
       aborts_if y != z && x > z && z == 0;
-      aborts_if y != z && x > z && z!=0 && x/z*y > MAX_U128;
+      aborts_if y != z && x > z && z != 0 && x / z * y > MAX_U128;
       aborts_if y != z && x <= z && z == 0;
       //a * b overflow
       aborts_if y != z && x <= z && x / z * (x % z) > MAX_U128;

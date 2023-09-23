@@ -8,7 +8,7 @@ module interest_lst::entry {
   use interest_lst::isui::{ISUI, InterestSuiStorage};
   use interest_lst::sui_yield::{SuiYieldStorage, SuiYield};
   use interest_lst::pool::{Self, PoolStorage};
-  use interest_lst::semi_fungible_token::{SemiFungibleToken};
+  use interest_lst::semi_fungible_token::SemiFungibleToken;
   use interest_lst::sui_principal::{SuiPrincipalStorage, SUI_PRINCIPAL};
   use interest_lst::asset_utils::{
     handle_coin_vector, 

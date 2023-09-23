@@ -1,7 +1,7 @@
 // A module to easily calculate the amount of shares of an elastic pool of assets
 module interest_lst::rebase {
 
-  use interest_lst::math::{mul_div};
+  use interest_lst::math::mul_div;
 
   struct Rebase has store, copy {
     base: u128,

@@ -21,11 +21,9 @@ module interest_lst::soulbound_token {
   use sui::tx_context::{Self, TxContext};
   use sui::package::{Self, Publisher};
 
+  use interest_lst::errors;
   use interest_lst::admin::AdminCap;
-  use interest_lst::constants::{ten_years_epochs};
-
-  const EStillLocked: u64 = 0;
-  const ETooLong: u64 = 1;
+  use interest_lst::constants::ten_years_epochs;
 
   struct SOULBOUND_TOKEN has drop {}
 
@@ -204,7 +202,7 @@ module interest_lst::soulbound_token {
   */
   public fun lock_asset<Asset: key + store>(sbt: &mut InterestSBT, asset: Asset, number_of_epochs: u64, ctx: &mut TxContext) {
     // We add a maximum of ten years
-    assert!(ten_years_epochs() >= number_of_epochs, ETooLong);
+    assert!(ten_years_epochs() >= number_of_epochs, errors::sbt_lock_period_too_long());
     let type = type_name::get<Asset>();
 
     let unlock_epoch = tx_context::epoch(ctx) + number_of_epochs;
@@ -222,7 +220,7 @@ module interest_lst::soulbound_token {
 
     let LockedAsset { unlock_epoch, assets } = bag::remove<TypeName, LockedAsset<Asset>>(&mut sbt.locked_assets, type);
     // verify the asset is no longer locked
-    assert!(unlock_epoch < tx_context::epoch(ctx), EStillLocked);
+    assert!(unlock_epoch < tx_context::epoch(ctx), errors::sbt_assets_still_locked());
     assets
   } 
 

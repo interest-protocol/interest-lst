@@ -20,10 +20,11 @@ module interest_lst::pool {
   use sui_system::staking_pool::{Self, StakedSui};
   use sui_system::sui_system::{Self, SuiSystemState};
 
+  use interest_lst::errors;
   use interest_lst::admin::AdminCap;
   use interest_lst::math::{fmul, fdiv};
   use interest_lst::rebase::{Self, Rebase};
-  use interest_lst::constants::{one_sui_value};
+  use interest_lst::constants::one_sui_value;
   use interest_lst::semi_fungible_token::SemiFungibleToken;
   use interest_lst::isui::{Self, ISUI, InterestSuiStorage};
   use interest_lst::sui_yield::{Self, SuiYield, SuiYieldStorage};
@@ -32,16 +33,6 @@ module interest_lst::pool {
   use interest_lst::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
 
   friend interest_lst::review;
-
-  // ** Errors
-
-  const EInvalidFee: u64 = 0; // All values inside the Fees Struct must be equal or below 1e18 as it represents 100%
-  const EMistmatchedValues: u64 = 1; // Sender did not provide the same quantity of Yield and Principal
-  const EInvalidStakeAmount: u64 = 2; // The sender tried to unstake more than he is allowed 
-  const ETooEarly: u64 = 3; // User tried to redeem tokens before their maturity
-  const EInvalidMaturity: u64 = 4; // Sender tried to create a bond with an outdated maturity
-  const EInvalidBackupMaturity: u64 = 5; // Sender tried to abuse the maturity 
-  const EMistmatchedSlots: u64 = 6; // Sender tried to call a bond with SFTs with different slots
 
   // ** Structs
 
@@ -392,7 +383,7 @@ module interest_lst::pool {
     ctx: &mut TxContext,
   ):(SemiFungibleToken<SUI_PRINCIPAL>, SuiYield) {
     // It makes no sense to create an expired bond
-    assert!(maturity >= tx_context::epoch(ctx), EInvalidMaturity);
+    assert!(maturity >= tx_context::epoch(ctx), errors::pool_outdated_maturity());
 
     let token_amount = coin::value(&token);
     mint_isui_logic(wrapper, storage, token, validator_address, ctx);
@@ -464,9 +455,9 @@ module interest_lst::pool {
     let slot = (sui_yield::slot(&sft_yield) as u64);
     
     // They must be with the same slot
-    assert!((slot as u256) == sui_principal::slot(&sft_principal), EMistmatchedSlots);
+    assert!((slot as u256) == sui_principal::slot(&sft_principal), errors::pool_mismatched_maturity());
     // They must have the same value
-    assert!(sui_yield::value(&sft_yield) == sui_principal::value(&sft_principal), EMistmatchedValues);
+    assert!(sui_yield::value(&sft_yield) == sui_principal::value(&sft_principal), errors::pool_mismatched_values());
 
     // Need to update the entire state of Sui/Sui Rewards once every epoch
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
@@ -507,7 +498,7 @@ module interest_lst::pool {
     validator_address: address,
     ctx: &mut TxContext,
   ): Coin<SUI> {
-    assert!(tx_context::epoch(ctx) >= (sui_principal::slot(&token) as u64), ETooEarly);
+    assert!(tx_context::epoch(ctx) >= (sui_principal::slot(&token) as u64), errors::pool_bond_not_matured());
 
     // Need to update the entire state of Sui/Sui Rewards once every epoch
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
@@ -615,7 +606,7 @@ module interest_lst::pool {
   ) {
     let max = (one_sui_value() as u128);
     // scalar represents 100% - the protocol does not allow a fee higher than that.
-    assert!(max >= base && max >= kink && max >= jump, EInvalidFee);
+    assert!(max >= base && max >= kink && max >= jump, errors::pool_invalid_fee());
 
     // Update the fee values
     set_fee(&mut storage.fee, base, kink, jump);
@@ -667,7 +658,7 @@ module interest_lst::pool {
     let stake_value = coin::value(&token);
 
     // Will save gas since the sui_system will throw
-    assert!(stake_value >= one_sui_value(), EInvalidStakeAmount);
+    assert!(stake_value >= one_sui_value(), errors::pool_invalid_stake_amount());
     
     // Need to update the entire state of Sui/Sui Rewards once every epoch
     // The dev team will update once every 24 hours so users do not need to pay for this insane gas cost
@@ -946,7 +937,7 @@ module interest_lst::pool {
         linked_table::borrow(&storage.pool_history, slot)
       } else {
         // Back up maturity needs to be before the slot
-        assert!(slot > maturity, EInvalidBackupMaturity);
+        assert!(slot > maturity, errors::pool_invalid_backup_maturity());
         linked_table::borrow(&storage.pool_history, maturity)
       };
 

@@ -6,7 +6,7 @@ module interest_lst::query {
 
   use sui_system::staking_pool;
   
-  use interest_lst::fee_utils::{calculate_fee_percentage};
+  use interest_lst::fee_utils::calculate_fee_percentage;
   use interest_lst::pool::{Self, PoolStorage, ValidatorData};
 
   struct StakePosition has store, drop {
