@@ -56,8 +56,7 @@ module interest_lst::semi_fungible_balance {
     value
   }
 
-  public fun zero<T>(supply: &mut SFTSupply<T>, slot: u256): SFTBalance<T> {
-    new_slot(supply, slot);
+  public fun zero<T>(slot: u256): SFTBalance<T> {
     SFTBalance { slot, value: 0 }
   }
 

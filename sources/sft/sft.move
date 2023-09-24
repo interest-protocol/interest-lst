@@ -172,10 +172,10 @@ module interest_lst::semi_fungible_token {
     aborts_if ctx.ids_created + n - 1 > MAX_U64;
   }
 
-  public fun zero<T>(supply: &mut SFTSupply<T>, slot: u256, ctx: &mut TxContext): SemiFungibleToken<T> {    
+  public fun zero<T>(slot: u256, ctx: &mut TxContext): SemiFungibleToken<T> {    
     SemiFungibleToken {
       id: object::new(ctx),
-      balance: balance::zero(supply, slot)
+      balance: balance::zero(slot)
     }
   }
 

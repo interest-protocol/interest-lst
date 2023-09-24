@@ -61,8 +61,8 @@ module interest_lst::sui_principal {
     sft::slot(self)
   }
 
-  public fun zero(storage: &mut SuiPrincipalStorage, slot: u256, ctx: &mut TxContext): SemiFungibleToken<SUI_PRINCIPAL> {
-    sft::zero(sft::supply_mut(&mut storage.treasury_cap), slot, ctx)
+  public fun zero(slot: u256, ctx: &mut TxContext): SemiFungibleToken<SUI_PRINCIPAL> {
+    sft::zero( slot, ctx)
   }
 
   public fun is_zero(token: &SemiFungibleToken<SUI_PRINCIPAL>): bool {

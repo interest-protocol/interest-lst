@@ -108,10 +108,10 @@ module interest_lst::sui_yield {
     x
   }
 
-  public fun zero(storage: &mut SuiYieldStorage, slot: u256, ctx: &mut TxContext): SuiYield {
+  public fun zero(slot: u256, ctx: &mut TxContext): SuiYield {
     SuiYield {
       id: object::new(ctx),
-      sft: sft::zero(sft::supply_mut(&mut storage.treasury_cap), slot, ctx),
+      sft: sft::zero( slot, ctx),
       shares: 0, 
       rewards_paid: 0
     }
@@ -187,7 +187,7 @@ module interest_lst::sui_yield {
   }
 
   public(friend) fun expire(storage: &mut SuiYieldStorage, token: SuiYield, ctx: &mut TxContext): SuiYield {
-    let x = zero(storage, slot(&token),  ctx);
+    let x = zero(slot(&token),  ctx);
     burn(storage, token);
     x
   }
