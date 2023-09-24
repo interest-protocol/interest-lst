@@ -405,7 +405,7 @@ module interest_lst::pool {
     let shares_amount = rebase::to_base(&storage.pool, sui_amount, false);
 
     // mint_isui_logic will update the pool
-    let sft_yield = sui_yield::new( 
+    let sft_yield = sui_yield::mint( 
       sui_yield_storage,
       (maturity as u256),
       sui_amount,
@@ -413,7 +413,7 @@ module interest_lst::pool {
       ctx
     );
 
-    let sft_principal = sui_principal::new(sui_principal_storage, (maturity as u256), sui_amount, ctx);
+    let sft_principal = sui_principal::mint(sui_principal_storage, (maturity as u256), sui_amount, ctx);
 
     emit(MintStrippedBond { 
       sender: tx_context::sender(ctx), 
@@ -465,8 +465,8 @@ module interest_lst::pool {
 
     // Destroy both tokens
     // Calculate how much Sui they are worth
-    let sui_value_to_return = get_pending_yield_logic(storage, &sft_yield, maturity, ctx) + sui_principal::burn_destroy(sui_principal_storage, sft_principal);
-    sui_yield::burn_destroy(sui_yield_storage, sft_yield);
+    let sui_value_to_return = get_pending_yield_logic(storage, &sft_yield, maturity, ctx) + sui_principal::burn(sui_principal_storage, sft_principal);
+    sui_yield::burn(sui_yield_storage, sft_yield);
 
     emit(CallBond { 
       sui_amount: 
@@ -506,7 +506,7 @@ module interest_lst::pool {
 
     // 1 Sui Principal is always 1 SUI
     // Burn the Sui Principal
-    let sui_value_to_return = sui_principal::burn_destroy(sui_principal_storage, token);
+    let sui_value_to_return = sui_principal::burn(sui_principal_storage, token);
 
     // We need to update the pool
     rebase::sub_elastic(&mut storage.pool, sui_value_to_return, false);
@@ -540,11 +540,10 @@ module interest_lst::pool {
     // Destroy both tokens
     // Calculate how much Sui they are worth
     let sui_amount = get_pending_yield(wrapper, storage, &sft_yield, maturity, ctx);
+    let is_sui_amount_zero = sui_amount == 0;
 
     // SuiYield has expired
-    if (sui_amount == 0) {
-      sui_yield::expire(sui_yield_storage, &mut sft_yield);
-    } else {
+    if (!is_sui_amount_zero) {
       // Consider yield paid
       sui_yield::add_rewards_paid(&mut sft_yield, sui_amount);
       // We need to update the pool
@@ -554,7 +553,9 @@ module interest_lst::pool {
     emit(ClaimYield { sui_yield_id: object::id(&sft_yield), sui_amount, sender: tx_context::sender(ctx) });
 
     // Unstake Sui
-    (sft_yield, remove_staked_sui(wrapper, storage, sui_amount, validator_address, ctx))
+    (
+    if (is_sui_amount_zero) 
+      { sui_yield::expire(sui_yield_storage, sft_yield, ctx)} else { sft_yield }, remove_staked_sui(wrapper, storage, sui_amount, validator_address, ctx))
   }
 
   // ** Functions to handle Whitelist validators

@@ -6,8 +6,8 @@ module interest_lst::bond_math_tests {
   use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
 
   use interest_lst::fixed_point64;
+  use interest_lst::sui_principal;
   use interest_lst::semi_fungible_token as sft;
-  use interest_lst::sui_principal::{Self, SuiPrincipalStorage};
   use interest_lst::test_utils::{people, scenario, add_decimals}; 
   use interest_lst::bond_math::{
     get_coupon_price, 
@@ -30,10 +30,8 @@ module interest_lst::bond_math_tests {
 
     next_tx(test, alice);
     {
-      let interest_sui_principal_storage = test::take_shared<SuiPrincipalStorage>(test);
 
-      let sft = sui_principal::new_for_testing(
-        &mut interest_sui_principal_storage,
+      let sft = sui_principal::mint_for_testing(
         1510,
         add_decimals(1000, 9),
         ctx(test)
@@ -67,8 +65,7 @@ module interest_lst::bond_math_tests {
 
       // very large bond
       // 1 Billion Sui bond
-      let big_sft = sui_principal::new_for_testing(
-        &mut interest_sui_principal_storage,
+      let big_sft = sui_principal::mint_for_testing(
         1510,
         add_decimals(1_000_000_000, 9),
         ctx(test)
@@ -83,10 +80,9 @@ module interest_lst::bond_math_tests {
         999890422967346044// ~999 SUI
       );
 
-      sui_principal::burn_destroy(&mut interest_sui_principal_storage, sft);
-      sui_principal::burn_destroy(&mut interest_sui_principal_storage, big_sft);
+      sui_principal::burn_for_testing( sft);
+      sui_principal::burn_for_testing( big_sft);
 
-      test::return_shared(interest_sui_principal_storage);
     };
     test::end(scenario); 
   }
@@ -132,7 +128,7 @@ module interest_lst::bond_math_tests {
     // So we can convert Sui to Sui Naked Bond and vice versa
     next_tx(test, alice);
     {
-      let sft = sft::create_for_testing<Test>(
+      let sft = sft::mint_for_testing<Test>(
         1510,
         add_decimals(1000, 9),
         ctx(test)
@@ -170,7 +166,7 @@ module interest_lst::bond_math_tests {
         136972198 // ~ less than a dollar
       );
 
-      sft::destroy_for_testing( sft);
+      sft::burn_for_testing( sft);
 
     };
     test::end(scenario); 

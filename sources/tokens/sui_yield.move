@@ -62,8 +62,8 @@ module interest_lst::sui_yield {
 
   // === Open Functions ===
 
-  public fun total_supply_in_slot(storage: &SuiYieldStorage, slot: u256): u64 {
-    sft::total_supply_in_slot(&storage.treasury_cap, slot)
+  public fun total_supply(storage: &SuiYieldStorage, slot: u256): u64 {
+    sft::total_supply(&storage.treasury_cap, slot)
   }
 
   public fun value(token: &SuiYield): u64 {
@@ -108,10 +108,10 @@ module interest_lst::sui_yield {
     x
   }
 
-  public fun zero(storage: &mut SuiYieldStorage, slot: u256, ctx: &mut TxContext): SuiYield {
+  public fun zero(slot: u256, ctx: &mut TxContext): SuiYield {
     SuiYield {
       id: object::new(ctx),
-      sft: sft::zero(&mut storage.treasury_cap, slot, ctx),
+      sft: sft::zero( slot, ctx),
       shares: 0, 
       rewards_paid: 0
     }
@@ -133,26 +133,24 @@ module interest_lst::sui_yield {
     sft::is_zero(&token.sft)
   }
 
-  public fun destroy_zero(token: SuiYield) {
+  public fun burn_zero(token: SuiYield) {
     let SuiYield {sft: a, id, rewards_paid: _, shares: _} = token;
-    sft::destroy_zero(a);
+    sft::burn_zero(a);
     object::delete(id);
   }
 
-  public fun burn(storage: &mut SuiYieldStorage, token: &mut SuiYield, value: u64) {
-    sft::burn(&mut storage.treasury_cap,&mut token.sft, value);
-  } 
+  public fun burn(storage: &mut SuiYieldStorage, token: SuiYield): (u64, u64, u64) {
+    let (x, y, z) = read_data(&token);
 
-  public fun burn_destroy(storage: &mut SuiYieldStorage, token: SuiYield): u64 {
-    let value = value(&token);
-    burn(storage, &mut token, value);
-    destroy_zero(token);
-    value
+    let SuiYield { id, sft, shares:_, rewards_paid:_} = token;
+    object::delete(id);
+    sft::burn(&mut storage.treasury_cap, sft);
+    (x, y, z)
   } 
 
   // === FRIEND ONLY Functions ===
 
-  public(friend) fun new(
+  public(friend) fun mint(
     storage: &mut SuiYieldStorage, 
     slot: u256, 
     principal: u64, 
@@ -161,15 +159,11 @@ module interest_lst::sui_yield {
   ): SuiYield {
     SuiYield {
       id: object::new(ctx),
-      sft: sft::new(&mut storage.treasury_cap, slot, principal, ctx),
+      sft: sft::mint(&mut storage.treasury_cap, slot, principal, ctx),
       shares,
       rewards_paid: 0 
     }
   } 
-
-  public(friend) fun mint(storage: &mut SuiYieldStorage, token: &mut SuiYield, value: u64) {
-    sft::mint(&mut storage.treasury_cap, &mut token.sft, value);
-  }   
 
   public(friend) fun add_rewards_paid(
     token: &mut SuiYield,
@@ -192,11 +186,10 @@ module interest_lst::sui_yield {
     token.rewards_paid =  rewards_paid;
   }
 
-  public(friend) fun expire(storage: &mut SuiYieldStorage, token: &mut SuiYield) {
-    token.rewards_paid = 0;
-    token.shares = 0;
-    let burn_value = value(token);
-    burn(storage, token, burn_value);
+  public(friend) fun expire(storage: &mut SuiYieldStorage, token: SuiYield, ctx: &mut TxContext): SuiYield {
+    let x = zero(slot(&token),  ctx);
+    burn(storage, token);
+    x
   }
 
   // === ADMIN ONLY Functions ===
@@ -232,8 +225,18 @@ module interest_lst::sui_yield {
   }
 
   #[test_only]
-  public fun new_for_testing(
+  public fun mint_with_supply_for_testing(
     storage: &mut SuiYieldStorage, 
+    slot: u256, 
+    principal: u64, 
+    shares: u64, 
+    ctx: &mut TxContext
+  ): SuiYield {
+    mint(storage, slot, principal, shares, ctx)
+  } 
+
+  #[test_only]
+  public fun mint_for_testing(
     slot: u256, 
     principal: u64, 
     shares: u64,
@@ -242,16 +245,21 @@ module interest_lst::sui_yield {
   ): SuiYield {
     SuiYield {
       id: object::new(ctx),
-      sft: sft::new(&mut storage.treasury_cap, slot, principal, ctx),
+      sft: sft::mint_for_testing( slot, principal, ctx),
       shares,
       rewards_paid
     }
-  } 
+  }  
 
   #[test_only]
-  public fun mint_for_testing(storage: &mut SuiYieldStorage, token: &mut SuiYield, value: u64) {
-    mint(storage, token, value);
-  }   
+  public fun burn_for_testing(token: SuiYield): (u64, u64, u64) {
+    let (x, y, z) = read_data(&token);
+
+    let SuiYield { id, sft, shares:_, rewards_paid:_} = token;
+    object::delete(id);
+    sft::burn_for_testing(sft);
+    (x, y, z)
+  } 
 
   #[test_only]
   public fun add_rewards_paid_for_testing(

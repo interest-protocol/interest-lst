@@ -373,7 +373,9 @@ module interest_lst::pool_tests {
       assert_eq(validator_total_principal, add_decimals(10, 9));
       assert_eq(linked_table::length(staked_sui_table), 1);
 
-      assert_eq(sui_principal::burn_destroy(&mut interest_sui_principal_storage, residue), add_decimals(10, 9));
+      let (_, residue_value) = sui_principal::burn_for_testing(residue);
+
+      assert_eq(residue_value, add_decimals(10, 9));
 
       // ISUI_YC has the same minting logic as ISUI
       let (shares, principal, rewards_paid) = sui_yield::read_data(&coupon);
@@ -381,7 +383,7 @@ module interest_lst::pool_tests {
       assert_eq(shares, add_decimals(10, 9));
       assert_eq(rewards_paid, 0);
 
-      sui_yield::burn_destroy(&mut interest_sui_yield_Storage, coupon);
+      sui_yield::burn_for_testing( coupon);
 
       test::return_shared(interest_sui_yield_Storage);
       test::return_shared(interest_sui_principal_storage);
@@ -443,12 +445,11 @@ module interest_lst::pool_tests {
       let old_base = rebase::base(pool_rebase);
  
 
-      let coupon = sui_yield::new_for_testing(
-        &mut interest_sui_yield_Storage, 
+      let coupon = sui_yield::mint_with_supply_for_testing(
+        &mut interest_sui_yield_Storage,
         20, 
         principal_amount, 
         principal_amount, 
-        0, 
         ctx(test)
       );
 
@@ -464,7 +465,7 @@ module interest_lst::pool_tests {
 
       let shares_burned = rebase::to_base(pool_rebase, principal_amount + yield_amount, false);
 
-      let residue = sui_principal::new_for_testing(
+      let residue = sui_principal::mint_with_supply_for_testing(
         &mut interest_sui_principal_storage,
         20,
         principal_amount,
@@ -528,7 +529,7 @@ module interest_lst::pool_tests {
 
       pool::update_pool(&mut wrapper, &mut pool_storage, ctx(test));
 
-      let residue = sui_principal::new_for_testing(&mut interest_sui_principal_storage, 1, add_decimals(10, 9), ctx(test));
+      let residue = sui_principal::mint_with_supply_for_testing(&mut interest_sui_principal_storage, 1, add_decimals(10, 9), ctx(test));
 
       let (pool_rebase, _, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
@@ -590,8 +591,8 @@ module interest_lst::pool_tests {
 
       let value = add_decimals(10, 9);
 
-      let coupon = sui_yield::new_for_testing(
-        &mut interest_sui_yield_Storage, 10, value, value, 800000, ctx(test));
+      let coupon = sui_yield::mint_for_testing(
+         10, value, value, 800000, ctx(test));
 
       let (pool_rebase, _, _, _, _, _, _) = pool::read_pool_storage(&pool_storage);
 
@@ -619,7 +620,7 @@ module interest_lst::pool_tests {
       assert_eq(rebase::base(pool_rebase), old_base - shares_burned);
       assert_eq(rebase::elastic(pool_rebase), old_elastic - yield_earned);
       
-      sui_yield::burn_destroy(&mut interest_sui_yield_Storage, coupon_returned);
+      sui_yield::burn_for_testing( coupon_returned);
 
       test::return_shared(interest_sui_yield_Storage);
       test::return_shared(wrapper);
