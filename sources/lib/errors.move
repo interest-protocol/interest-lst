@@ -74,4 +74,6 @@ module interest_lst::errors {
   public fun amm_pool_already_exists(): u64 { 33 }
 
   public fun amm_invalid_fee(): u64 { 34 }
+
+  public fun amm_invalid_r(): u64 { 35 }
 }

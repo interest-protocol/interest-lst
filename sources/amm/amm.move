@@ -30,7 +30,8 @@ module interest_lst::amm {
 
   struct Registry has key {
     id: UID,
-    pools: VecSet<u64>
+    pools: VecSet<u64>,
+    initial_r: FixedPoint64
   }
 
   struct Pool has key {
@@ -75,18 +76,18 @@ module interest_lst::amm {
     transfer::share_object(
       Registry {
         id: object::new(ctx),
-        pools: vec_set::empty()
+        pools: vec_set::empty(),
+        // 2.87% based AAVE USDC Supply Yield
+        initial_r: fixed_point64::create_from_rational(287,  10000 * 365)
       }
     );
   }
 
   public fun create_pool(
-    _: &AdminCap,
     registry: &mut Registry,
     wrapper: &mut SuiSystemState,
     lst_storage: &mut LSTStorage, 
     lp_storage: &mut LPTokenStorage,
-    r: FixedPoint64,
     coin_isui: Coin<ISUI>,
     principal: SFT<SUI_PRINCIPAL>,
     ctx: &mut TxContext
@@ -98,7 +99,7 @@ module interest_lst::amm {
     // Calculate how much iSui is worth in principal
     let principal_optimal_value = bond_math::get_zero_coupon_bond_amount(
       lst::get_exchange_rate_isui_to_sui(wrapper, lst_storage, coin::value(&coin_isui), ctx),
-      r,
+      registry.initial_r,
       maturity - tx_context::epoch(ctx)
     );
     
@@ -115,7 +116,7 @@ module interest_lst::amm {
       isui_balance: coin::into_balance(coin_isui),
       principal_balance: sft::into_balance(principal),
       k: (principal_optimal_value as u128) * 2,
-      r,
+      r: registry.initial_r,
       maturity,
       fee: 0,
       fee_isui_balance: balance::zero(),
@@ -126,7 +127,7 @@ module interest_lst::amm {
     emit(CreatePool { 
       pool_id: object::id(&pool), 
       k: pool.k, 
-      r: fixed_point64::round(r), 
+      r: fixed_point64::round(pool.r), 
       maturity 
     });
 
@@ -142,15 +143,19 @@ module interest_lst::amm {
 
    // ** Admin Functions
 
-   public fun update_r(_: &AdminCap, pool: &mut Pool, r: FixedPoint64) {
+   public fun update_r(_: &AdminCap, pool: &mut Pool, r_numerator: u64) {
+    // Cannot be higher than 20%
+    assert!(2000 >= r_numerator, errors::amm_invalid_r());
+
     let old_r = pool.r;
 
-    pool.r = r;
+    pool.r = fixed_point64::create_from_rational(436,  10000 * 365);
 
     emit(UpdateR { pool_id: 
       object::id(pool), 
       old_r: fixed_point64::round(old_r), 
-      new_r: fixed_point64::round(r) }
+      new_r: fixed_point64::round(pool.r) 
+      }
     );
    }
 
