@@ -19,4 +19,20 @@ module interest_lst::constants {
   public fun ten_years_epochs(): u64 {
     3_650
   }
+
+  public fun initial_r_numerator(): u128 {
+    287
+  }
+
+  public fun min_amm_lp_token_value(): u64 {
+    100
+  }
+
+  public fun n_denominator(): u128 {
+    3650000
+  }
+
+  public fun max_n_numerator(): u128 {
+    2000
+  }
 }

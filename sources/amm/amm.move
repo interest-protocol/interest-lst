@@ -31,7 +31,7 @@ module interest_lst::amm {
 
   struct Registry has key {
     id: UID,
-    pools: VecMap<u64, ID>,
+    pools: VecMap<u64, ID>, // Maturity => Pool ID
     initial_r: FixedPoint64
   }
 
@@ -83,7 +83,7 @@ module interest_lst::amm {
         id: object::new(ctx),
         pools: vec_map::empty(),
         // 2.87% based AAVE USDC Supply Yield
-        initial_r: fixed_point64::create_from_rational(287,  10000 * 365)
+        initial_r: amm_utils::create_r(constants::initial_r_numerator())
       }
     );
   }
@@ -116,7 +116,7 @@ module interest_lst::amm {
     assert!(sft::value(&principal) == principal_optimal_value, errors::amm_not_enough_principal());
     
     // Mint and Burn a minimum LP amount to avoid zero division
-    transfer::public_transfer(lp_token::mint(lp_storage, maturity, 100, ctx), @0x0);
+    transfer::public_transfer(lp_token::mint(lp_storage, maturity, constants::min_amm_lp_token_value(), ctx), @0x0);
 
     // Create the pool
     let pool = Pool {
@@ -151,14 +151,11 @@ module interest_lst::amm {
   }
 
   // ** Admin Functions
-  
-  public fun update_initial_r(_: &AdminCap, registry: &mut Registry, r_numerator: u128) {
-    // Cannot be higher than 20%
-    assert!(2000 >= r_numerator, errors::amm_invalid_r());
 
+  public fun update_initial_r(_: &AdminCap, registry: &mut Registry, r_numerator: u128) {
     let old_r = registry.initial_r;
 
-    registry.initial_r = fixed_point64::create_from_rational(r_numerator,  10000 * 365);
+    registry.initial_r = amm_utils::create_r(r_numerator);
 
     emit(UpdateInitialR {
       old_r: fixed_point64::round(old_r), 
@@ -168,12 +165,9 @@ module interest_lst::amm {
    }
 
    public fun update_r(_: &AdminCap, pool: &mut Pool, r_numerator: u128) {
-    // Cannot be higher than 20%
-    assert!(2000 >= r_numerator, errors::amm_invalid_r());
-
     let old_r = pool.r;
 
-    pool.r = fixed_point64::create_from_rational(r_numerator,  10000 * 365);
+    pool.r = amm_utils::create_r(r_numerator);
 
     emit(UpdateR { pool_id: 
       object::id(pool), 
