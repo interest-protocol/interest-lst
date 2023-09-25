@@ -76,4 +76,6 @@ module interest_lst::errors {
   public fun amm_invalid_fee(): u64 { 34 }
 
   public fun amm_invalid_r(): u64 { 35 }
+
+  public fun amm_old_maturity(): u64 { 36 }
 }
