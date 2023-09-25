@@ -54,6 +54,11 @@ module interest_lst::amm {
     maturity: u64
   }
 
+  struct UpdateInitialR has copy, drop {
+    old_r: u128,
+    new_r: u128
+  }
+
   struct UpdateR has copy, drop {
     pool_id: ID,
     old_r: u128,
@@ -141,15 +146,29 @@ module interest_lst::amm {
     lp_token::mint(lp_storage, maturity, principal_optimal_value, ctx)
   }
 
-   // ** Admin Functions
+  // ** Admin Functions
+  public fun update_initial_r(_: &AdminCap, registry: &mut Registry, r_numerator: u128) {
+    // Cannot be higher than 20%
+    assert!(2000 >= r_numerator, errors::amm_invalid_r());
 
-   public fun update_r(_: &AdminCap, pool: &mut Pool, r_numerator: u64) {
+    let old_r = registry.initial_r;
+
+    registry.initial_r = fixed_point64::create_from_rational(r_numerator,  10000 * 365);
+
+    emit(UpdateInitialR {
+      old_r: fixed_point64::round(old_r), 
+      new_r: fixed_point64::round(registry.initial_r) 
+      }
+    );
+   }
+
+   public fun update_r(_: &AdminCap, pool: &mut Pool, r_numerator: u128) {
     // Cannot be higher than 20%
     assert!(2000 >= r_numerator, errors::amm_invalid_r());
 
     let old_r = pool.r;
 
-    pool.r = fixed_point64::create_from_rational(436,  10000 * 365);
+    pool.r = fixed_point64::create_from_rational(r_numerator,  10000 * 365);
 
     emit(UpdateR { pool_id: 
       object::id(pool), 
