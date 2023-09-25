@@ -1,0 +1,1 @@
+module interest_lst::amm {}

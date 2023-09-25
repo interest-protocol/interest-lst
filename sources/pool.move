@@ -28,7 +28,7 @@ module interest_lst::pool {
   use interest_lst::semi_fungible_token::SemiFungibleToken;
   use interest_lst::isui::{Self, ISUI, InterestSuiStorage};
   use interest_lst::sui_yield::{Self, SuiYield, SuiYieldStorage};
-  use interest_lst::staking_pool_utils::{calc_staking_pool_rewards};
+  use interest_lst::staking_pool_utils::calc_staking_pool_rewards;
   use interest_lst::sui_principal::{Self, SuiPrincipalStorage, SUI_PRINCIPAL};
   use interest_lst::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
 
