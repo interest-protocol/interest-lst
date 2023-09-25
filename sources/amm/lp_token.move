@@ -1,3 +1,4 @@
+// The LP Token of the Sui Bond AMM
 module interest_lst::sui_lp_token {
   use std::ascii;
   use std::option;
@@ -25,10 +26,10 @@ module interest_lst::sui_lp_token {
       witness,
       9,
       b"LP-iSUIP/iSUIY",
-      b"Liquidity Provider Token for iSUIP/iSUIY pools",
-      b"It represents a liquidity share of a iSUIP/iSUIY pool", 
+      b"Liquidity Provider Token for iSui/iSUIP pools",
+      b"It represents a liquidity share of a iSui/iSUIP pool", 
       b"The slot is the maturity epoch of the liquidity.",
-      option::some(url::new_unsafe_from_bytes(b"https://interestprotocol.infura-ipfs.io/ipfs/QmdNWHCHizeiVB4wt9dMaEqeQG6bLgTHRzGyxGNqKLgQ2o")),
+      option::some(url::new_unsafe_from_bytes(b"https://interestprotocol.infura-ipfs.io/ipfs/QmeJ92yFYeJEwCWFzAkRg1p1xxrmKJscAe5NtrTiKybdAT")),
       ctx      
     );
     
@@ -38,11 +39,11 @@ module interest_lst::sui_lp_token {
 
   public(friend) fun mint(
     storage: &mut LPTokenStorage, 
-    slot: u256,
+    slot: u64,
     amount: u64, 
     ctx: &mut TxContext
   ): SFT<SUI_LP_TOKEN> {
-    sft::mint(&mut storage.treasury_cap, slot, amount, ctx)
+    sft::mint(&mut storage.treasury_cap, (slot as u256), amount, ctx)
   }
 
   public fun burn(storage: &mut LPTokenStorage, token: SFT<SUI_LP_TOKEN>): u64 {
@@ -82,17 +83,17 @@ module interest_lst::sui_lp_token {
   }
 
   #[test_only]
-   public fun mint_with_supply_for_testing(storage: &mut LPTokenStorage, slot: u256, value: u64 , ctx: &mut TxContext): SFT<SUI_LP_TOKEN> {
+   public fun mint_with_supply_for_testing(storage: &mut LPTokenStorage, slot: u64, value: u64 , ctx: &mut TxContext): SFT<SUI_LP_TOKEN> {
     mint(storage, slot, value, ctx)
   } 
 
   #[test_only]
   public fun mint_for_testing(
-    slot: u256, 
+    slot: u64, 
     value: u64, 
     ctx: &mut TxContext
   ): SFT<SUI_LP_TOKEN> {
-    sft:: mint_for_testing(slot, value, ctx)
+    sft:: mint_for_testing((slot as u256), value, ctx)
   } 
 
   #[test_only]

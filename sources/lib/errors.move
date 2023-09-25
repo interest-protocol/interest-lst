@@ -68,4 +68,8 @@ module interest_lst::errors {
   public fun sft_cannot_divide_zero_value(): u64 { 30 }
 
   public fun sft_cannot_divide_into_zero(): u64 { 31 }
+
+  public fun amm_not_enough_principal(): u64 { 32 }
+
+  public fun amm_pool_already_exists(): u64 { 33 }
 }
