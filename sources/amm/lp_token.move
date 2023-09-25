@@ -1,5 +1,5 @@
 // The LP Token of the Sui Bond AMM
-module interest_lst::sui_lp_token {
+module interest_lst::lp_token {
   use std::ascii;
   use std::option;
   use std::string::String;
@@ -14,14 +14,14 @@ module interest_lst::sui_lp_token {
 
   friend interest_lst::amm;
 
-  struct SUI_LP_TOKEN has drop {}
+  struct LP_TOKEN has drop {}
   
   struct LPTokenStorage has key {
     id: UID,
-    treasury_cap: SFTTreasuryCap<SUI_LP_TOKEN>
+    treasury_cap: SFTTreasuryCap<LP_TOKEN>
   }
 
-  fun init(witness: SUI_LP_TOKEN, ctx: &mut TxContext) {
+  fun init(witness: LP_TOKEN, ctx: &mut TxContext) {
     let (treasury_cap, metadata) = sft::create_sft(
       witness,
       9,
@@ -42,34 +42,34 @@ module interest_lst::sui_lp_token {
     slot: u64,
     amount: u64, 
     ctx: &mut TxContext
-  ): SFT<SUI_LP_TOKEN> {
+  ): SFT<LP_TOKEN> {
     sft::mint(&mut storage.treasury_cap, (slot as u256), amount, ctx)
   }
 
-  public fun burn(storage: &mut LPTokenStorage, token: SFT<SUI_LP_TOKEN>): u64 {
+  public fun burn(storage: &mut LPTokenStorage, token: SFT<LP_TOKEN>): u64 {
     sft::burn(&mut storage.treasury_cap, token)
   }
 
   // === ADMIN ONLY Functions ===
 
   public entry fun update_name(
-    _:&AdminCap, storage: &mut LPTokenStorage, metadata: &mut SFTMetadata<SUI_LP_TOKEN>, name: String
+    _:&AdminCap, storage: &mut LPTokenStorage, metadata: &mut SFTMetadata<LP_TOKEN>, name: String
   ) { sft::update_name(&mut storage.treasury_cap, metadata, name); }
 
   public entry fun update_symbol(
-    _:&AdminCap, storage: &mut LPTokenStorage, metadata: &mut SFTMetadata<SUI_LP_TOKEN>, symbol: ascii::String
+    _:&AdminCap, storage: &mut LPTokenStorage, metadata: &mut SFTMetadata<LP_TOKEN>, symbol: ascii::String
   ) { sft::update_symbol(&mut storage.treasury_cap, metadata, symbol) }
 
   public entry fun update_description(
-    _:&AdminCap, storage: &mut LPTokenStorage, metadata: &mut SFTMetadata<SUI_LP_TOKEN>, description: String
+    _:&AdminCap, storage: &mut LPTokenStorage, metadata: &mut SFTMetadata<LP_TOKEN>, description: String
   ) { sft::update_description(&mut storage.treasury_cap, metadata, description) }
 
   public entry fun update_slot_description(
-    _:&AdminCap, storage: &mut LPTokenStorage, metadata: &mut SFTMetadata<SUI_LP_TOKEN>, slot_description: String
+    _:&AdminCap, storage: &mut LPTokenStorage, metadata: &mut SFTMetadata<LP_TOKEN>, slot_description: String
   ) { sft::update_slot_description(&mut storage.treasury_cap, metadata, slot_description) }
 
   public entry fun update_icon_url(
-    _:&AdminCap, storage: &mut LPTokenStorage, metadata: &mut SFTMetadata<SUI_LP_TOKEN>, url: ascii::String
+    _:&AdminCap, storage: &mut LPTokenStorage, metadata: &mut SFTMetadata<LP_TOKEN>, url: ascii::String
   ) {
     sft::update_icon_url(&storage.treasury_cap, metadata, url);
   }
@@ -79,11 +79,11 @@ module interest_lst::sui_lp_token {
 
   #[test_only]
   public fun init_for_testing(ctx: &mut TxContext) {
-    init(SUI_LP_TOKEN {}, ctx);
+    init(LP_TOKEN {}, ctx);
   }
 
   #[test_only]
-   public fun mint_with_supply_for_testing(storage: &mut LPTokenStorage, slot: u64, value: u64 , ctx: &mut TxContext): SFT<SUI_LP_TOKEN> {
+   public fun mint_with_supply_for_testing(storage: &mut LPTokenStorage, slot: u64, value: u64 , ctx: &mut TxContext): SFT<LP_TOKEN> {
     mint(storage, slot, value, ctx)
   } 
 
@@ -92,12 +92,12 @@ module interest_lst::sui_lp_token {
     slot: u64, 
     value: u64, 
     ctx: &mut TxContext
-  ): SFT<SUI_LP_TOKEN> {
+  ): SFT<LP_TOKEN> {
     sft:: mint_for_testing((slot as u256), value, ctx)
   } 
 
   #[test_only]
-  public fun burn_for_testing(token: SFT<SUI_LP_TOKEN>): (u256, u64) {
+  public fun burn_for_testing(token: SFT<LP_TOKEN>): (u256, u64) {
     sft::burn_for_testing(token)
   }    
 }

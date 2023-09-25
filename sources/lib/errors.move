@@ -72,4 +72,6 @@ module interest_lst::errors {
   public fun amm_not_enough_principal(): u64 { 32 }
 
   public fun amm_pool_already_exists(): u64 { 33 }
+
+  public fun amm_invalid_fee(): u64 { 34 }
 }

@@ -152,4 +152,74 @@ module interest_lst::fixed_point64 {
     public fun get_raw_value(num: FixedPoint64): u128 {
         num.value
     }
+
+        /// Returns the largest integer less than or equal to a given number.
+    public fun floor(num: FixedPoint64): u128 {
+        num.value >> 64
+    }
+    spec floor {
+        pragma opaque;
+        aborts_if false;
+        ensures result == spec_floor(num);
+    }
+    spec fun spec_floor(val: FixedPoint64): u128 {
+        let fractional = val.value % (1 << 64);
+        if (fractional == 0) {
+            val.value >> 64
+        } else {
+            (val.value - fractional) >> 64
+        }
+    }
+
+    /// Rounds up the given FixedPoint64 to the next largest integer.
+    public fun ceil(num: FixedPoint64): u128 {
+        let floored_num = floor(num) << 64;
+        if (num.value == floored_num) {
+            return floored_num >> 64
+        };
+        let val = ((floored_num as u256) + (1 << 64));
+        (val >> 64 as u128)
+    }
+    spec ceil {
+        /// TODO: worked in the past but started to time out since last z3 update
+        pragma verify = false;
+        pragma opaque;
+        aborts_if false;
+        ensures result == spec_ceil(num);
+    }
+    spec fun spec_ceil(val: FixedPoint64): u128 {
+        let fractional = val.value % (1 << 64);
+        let one = 1 << 64;
+        if (fractional == 0) {
+            val.value >> 64
+        } else {
+            (val.value - fractional + one) >> 64
+        }
+    }
+
+    /// Returns the value of a FixedPoint64 to the nearest integer.
+    public fun round(num: FixedPoint64): u128 {
+        let floored_num = floor(num) << 64;
+        let boundary = floored_num + ((1 << 64) / 2);
+        if (num.value < boundary) {
+            floored_num >> 64
+        } else {
+            ceil(num)
+        }
+    }
+    spec round {
+        pragma opaque;
+        aborts_if false;
+        ensures result == spec_round(num);
+    }
+    spec fun spec_round(val: FixedPoint64): u128 {
+        let fractional = val.value % (1 << 64);
+        let boundary = (1 << 64) / 2;
+        let one = 1 << 64;
+        if (fractional < boundary) {
+            (val.value - fractional) >> 64
+        } else {
+            (val.value - fractional + one) >> 64
+        }
+    }
 }

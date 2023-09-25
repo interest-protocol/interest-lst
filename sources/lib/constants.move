@@ -4,6 +4,10 @@ module interest_lst::constants {
     1_000_000_000
   }
 
+  public fun five_percent(): u64 {
+    50_000_000
+  }
+
   public fun u256_max_u128(): u256 {
     340282366920938463463374607431768211455
   }
