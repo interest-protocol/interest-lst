@@ -1,14 +1,19 @@
 // Access Control for Interest LSD package
+// There is a 1 week time delay to protect users
 module access::admin {
   use sui::transfer;
   use sui::event::emit;
   use sui::object::{Self, UID};
   use sui::tx_context::{Self, TxContext};
 
+  const TIME_DELAY: u64 = 7;
+  const SENTINEL_VALUE: u64 = 18446744073709551615;
+
   // Errors
   const EZeroAddress: u64 = 0;
   const EInvalidAcceptSender: u64 = 1;
   const EAdminDidNotAccept: u64 = 2;
+  const ETooEarly: u64 = 4;
 
   // The owner of this object can add and remove minters + update the metadata
   struct AdminCap has key {
@@ -19,7 +24,8 @@ module access::admin {
     id: UID,
     pending_admin: address,
     current_admin: address,
-    accepted: bool
+    accepted: bool,
+    init_epoch: u64
   }
 
   // * Events
@@ -59,7 +65,8 @@ module access::admin {
         id: object::new(ctx),
         pending_admin: @0x0,
         current_admin: sender,
-        accepted: false
+        accepted: false,
+        init_epoch: SENTINEL_VALUE
       }
     );
   }
@@ -69,10 +76,11 @@ module access::admin {
   * @param admin_cap The AdminCap that will be transferred
   * @recipient the new admin address
   */
-  entry public fun start_transfer_admin(_: &AdminCap, storage: &mut AdminStorage, recipient: address) {
+  entry public fun start_transfer_admin(_: &AdminCap, storage: &mut AdminStorage, recipient: address, ctx: &mut TxContext) {
     assert!(recipient != @0x0, EZeroAddress);
     storage.pending_admin = recipient;
     storage.accepted = false;
+    storage.init_epoch = tx_context::epoch(ctx);
 
     emit(StartTransferAdmin {
       current_admin: storage.current_admin,
@@ -88,6 +96,7 @@ module access::admin {
   entry public fun cancel_transfer_admin(_: &AdminCap, storage: &mut AdminStorage) {
     storage.pending_admin = @0x0;
     storage.accepted = false;
+    storage.init_epoch = SENTINEL_VALUE;
 
     emit(CancelTransferAdmin {
       current_admin: storage.current_admin
@@ -114,14 +123,16 @@ module access::admin {
   * @param admin_cap The AdminCap that will be transferred
   * @recipient the new admin address
   */
-  entry public fun transfer_admin(cap: AdminCap, storage: &mut AdminStorage) {
+  entry public fun transfer_admin(cap: AdminCap, storage: &mut AdminStorage, ctx: &mut TxContext) {
     // New admin must accept the capability
     assert!(storage.accepted, EAdminDidNotAccept);
+    assert!(tx_context::epoch(ctx) >= storage.init_epoch + TIME_DELAY, ETooEarly);
 
     storage.accepted = false;
     let new_admin = storage.pending_admin;
     storage.current_admin = new_admin;
     storage.pending_admin = @0x0;
+    storage.init_epoch = SENTINEL_VALUE;
 
     transfer::transfer(cap, new_admin);
 

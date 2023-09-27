@@ -10,8 +10,9 @@ module interest_lst::entry {
   use interest_tokens::isui::{ISUI, InterestSuiStorage};
   use interest_tokens::sui_yield::{SuiYieldStorage, SuiYield};
   use interest_tokens::sui_principal::{SuiPrincipalStorage, SUI_PRINCIPAL};
-  
+
   use interest_lst::pool::{Self, PoolStorage};
+  use interest_lst::unstake_utils::UnstakePayload;
   use interest_lst::asset_utils::{
     handle_coin_vector, 
     handle_yield_vector,
@@ -40,13 +41,14 @@ module interest_lst::entry {
     ), tx_context::sender(ctx));
   }
 
-  entry fun burn_isui(
+  public fun burn_isui(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     interest_sui_storage: &mut InterestSuiStorage,
     tokens: vector<Coin<ISUI>>,
     token_value: u64,
     validator_address: address,
+    unstake_payload: vector<UnstakePayload>,
     ctx: &mut TxContext,
   ) {
     public_transfer_coin(pool::burn_isui(
@@ -55,6 +57,7 @@ module interest_lst::entry {
       interest_sui_storage,
       handle_coin_vector(tokens, token_value, ctx),
       validator_address,
+      unstake_payload,
       ctx
     ), tx_context::sender(ctx));
   }
@@ -89,7 +92,7 @@ module interest_lst::entry {
     public_transfer_yield(yield, sender);
   }
 
-  entry fun call_bond(
+  public fun call_bond(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     sui_principal_storage: &mut SuiPrincipalStorage,
@@ -100,6 +103,7 @@ module interest_lst::entry {
     yield_value: u64,
     maturity: u64,
     validator_address: address,
+    unstake_payload: vector<UnstakePayload>,
     ctx: &mut TxContext,
   ) {
     public_transfer_coin(
@@ -112,19 +116,21 @@ module interest_lst::entry {
         handle_yield_vector(sft_yield_vector, yield_value, ctx),
         maturity,
         validator_address,
+        unstake_payload,
         ctx
       ),
       tx_context::sender(ctx)
     );
   }
 
-  entry fun burn_sui_principal(
+  public fun burn_sui_principal(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     sui_principal_storage: &mut SuiPrincipalStorage,
     sft_principal_vector: vector<SemiFungibleToken<SUI_PRINCIPAL>>,
     principal_value: u64,
     validator_address: address,
+    unstake_payload: vector<UnstakePayload>,
     ctx: &mut TxContext,
   ) {
     public_transfer_coin(
@@ -134,18 +140,20 @@ module interest_lst::entry {
         sui_principal_storage,
         handle_principal_vector(sft_principal_vector, principal_value, ctx),
         validator_address,
+        unstake_payload,
         ctx
       ),
       tx_context::sender(ctx))
   }
 
-  entry fun claim_yield(
+  public fun claim_yield(
     wrapper: &mut SuiSystemState,
     storage: &mut PoolStorage,
     sui_yield_storage: &mut SuiYieldStorage,
     sft_yield_vector: vector<SuiYield>,
     yield_value: u64,
     validator_address: address,
+    unstake_payload: vector<UnstakePayload>,
     maturity: u64,
     ctx: &mut TxContext,
   ) {
@@ -155,6 +163,7 @@ module interest_lst::entry {
       sui_yield_storage,
       handle_yield_vector(sft_yield_vector, yield_value, ctx),
       validator_address,
+      unstake_payload,
       maturity,
       ctx
     );

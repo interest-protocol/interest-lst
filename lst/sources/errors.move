@@ -1,7 +1,7 @@
 module interest_lst::errors {
-  public fun sbt_assets_still_locked(): u64 { 6 }
+  public fun unstake_utils_mismatched_length(): u64 { 12 }
 
-  public fun sbt_lock_period_too_long(): u64 { 7 }
+  public fun old_version(): u64 { 13 }
 
   // All values inside the Fees Struct must be equal or below 1e18 as it represents 100%
   public fun pool_invalid_fee(): u64 { 14 }

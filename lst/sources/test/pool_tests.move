@@ -34,6 +34,7 @@ module interest_lst::pool_tests {
 
   use interest_lst::fee_utils::read_fee;
   use interest_lst::pool::{Self, PoolStorage};
+  use interest_lst::unstake_algorithms::default_unstake_algorithm;
 
   const MYSTEN_LABS: address = @0x4;
   const FIGMENT: address = @0x5;
@@ -288,6 +289,8 @@ module interest_lst::pool_tests {
       let old_elastic = rebase::elastic(pool_rebase);
       let old_base = rebase::base(pool_rebase);
 
+      let unstake_payload = default_unstake_algorithm(&pool_storage, add_decimals(10, 9), ctx(test));
+
       // Unstakes the correct amount
       assert_eq(
         burn(
@@ -297,6 +300,7 @@ module interest_lst::pool_tests {
           &mut interest_sui_storage,
           mint_for_testing<ISUI>(isui_unstake_amount, ctx(test)),
           COINBASE_CLOUD,
+          unstake_payload,
           ctx(test)
           )
         ),
@@ -476,6 +480,8 @@ module interest_lst::pool_tests {
         ctx(test)
       );
 
+      let unstake_payload = default_unstake_algorithm(&pool_storage, principal_amount + yield_amount, ctx(test));
+
       assert_eq(burn(pool::call_bond(
         &mut wrapper,
         &mut pool_storage,
@@ -485,6 +491,7 @@ module interest_lst::pool_tests {
         coupon,
         30,
          MYSTEN_LABS,
+         unstake_payload,
         ctx(test)
       )), principal_amount + yield_amount);
 
@@ -541,12 +548,15 @@ module interest_lst::pool_tests {
       let old_elastic = rebase::elastic(pool_rebase);
       let removed_shares = rebase::to_base(pool_rebase, add_decimals(10, 9), false);
 
+      let unstake_payload = default_unstake_algorithm(&pool_storage, add_decimals(10, 9), ctx(test));
+
       let coin_sui = pool::burn_sui_principal(
         &mut wrapper,
         &mut pool_storage,
         &mut interest_sui_principal_storage,
         residue,
         MYSTEN_LABS,
+        unstake_payload,
         ctx(test)
       );
 
@@ -605,12 +615,15 @@ module interest_lst::pool_tests {
       let yield_earned = rebase::to_elastic(pool_rebase, value, false) - 800000 - value;
       let shares_burned = rebase::to_base(pool_rebase, yield_earned, false);
 
+      let unstake_paylaod = default_unstake_algorithm(&pool_storage, yield_earned, ctx(test));
+
       let (coupon_returned, rewards) = pool::claim_yield(
         &mut wrapper,
         &mut pool_storage,
         &mut interest_sui_yield_Storage,
         coupon,
         MYSTEN_LABS, 
+        unstake_paylaod,
         99,
         ctx(test)
       );
