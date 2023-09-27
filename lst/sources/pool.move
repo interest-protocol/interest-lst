@@ -820,6 +820,7 @@ module interest_lst::pool {
 
     // Update the total principal
     storage.total_principal = storage.total_principal - total_value_unstaked;
+    storage.total_activate_staked_sui = storage.total_activate_staked_sui - total_value_unstaked;
 
     // If we unstaked more than the desired amount, we need to restake the different
     if (total_value_unstaked > amount) {
