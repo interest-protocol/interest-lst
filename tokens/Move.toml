@@ -1,0 +1,14 @@
+[package]
+name = "InterestTokens"
+version = "0.0.1"
+
+[dependencies]
+MoveStdlib = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/move-stdlib", rev = "testnet-v1.9.0" }
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet-v1.9.0" }
+Access = { local = "../access" }
+InterestFramework = { local = "../framework" }
+ 
+[addresses]
+interest_tokens = "0x0"
+std = "0x1"
+sui = "0x2"
