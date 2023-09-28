@@ -584,10 +584,9 @@ module interest_lst::pool {
     // Destroy both tokens
     // Calculate how much Sui they are worth
     let sui_amount = get_pending_yield(wrapper, storage, &sft_yield, maturity, ctx);
-    let is_sui_amount_zero = sui_amount == 0;
-
+    let is_zero_amount = sui_amount == 0;
     // SuiYield has expired
-    if (!is_sui_amount_zero) {
+    if (!is_zero_amount) {
       // Consider yield paid
       sui_yield::add_rewards_paid(sui_yield_storage, &storage.publisher, &mut sft_yield, sui_amount);
       // We need to update the pool
@@ -598,8 +597,18 @@ module interest_lst::pool {
 
     // Unstake Sui
     (
-    if (is_sui_amount_zero) 
-      { sui_yield::expire(sui_yield_storage, &storage.publisher,  sft_yield, ctx)} else { sft_yield }, remove_staked_sui(wrapper, storage, sui_amount, unstake_payload, validator_address, ctx))
+      // We expire
+      if (tx_context::epoch(ctx) > (sui_yield::slot(&sft_yield) as u64)) { 
+          sui_yield::expire(sui_yield_storage, &storage.publisher,  sft_yield, ctx) 
+        } else { 
+          sft_yield 
+        }, 
+      if (is_zero_amount) { 
+          coin::zero(ctx) 
+        } else {
+          remove_staked_sui(wrapper, storage, sui_amount, unstake_payload, validator_address, ctx)
+        }
+    )
   }
 
   // ** Functions to handle Whitelist validators

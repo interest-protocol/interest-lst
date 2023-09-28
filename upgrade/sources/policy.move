@@ -22,6 +22,11 @@ module interest_upgrade::policy {
     
     // * Events
 
+    struct NewUpgradeWrapper has copy, drop {
+        upgrade_cap: ID,
+        wrapper: ID
+    }
+
     struct ImmutablePackage has copy, drop {
         id: ID
     }
@@ -53,13 +58,15 @@ module interest_upgrade::policy {
         cap: UpgradeCap,
         ctx: &mut TxContext
     ): UpgradeWrapper {
-        UpgradeWrapper {
+        let wrapper = UpgradeWrapper {
             id: object::new(ctx),
             cap,
             init_epoch: SENTINEL_VALUE,
             policy: 0,
             digest: vector::empty()
-        }
+        };
+        emit(NewUpgradeWrapper { wrapper: object::id(&wrapper), upgrade_cap: object::id(&wrapper.cap) });
+        wrapper
     }
 
     public fun init_upgrade(
