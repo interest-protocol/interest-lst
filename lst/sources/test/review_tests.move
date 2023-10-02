@@ -24,7 +24,6 @@ module interest_lst::review_tests {
   const FIGMENT: address = @0x5;
   const COINBASE_CLOUD: address = @0x6;
   const SPARTA: address = @0x7;
-  const JOSE: address = @0x8;
 
   #[test]
   fun test_crud_review() {

@@ -1042,7 +1042,7 @@ module interest_lst::pool {
     emit(FinishUpgrade {version: storage.version });
   }
 
-  public fun cencel_upgrade(_: &AdminCap, timelock: &mut VersionTimelock, ctx: &mut TxContext) {
+  public fun cencel_upgrade(_: &AdminCap, timelock: &mut VersionTimelock) {
     v::cancel_upgrade(timelock);
     emit(CancelUpgrade {});
   }
