@@ -73,7 +73,7 @@ module interest_tokens::soulbound_token {
 
     let values = vector[
       string::utf8(b"Interest Protocol Soulbound Token"),
-      string::utf8(b"https://interestprotocol.infura-ipfs.io/ipfs/QmSG6xHk6hiaCur3AifAXV1ZaMfPpARn2xqCsBP9sWEYHg"),
+      string::utf8(b"https://interestprotocol.infura-ipfs.io/ipfs/QmU5k89uZFB9mxvPKzrxU4nYusuxt2JMcHiE8VoxgNVMCX"),
       string::utf8(b"This Soulbound token allows users to attain points in various DeFi protocols by locking up assets."),
       string::utf8(b"https://www.interestprotocol.com/"),      
     ];

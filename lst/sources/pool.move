@@ -34,6 +34,7 @@ module interest_lst::pool {
 
   use interest_lst::errors;
   use interest_lst::version;
+  use interest_lst::version::{Self as v, VersionTimelock};
   use interest_lst::unstake_utils::{Self, UnstakePayload};
   use interest_lst::staking_pool_utils::calc_staking_pool_rewards;
   use interest_lst::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
@@ -131,6 +132,17 @@ module interest_lst::pool {
     rewards: u64,
     principal: u64
   }
+
+  struct StartUpgrade has copy, drop {
+    version: u64
+  }
+
+  struct CancelUpgrade has copy, drop {}
+
+  struct FinishUpgrade has copy, drop {
+    version: u64
+  }
+
 
   fun init(otw: POOL, ctx: &mut TxContext) {
     // Share the PoolStorage Object with the Sui network
@@ -1014,13 +1026,25 @@ module interest_lst::pool {
     (fmul((amount as u128), fee) as u64)
   }
 
-  // ** Version Functions
+  // ** Version / Upgrade Functions
   
-  public fun value(storage: &PoolStorage): u64 { storage.version }
+  public fun version(storage: &PoolStorage): u64 { storage.version }
+
+  public fun start_upgrade(_: &AdminCap, storage: &PoolStorage, timelock: &mut VersionTimelock, ctx: &mut TxContext) {
+    v::start_upgrade(timelock, ctx);
+    emit(StartUpgrade { version: storage.version });
+  }
   
-  public fun upgrade(_: &AdminCap, storage: &mut PoolStorage) {
+  public fun upgrade(_: &AdminCap, storage: &mut PoolStorage, timelock: &mut VersionTimelock, ctx: &mut TxContext) {
+    v::upgrade(timelock, ctx);
     // Bump the version so users are forced to use the new package
     storage.version = version::current_version() + 1;
+    emit(FinishUpgrade {version: storage.version });
+  }
+
+  public fun cencel_upgrade(_: &AdminCap, timelock: &mut VersionTimelock, ctx: &mut TxContext) {
+    v::cancel_upgrade(timelock);
+    emit(CancelUpgrade {});
   }
   
   public fun is_current_version(storage: &PoolStorage): bool {

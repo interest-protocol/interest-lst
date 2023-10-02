@@ -32,4 +32,6 @@ module interest_lst::errors {
   public fun validator_not_reviewed(): u64 { 24 }
 
   public fun not_active_validator(): u64 { 25 }
+
+  public fun upgrade_locked() : u64 { 26 }
 }
