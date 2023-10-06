@@ -54,7 +54,7 @@ module interest_lst::staking_pool_utils {
     };
 
     // This should never happen?!
-    // A validator with an empty PoolTokenExchangeRate
+    // A validator with an empty PoolTokenExchangeRate Table
     abort errors::no_exchange_rate_found()
   }  
 

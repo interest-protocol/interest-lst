@@ -1,6 +1,6 @@
 // @Authors - JMVC <> Thouny
 // This contract manages the minting/burning of iSui, iSUIP, and iSUIY
-// iSsui is a share of the total SUI principal + rewards this module owns
+// iSui is a share of the total SUI principal + rewards this module owns
 // iSUIP is always 1 SUI as it represents the principal owned by this module
 // iSUIY represents the yield component of a iSUIP
 module interest_lst::pool { 
@@ -257,6 +257,7 @@ module interest_lst::pool {
       let validator_data = linked_table::borrow(&storage.validators_table, validator_address);
 
       let pool_exchange_rates = sui_system::pool_exchange_rates(wrapper, &validator_data.staking_pool_id);
+      // If the validator is deactivated, we need to find its most recent exchange rate
       let current_exchange_rate = get_most_recent_exchange_rate(pool_exchange_rates, epoch);
 
       // If the validator does not have any sui staked, we to the next validator
