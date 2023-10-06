@@ -47,7 +47,7 @@ module interest_lst::staking_pool_utils {
   public fun get_most_recent_exchange_rate(rates: &Table<u64, PoolTokenExchangeRate>, current_epoch: u64): &PoolTokenExchangeRate {
     if (table::contains(rates, current_epoch)) return table::borrow(rates, current_epoch);
 
-    let i = current_epoch;
+    let i = current_epoch - 1;
     while (i > 0) {
       if (table::contains(rates, i)) return table::borrow(rates, i);
       i = i - 1;
