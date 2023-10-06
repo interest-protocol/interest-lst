@@ -49,7 +49,10 @@ module amm::amm {
     sy_balance: Balance<ISUI>,
     principal_balance: SFTBalance<SUI_PRINCIPAL>,
     k: u128, // This value must be equal or higher after Swaps
-    r: FixedPoint64,
+    initial_r: FixedPoint64,
+    future_r: FixedPoint64,
+    initial_a_time: u64,
+    future_a_time: u64,
     fee_balance: SFTBalance<LP_TOKEN>,
     maturity: u64,
     fee: u128
@@ -133,7 +136,10 @@ module amm::amm {
       sy_balance: coin::into_balance(coin_isui),
       principal_balance: sft::into_balance(principal),
       k: (principal_optimal_value as u128) * 2,
-      r: registry.initial_r,
+      initial_r: registry.initial_r,
+      future_r: registry.initial_r,
+      initial_a_time: 0,
+      future_a_time: 0,
       maturity,
       fee: 0,
       fee_balance: sfb::zero((maturity as u256))
@@ -145,7 +151,7 @@ module amm::amm {
     emit(CreatePool { 
       pool_id, 
       k: pool.k, 
-      r: fixed_point64::round(pool.r), 
+      r: fixed_point64::round(registry.initial_r), 
       maturity 
     });
 
@@ -174,16 +180,16 @@ module amm::amm {
    }
 
    public fun update_r(_: &AdminCap, pool: &mut Pool, r_numerator: u128) {
-    let old_r = pool.r;
+    // let old_r = pool.r;
 
-    pool.r = utils::create_r(r_numerator);
+    // pool.r = utils::create_r(r_numerator);
 
-    emit(UpdateR { pool_id: 
-      object::id(pool), 
-      old_r: fixed_point64::round(old_r), 
-      new_r: fixed_point64::round(pool.r) 
-      }
-    );
+    // emit(UpdateR { pool_id: 
+    //   object::id(pool), 
+    //   old_r: fixed_point64::round(old_r), 
+    //   new_r: fixed_point64::round(pool.r) 
+    //   }
+    // );
    }
 
    public fun update_fee(_: &AdminCap, pool: &mut Pool, fee: u128) {

@@ -4,6 +4,10 @@ module interest_lst::staking_pool_utils {
 
   use sui_system::staking_pool::{Self, PoolTokenExchangeRate};
 
+  use sui::table::{Self, Table};
+
+  use interest_lst::errors;
+
   fun get_sui_amount(exchange_rate: &PoolTokenExchangeRate, token_amount: u64): u64 {
       // When either amount is 0, that means we have no stakes with this pool.
       // The other amount might be non-zero when there's dust left in the pool.
@@ -39,6 +43,20 @@ module interest_lst::staking_pool_utils {
               / (exchange_sui_amount as u128);
       (res as u64)
     }
+
+  public fun get_most_recent_exchange_rate(rates: &Table<u64, PoolTokenExchangeRate>, current_epoch: u64): &PoolTokenExchangeRate {
+    if (table::contains(rates, current_epoch)) return table::borrow(rates, current_epoch);
+
+    let i = current_epoch;
+    while (i > 0) {
+      if (table::contains(rates, i)) return table::borrow(rates, i);
+      i = i - 1;
+    };
+
+    // This should never happen?!
+    // A validator with an empty PoolTokenExchangeRate
+    abort errors::no_exchange_rate_found()
+  }  
 
   public fun calc_staking_pool_rewards(
     activation_exchange_rate: &PoolTokenExchangeRate, 

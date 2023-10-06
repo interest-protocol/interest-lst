@@ -36,8 +36,8 @@ module interest_lst::pool {
   use interest_lst::version;
   use interest_lst::version::{Self as v, VersionTimelock};
   use interest_lst::unstake_utils::{Self, UnstakePayload};
-  use interest_lst::staking_pool_utils::calc_staking_pool_rewards;
   use interest_lst::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
+  use interest_lst::staking_pool_utils::{calc_staking_pool_rewards, get_most_recent_exchange_rate};
 
   friend interest_lst::review;
 
@@ -257,7 +257,7 @@ module interest_lst::pool {
       let validator_data = linked_table::borrow(&storage.validators_table, validator_address);
 
       let pool_exchange_rates = sui_system::pool_exchange_rates(wrapper, &validator_data.staking_pool_id);
-      let current_exchange_rate = table::borrow(pool_exchange_rates, epoch);
+      let current_exchange_rate = get_most_recent_exchange_rate(pool_exchange_rates, epoch);
 
       // If the validator does not have any sui staked, we to the next validator
       if (validator_data.total_principal != 0) {
@@ -276,6 +276,7 @@ module interest_lst::pool {
           if (epoch >= activation_epoch) {
             let amount = staking_pool::staked_sui_amount(staked_sui);
             total_rewards = total_rewards + calc_staking_pool_rewards(
+              // ** IMPORTANT AUDITORS - is it possible for a validator to not have the activation_epoch of a StakedSui on their PoolExchangeRate ????
               table::borrow(pool_exchange_rates, activation_epoch),
               current_exchange_rate,
               amount

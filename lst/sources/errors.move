@@ -23,15 +23,17 @@ module interest_lst::errors {
 
   public fun pool_mismatched_maturity(): u64 { 20 }
 
-  public fun review_on_cooldown(): u64 { 21 }
+  public fun no_exchange_rate_found(): u64 { 21 }
 
-  public fun review_comment_too_long(): u64 { 22 }
+  public fun review_on_cooldown(): u64 { 22 }
 
-  public fun user_already_reviewed(): u64 { 23 }
+  public fun review_comment_too_long(): u64 { 23 }
 
-  public fun validator_not_reviewed(): u64 { 24 }
+  public fun user_already_reviewed(): u64 { 24 }
 
-  public fun not_active_validator(): u64 { 25 }
+  public fun validator_not_reviewed(): u64 { 25 }
 
-  public fun upgrade_locked() : u64 { 26 }
+  public fun not_active_validator(): u64 { 26 }
+
+  public fun upgrade_locked() : u64 { 27 }
 }
