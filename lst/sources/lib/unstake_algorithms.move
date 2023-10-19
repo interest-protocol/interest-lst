@@ -7,8 +7,6 @@ module interest_lst::unstake_algorithms {
 
   // use sui_system::staking_pool;
 
-  // use interest_framework::constants::one_sui_value;
-
   // use interest_lst::pool::{Self, PoolStorage};
   // use interest_lst::unstake_utils::{
   //   UnstakePayload, 
@@ -16,6 +14,8 @@ module interest_lst::unstake_algorithms {
   //   make_epoch_amount, 
   //   update_unstake_payload_amounts
   // };
+
+  // const MIN_STAKE_AMOUNT: u64 = 1_000_000_000;
 
   //   // TODO ADD other algorithms (Example unstake from lowest APY etc)
 
@@ -59,7 +59,7 @@ module interest_lst::unstake_algorithms {
   //           // Find out how much amount we have left to unstake
   //           let amount_left = amount - total_value_unstaked;
 
-  //           if (value >= amount_left + one_sui_value()) {
+  //           if (value >= amount_left + MIN_STAKE_AMOUNT) {
   //             total_value_unstaked = total_value_unstaked  + amount_left;
   //             vector::push_back(update_unstake_payload_amounts(&mut unstake_payload), make_epoch_amount(activation_epoch, amount_left, true) );
   //           } else {

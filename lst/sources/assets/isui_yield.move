@@ -1,7 +1,7 @@
 // Sui Yield is a Wrapped SFT with extra information about the yield
 // Reward paid is the rewards paid to date
 // Principal was the original shares to create the yield
-module interest_lst::sui_yield {
+module interest_lst::isui_yield {
   use std::option::some;
 
   use sui::transfer;
@@ -10,9 +10,9 @@ module interest_lst::sui_yield {
 
   use yield::yield::create;
 
-  struct SUI_YIELD has drop {}
+  struct ISUI_YIELD has drop {}
 
-  fun init(witness: SUI_YIELD, ctx: &mut TxContext) {
+  fun init(witness: ISUI_YIELD, ctx: &mut TxContext) {
     let (treasury_cap, metadata) = create(
       witness,
       9,
@@ -32,6 +32,6 @@ module interest_lst::sui_yield {
 
   #[test_only]
   public fun init_for_testing(ctx: &mut TxContext) {
-    init(SUI_YIELD {}, ctx);
+    init(ISUI_YIELD {}, ctx);
   }
 }

@@ -3,76 +3,72 @@
 // iSui is a share of the total SUI principal + rewards this module owns
 // iSUIP is always 1 SUI as it represents the principal owned by this module
 // iSUIY represents the yield component of a iSUIP
-module interest_lst::pool { 
-//   use std::vector;
-//   use std::option;
+module interest_lst::interest_lst { 
+  use std::vector;
+  use std::option;
 
-//   use sui::table;
-//   use sui::transfer;
-//   use sui::sui::SUI;
-//   use sui::event::emit;
-//   use sui::coin::{Self, Coin};
-//   use sui::package::{Self, Publisher};
-//   use sui::object::{Self, UID, ID};
-//   use sui::balance::{Self, Balance};
-//   use sui::tx_context::{Self, TxContext};
-//   use sui::linked_table::{Self, LinkedTable};
+  use sui::table;
+  use sui::transfer;
+  use sui::sui::SUI;
+  use sui::event::emit;
+  use sui::dynamic_field as df;
+  use sui::object::{Self, UID, ID};
+  use sui::balance::{Self, Balance};
+  use sui::tx_context::{Self, TxContext};
+  use sui::coin::{Self, Coin, TreasuryCap};
+  use sui::linked_table::{Self, LinkedTable};
 
-//   use sui_system::staking_pool::{Self, StakedSui};
-//   use sui_system::sui_system::{Self, SuiSystemState};
+  use sui_system::staking_pool::{Self, StakedSui};
+  use sui_system::sui_system::{Self, SuiSystemState};
 
-//   use access::admin::AdminCap;
+  use suitears::fund::{Self, Fund};
+  use suitears::fixed_point_wad::{wad_mul_up as fmul, wad_div_up as fdiv};
+  use suitears::semi_fungible_token::{Self as sft, SemiFungibleToken, SftTreasuryCap};
 
-//   use interest_framework::math::{fmul, fdiv};
-//   use interest_framework::rebase::{Self, Rebase};
-//   use interest_framework::constants::one_sui_value;
-//   use interest_framework::semi_fungible_token::SemiFungibleToken;
+  use yield::yield::{Self, Yield, YieldCap};
 
-//   use interest_tokens::isui::{Self, ISUI, InterestSuiStorage};
-//   use interest_tokens::sui_yield::{Self, SuiYield, SuiYieldStorage};
-//   use interest_tokens::sui_principal::{Self, SuiPrincipalStorage, SUI_PRINCIPAL};
+  use interest_lst::errors;
+  use interest_lst::isui::ISUI;
+  use interest_lst::isui_yield::ISUI_YIELD;
+  use interest_lst::isui_principal::ISUI_PRINCIPAL;
+  use interest_lst::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
+  use interest_lst::staking_pool_utils::{calc_staking_pool_rewards, get_most_recent_exchange_rate};
+  use interest_lst::interest_lst_inner_state::{Self as inner_state, State};
 
-//   use interest_lst::errors;
-//   use interest_lst::version;
-//   use interest_lst::version::{Self as v, VersionTimelock};
-//   use interest_lst::unstake_utils::{Self, UnstakePayload};
-//   use interest_lst::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
-//   use interest_lst::staking_pool_utils::{calc_staking_pool_rewards, get_most_recent_exchange_rate};
+  const MIN_STAKE_AMOUNT: u64 = 1_000_000_000;
 
-//   friend interest_lst::review;
+  // ** Structs
 
-//   // ** Structs
+  struct StateKey has store, drop, copy {}
 
-//   struct POOL has drop {}
+  struct InterestLST has key {
+    id: UID
+  }
 
-//   struct ValidatorData has key, store {
-//     id: UID, // front end to grab and display data,
-//     staking_pool_id: ID, // The ID of the Validator's {StakingPool}
-//     staked_sui_table: LinkedTable<u64, StakedSui>, // activation_epoch => StakedSui
-//     total_principal: u64 // Total amount of StakedSui principal deposited in this validator
-//   }
+  fun init(ctx: &mut TxContext) {
+    transfer::share_object(InterestLST { id: object::new(ctx) });
+  }
 
-//   // Shared Object
-//   // Unfortunately, we cannot fully exploit Sui's concurrency model because we need our lst Coins to reflect the rewards accrued
-//   // This allows users to instantly to stake Sui by buying this coin without having to go through the process
-//   // This also makes Coins omnichannel and a user in Ethereum can buy the coin and instantly became a Sui Staker
-//   // Sui StakingV3 module will have a bonding period, lsts will be a great way to exit immediately
-//   struct PoolStorage has key {
-//     id: UID,
-//     pool: Rebase, // This struct holds the total shares of ISUI and the total SUI (Principal + Rewards). Rebase {base: ISUI total supply, elastic: total Sui}
-//     last_epoch: u64, // Last epoch that pool was updated
-//     validators_table: LinkedTable<address, ValidatorData>, // We need a linked table to iterate through all validators once every epoch to ensure all pool data is accurate
-//     total_principal: u64, // Total amount of StakedSui principal deposited in Interest lst Package
-//     fee: Fee, // Holds the data to calculate the stake fee
-//     whitelist_validators: vector<address>,
-//     pool_history: LinkedTable<u64, Rebase>, // Epoch => Pool Data
-//     dust: Balance<SUI>, // If there is less than 1 Sui from unstaking (rewards)
-//     dao_balance: Balance<ISUI>, // Fees collected by the protocol in ISUI
-//     rate: u64, // Weighted APY Arithmetic mean
-//     publisher: Publisher,
-//     total_activate_staked_sui: u64,
-//     version: u64
-//   }
+  // @dev this function cannot be called again because the caps cannot be created again
+  public fun create_genesis_state(
+    self: &mut InterestLST,
+    isui_cap: TreasuryCap<ISUI>,
+    principal_cap: SftTreasuryCap<ISUI_PRINCIPAL>,
+    yield_cap: YieldCap<ISUI_YIELD>,
+    ctx: &mut TxContext
+  ) {
+    let genesis_state = inner_state::create_genesis_state(isui_cap, principal_cap, yield_cap, ctx);
+    df::add(&mut self.id, StateKey {}, genesis_state);
+  }
+
+
+  fun load_state(self: &mut InterestLST): &State {
+    df::borrow_mut(&mut self.id, StateKey {})
+  }
+
+  fun load_state_mut(self: &mut InterestLST): &mut State {
+    df::borrow_mut(&mut self.id, StateKey {})
+  }
 
 //   // ** Events
 

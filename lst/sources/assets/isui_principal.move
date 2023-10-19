@@ -1,6 +1,6 @@
 // Interest lst Staked Sui is a Semi-Fungible Coin  
 // It represents an active deposit on the pool (NO YIELD - just the residue/principal)
-module interest_lst::sui_principal {
+module interest_lst::isui_principal {
   use std::option::some;
 
   use sui::transfer;
@@ -11,9 +11,9 @@ module interest_lst::sui_principal {
 
 
   // OTW to create the Staked Sui
-  struct SUI_PRINCIPAL has drop {}
+  struct ISUI_PRINCIPAL has drop {}
 
-  fun init(witness: SUI_PRINCIPAL, ctx: &mut TxContext) {
+  fun init(witness: ISUI_PRINCIPAL, ctx: &mut TxContext) {
     let (treasury_cap, metadata) = create_sft(
       witness,
       9,
@@ -33,6 +33,6 @@ module interest_lst::sui_principal {
 
   #[test_only]
   public fun init_for_testing(ctx: &mut TxContext) {
-    init(SUI_PRINCIPAL {}, ctx);
+    init(ISUI_PRINCIPAL {}, ctx);
   }
 }
