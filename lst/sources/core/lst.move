@@ -98,6 +98,20 @@ module interest_lst::interest_lst {
     inner_state::mint_stripped_bond(sui_state, state, asset, validator_address, maturity, ctx)
   }
 
+  public(friend) fun call_bond(
+    sui_state: &mut SuiSystemState,
+    self: &mut InterestLST,
+    principal: SemiFungibleToken<ISUI_PRINCIPAL>,
+    coupon: Yield<ISUI_YIELD>,
+    maturity: u64,
+    validator_address: address,
+    unstake_payload: vector<UnstakePayload>,
+    ctx: &mut TxContext,    
+  ): Coin<SUI> {
+    let state = load_state_mut(self);
+    inner_state::call_bond(sui_state, state, principal, coupon, maturity, validator_address, unstake_payload, ctx)
+  }
+
   // ** Read only Functions
 
   public fun read_state(self: &mut InterestLST): (&Fund, u64, &LinkedTable<address, Validator>, u64, &Fee, &Balance<ISUI>, &LinkedTable<u64, Fund>) {

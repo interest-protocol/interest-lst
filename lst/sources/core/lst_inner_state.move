@@ -194,6 +194,35 @@ module interest_lst::interest_lst_inner_state {
     (principal, coupon)
   }
 
+  public(friend) fun call_bond(
+    sui_state: &mut SuiSystemState,
+    state: &mut State,
+    principal: SemiFungibleToken<ISUI_PRINCIPAL>,
+    coupon: Yield<ISUI_YIELD>,
+    maturity: u64,
+    validator_address: address,
+    unstake_payload: vector<UnstakePayload>,
+    ctx: &mut TxContext,    
+  ): Coin<SUI> {
+    let slot = (yield::slot(&coupon) as u64);
+
+    assert!((slot as u256) == sft::slot(&principal), errors::pool_mismatched_maturity());
+
+    let state = load_state_mut(state);
+
+    update_fund_logic(sui_state, state, tx_context::epoch(ctx));
+
+    let burn_amount = sft::burn(&mut state.principal_cap, principal);
+    let sui_amount = get_pending_yield_logic(state, &coupon, maturity, ctx) + burn_amount;
+    yield::burn(&mut state.yield_cap, coupon);
+
+    events::emit_call_bond(tx_context::sender(ctx), sui_amount, maturity);
+
+    fund::sub_underlying(&mut state.pool, sui_amount, false);
+
+    remove_staked_sui(sui_state, state, sui_amount, validator_address, unstake_payload, ctx)
+  }
+
   // ** Read only Functions
 
   public(friend) fun read_state(state: &mut State): (&Fund, u64, &LinkedTable<address, Validator>, u64, &Fee, &Balance<ISUI>, &LinkedTable<u64, Fund>) {
@@ -452,6 +481,46 @@ module interest_lst::interest_lst_inner_state {
 
     // Return the Sui Coin
     coin_sui_unstaked
+  }
+
+  fun get_pending_yield_logic(
+    state: &mut StateV1,
+    coupon: &Yield<ISUI_YIELD>,
+    maturity: u64,
+    ctx: &mut TxContext
+  ): u64 {
+    let slot = (yield::slot(coupon) as u64);
+
+    let (shares, principal, rewards_paid) = yield::read_data(coupon);
+
+    let shares_value = if (tx_context::epoch(ctx) > slot) {
+      // If the user is getting the yield after maturity
+      // We need to find the exchange rate at maturity
+
+      // Check if the table has slot exchange rate
+      // If it does not we use the back up maturity value
+      let pool = if (linked_table::contains(&state.pool_history, slot)) { 
+        linked_table::borrow(&state.pool_history, slot)
+      } else {
+        // Back up maturity needs to be before the slot
+        assert!(slot > maturity, errors::pool_invalid_backup_maturity());
+        linked_table::borrow(&state.pool_history, maturity)
+      };
+
+      fund::to_underlying(pool, shares, false)
+    } else {
+      // If it is before maturity - we just read the pool
+      fund::to_underlying(&state.pool, shares, false)
+    };
+
+    let debt = rewards_paid + principal;
+
+    // Remove the principal to find out how many rewards this SFT has accrued
+    if (debt >= shares_value) {
+      0
+    } else {
+      shares_value - debt
+    }
   }
 
   fun charge_isui_mint(

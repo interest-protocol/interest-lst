@@ -29,6 +29,12 @@ module interest_lst::events {
     validator: address
   }
 
+  struct CallBond has copy, drop {
+    sender: address,
+    sui_amount: u64,
+    maturity: u64    
+  }
+
   public(friend) fun emit_update_fund(principal: u64, rewards: u64) {
     emit(UpdateFund { principal, rewards });  
   }
@@ -57,5 +63,13 @@ module interest_lst::events {
     validator: address    
   ) {
     emit(MintStrippedBond { sender, sui_amount, shares_amount, validator });
+  }
+
+  public(friend) fun emit_call_bond(
+    sender: address,
+    sui_amount: u64,
+    maturity: u64  
+  ) {
+    emit(CallBond { sender, sui_amount, maturity });
   }
 }
