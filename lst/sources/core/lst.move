@@ -4,38 +4,23 @@
 // iSUIP is always 1 SUI as it represents the principal owned by this module
 // iSUIY represents the yield component of a iSUIP
 module interest_lst::interest_lst { 
-  use std::vector;
-  use std::option;
-
-  use sui::table;
-  use sui::transfer;
   use sui::sui::SUI;
-  use sui::event::emit;
   use sui::dynamic_field as df;
-  use sui::object::{Self, UID, ID};
-  use sui::balance::{Self, Balance};
-  use sui::tx_context::{Self, TxContext};
-  use sui::coin::{Self, Coin, TreasuryCap};
-  use sui::linked_table::{Self, LinkedTable};
+  use sui::object::{Self, UID};
+  use sui::tx_context::TxContext;
+  use sui::transfer::share_object;
+  use sui::coin::{Coin, TreasuryCap};
 
-  use sui_system::staking_pool::{Self, StakedSui};
-  use sui_system::sui_system::{Self, SuiSystemState};
+  use sui_system::sui_system::SuiSystemState;
 
-  use suitears::fund::{Self, Fund};
-  use suitears::fixed_point_wad::{wad_mul_up as fmul, wad_div_up as fdiv};
-  use suitears::semi_fungible_token::{Self as sft, SemiFungibleToken, SftTreasuryCap};
+  use suitears::semi_fungible_token::{SemiFungibleToken, SftTreasuryCap};
 
   use yield::yield::{Self, Yield, YieldCap};
 
-  use interest_lst::errors;
   use interest_lst::isui::ISUI;
   use interest_lst::isui_yield::ISUI_YIELD;
   use interest_lst::isui_principal::ISUI_PRINCIPAL;
-  use interest_lst::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
-  use interest_lst::staking_pool_utils::{calc_staking_pool_rewards, get_most_recent_exchange_rate};
   use interest_lst::interest_lst_inner_state::{Self as inner_state, State};
-
-  const MIN_STAKE_AMOUNT: u64 = 1_000_000_000;
 
   // ** Structs
 
@@ -46,7 +31,7 @@ module interest_lst::interest_lst {
   }
 
   fun init(ctx: &mut TxContext) {
-    transfer::share_object(InterestLST { id: object::new(ctx) });
+    share_object(InterestLST { id: object::new(ctx) });
   }
 
   // @dev this function cannot be called again because the caps cannot be created again
@@ -59,6 +44,15 @@ module interest_lst::interest_lst {
   ) {
     let genesis_state = inner_state::create_genesis_state(isui_cap, principal_cap, yield_cap, ctx);
     df::add(&mut self.id, StateKey {}, genesis_state);
+  }
+
+  public fun update_fund(
+    sui_state: &mut SuiSystemState,
+    self: &mut InterestLST,
+    ctx: &mut TxContext,
+  ) {
+    let state = load_state_mut(self);
+    inner_state::update_fund(sui_state, state, ctx);
   }
 
 
