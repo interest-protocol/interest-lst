@@ -12,13 +12,13 @@ module interest_lst::interest_lst_inner_state {
   use sui::linked_table::{Self, LinkedTable};
 
   use suitears::fund::{Self, Fund};
-  use suitears::semi_fungible_token::{Self, SftTreasuryCap};
   use suitears::fixed_point_wad::{wad_mul_up as fmul, wad_div_up as fdiv};
+  use suitears::semi_fungible_token::{Self as sft, SftTreasuryCap, SemiFungibleToken};
 
   use sui_system::sui_system::{Self, SuiSystemState};
   use sui_system::staking_pool::{Self, StakedSui};
 
-  use yield::yield::{Self, YieldCap};
+  use yield::yield::{Self, YieldCap, Yield};
   
   use interest_lst::errors;
   use interest_lst::events;
@@ -85,6 +85,8 @@ module interest_lst::interest_lst_inner_state {
     }
   }
 
+  // ** Core Functions
+
   public(friend) fun update_fund(
     sui_state: &mut SuiSystemState,
     state: &mut State,
@@ -147,6 +149,53 @@ module interest_lst::interest_lst_inner_state {
     remove_staked_sui(sui_state, state, sui_amount, validator_address, unstake_payload, ctx)
   }
 
+  public(friend) fun mint_stripped_bond(
+    sui_state: &mut SuiSystemState,
+    state: &mut State,
+    asset: Coin<SUI>,
+    validator_address: address,
+    maturity: u64,
+    ctx: &mut TxContext    
+  ): (SemiFungibleToken<ISUI_PRINCIPAL>, Yield<ISUI_YIELD>) {
+    assert!(maturity >= tx_context::epoch(ctx), errors::pool_outdated_maturity());
+
+    let sui_amount = coin::value(&asset);
+    let state = load_state_mut(state);
+
+    mint_isui_logic(sui_state, state, asset, validator_address, ctx);
+
+    let sui_amount = if (is_whitelisted(state, validator_address)) 
+      sui_amount
+    else {
+      let validator = linked_table::borrow_mut(&mut state.validators_table, validator_address);
+      let validator_principal = validator::total_principal(validator);
+      charge_stripped_bond_mint(
+        state,
+        validator_principal,
+        sui_amount,
+        ctx
+      )
+    };
+
+    let shares_amount = fund::to_shares(&state.pool, sui_amount, false);
+
+    let coupon = yield::mint(
+      &mut state.yield_cap,
+      (maturity as u256),
+      sui_amount,
+      shares_amount,
+      ctx
+    );
+
+    let principal = sft::mint(&mut state.principal_cap, (maturity as u256), sui_amount, ctx);
+
+    events::emit_mint_stripped_bond(tx_context::sender(ctx), sui_amount, shares_amount, validator_address);
+
+    (principal, coupon)
+  }
+
+  // ** Read only Functions
+
   public(friend) fun read_state(state: &mut State): (&Fund, u64, &LinkedTable<address, Validator>, u64, &Fee, &Balance<ISUI>, &LinkedTable<u64, Fund>) {
     let state = load_state(state);
     (
@@ -167,6 +216,8 @@ module interest_lst::interest_lst_inner_state {
 
     (validator::borrow_staked_sui_table(validator), total_principal)
   }
+
+  // ** Private Functions
 
   fun load_state(self: &mut State): &StateV1 {
     load_state_maybe_upgrade(self)
@@ -422,6 +473,30 @@ module interest_lst::interest_lst_inner_state {
     shares - fee_amount
   }
 
+  fun charge_stripped_bond_mint(
+    state: &mut StateV1,
+    validator_principal: u64,
+    amount: u64,
+    ctx: &mut TxContext
+    ): u64 {
+    
+    // Find the fee % based on the validator dominance and fee parameters.  
+    let fee_amount = calculate_fee(state, validator_principal, amount);
+
+    // If the fee is zero, there is nothing else to do
+    if (fee_amount == 0) return amount;
+
+    // Mint the ISUI for the DAO. We need to make sure the total supply of ISUI is consistent with the pool shares
+    coin::put(&mut state.dao_balance, coin::mint(
+      &mut state.isui_cap, 
+      fund::to_shares(&state.pool, fee_amount, false), 
+      ctx
+    ));
+
+    // Return the shares amount to mint to the sender
+    amount - fee_amount
+  }
+
   fun calculate_fee(
     state: &StateV1,
     validator_principal: u64,
@@ -449,5 +524,4 @@ module interest_lst::interest_lst_inner_state {
     // * IMPORTANT: When new versions are added, we need to explicitly upgrade here.
     assert!(versioned::version(&self.inner) == STATE_VERSION_V1, errors::invalid_version());
   }
-
 }

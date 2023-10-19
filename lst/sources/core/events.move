@@ -22,6 +22,13 @@ module interest_lst::events {
     isui_amount: u64,
   }
 
+  struct MintStrippedBond has copy, drop {
+    sender: address,
+    sui_amount: u64,
+    shares_amount: u64,
+    validator: address
+  }
+
   public(friend) fun emit_update_fund(principal: u64, rewards: u64) {
     emit(UpdateFund { principal, rewards });  
   }
@@ -41,5 +48,14 @@ module interest_lst::events {
     isui_amount: u64,
   ) {
     emit(BurnISui { sender, sui_amount, isui_amount });
+  }
+
+  public(friend) fun  emit_mint_stripped_bond(
+    sender: address,
+    sui_amount: u64,
+    shares_amount: u64,
+    validator: address    
+  ) {
+    emit(MintStrippedBond { sender, sui_amount, shares_amount, validator });
   }
 }

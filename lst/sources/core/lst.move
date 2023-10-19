@@ -86,6 +86,18 @@ module interest_lst::interest_lst {
     inner_state::burn_isui(sui_state, state, asset, validator_address, unstake_payload, ctx)
   }
 
+  public(friend) fun mint_stripped_bond(
+    sui_state: &mut SuiSystemState,
+    self: &mut InterestLST,
+    asset: Coin<SUI>,
+    validator_address: address,
+    maturity: u64,
+    ctx: &mut TxContext    
+  ): (SemiFungibleToken<ISUI_PRINCIPAL>, Yield<ISUI_YIELD>) {
+    let state = load_state_mut(self);
+    inner_state::mint_stripped_bond(sui_state, state, asset, validator_address, maturity, ctx)
+  }
+
   // ** Read only Functions
 
   public fun read_state(self: &mut InterestLST): (&Fund, u64, &LinkedTable<address, Validator>, u64, &Fee, &Balance<ISUI>, &LinkedTable<u64, Fund>) {
