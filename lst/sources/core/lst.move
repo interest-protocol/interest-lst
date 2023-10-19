@@ -6,8 +6,8 @@
 module interest_lst::interest_lst { 
   use sui::sui::SUI;
   use sui::balance::Balance;
-  use sui::dynamic_field as df;
   use sui::object::{Self, UID};
+  use sui::dynamic_field as df;
   use sui::tx_context::TxContext;
   use sui::transfer::share_object;
   use sui::linked_table::LinkedTable;
@@ -19,7 +19,7 @@ module interest_lst::interest_lst {
   use suitears::fund::Fund;
   use suitears::semi_fungible_token::{SemiFungibleToken, SftTreasuryCap};
 
-  use yield::yield::{Self, Yield, YieldCap};
+  use yield::yield::{Yield, YieldCap};
 
   use interest_lst::isui::ISUI;
   
@@ -86,7 +86,7 @@ module interest_lst::interest_lst {
     inner_state::burn_isui(sui_state, state, asset, validator_address, unstake_payload, ctx)
   }
 
-  public(friend) fun mint_stripped_bond(
+  public fun mint_stripped_bond(
     sui_state: &mut SuiSystemState,
     self: &mut InterestLST,
     asset: Coin<SUI>,
@@ -98,7 +98,7 @@ module interest_lst::interest_lst {
     inner_state::mint_stripped_bond(sui_state, state, asset, validator_address, maturity, ctx)
   }
 
-  public(friend) fun call_bond(
+  public fun call_bond(
     sui_state: &mut SuiSystemState,
     self: &mut InterestLST,
     principal: SemiFungibleToken<ISUI_PRINCIPAL>,
@@ -110,6 +110,36 @@ module interest_lst::interest_lst {
   ): Coin<SUI> {
     let state = load_state_mut(self);
     inner_state::call_bond(sui_state, state, principal, coupon, maturity, validator_address, unstake_payload, ctx)
+  }
+
+  public fun burn_sui_principal(
+    sui_state: &mut SuiSystemState,
+    self: &mut InterestLST,
+    principal: SemiFungibleToken<ISUI_PRINCIPAL>,
+    validator_address: address,
+    unstake_payload: vector<UnstakePayload>,
+    ctx: &mut TxContext,
+  ): Coin<SUI> {
+    let state = load_state_mut(self);
+    inner_state::burn_sui_principal(sui_state, state, principal, validator_address, unstake_payload, ctx)
+  }
+
+  public fun claim_yield(
+    sui_state: &mut SuiSystemState,
+    self: &mut InterestLST,
+    coupon: Yield<ISUI_YIELD>,
+    validator_address: address,
+    unstake_payload: vector<UnstakePayload>,
+    maturity: u64,
+    ctx: &mut TxContext,
+  ): (Yield<ISUI_YIELD>, Coin<SUI>) {
+    let state = load_state_mut(self);
+    inner_state::claim_yield(sui_state, state, coupon, validator_address, unstake_payload, maturity, ctx)
+  }
+
+  public fun is_whitelisted(self: &mut InterestLST, validator_address: address): bool {
+    let state = load_state_mut(self);
+    inner_state::is_whitelisted(state, validator_address)
   }
 
   // ** Read only Functions

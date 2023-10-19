@@ -35,6 +35,16 @@ module interest_lst::events {
     maturity: u64    
   }
 
+  struct BurnSuiPrincipal has copy, drop {
+    sender: address,
+    sui_amount: u64
+  }
+
+  struct ClaimYield has copy, drop {
+    sender: address,
+    sui_amount: u64,   
+  }
+
   public(friend) fun emit_update_fund(principal: u64, rewards: u64) {
     emit(UpdateFund { principal, rewards });  
   }
@@ -71,5 +81,13 @@ module interest_lst::events {
     maturity: u64  
   ) {
     emit(CallBond { sender, sui_amount, maturity });
+  }
+
+  public(friend) fun emit_burn_sui_principal(sender: address, sui_amount: u64) {
+    emit(BurnSuiPrincipal { sender, sui_amount });
+  }
+
+  public(friend) fun emit_claim_yield(sender: address, sui_amount: u64) {
+    emit(ClaimYield{ sender, sui_amount });
   }
 }

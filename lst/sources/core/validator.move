@@ -5,7 +5,7 @@ module interest_lst::validator {
   use sui::linked_table::{Self, LinkedTable};
   use sui::tx_context::TxContext;
 
-  use sui_system::staking_pool::{Self, StakedSui};
+  use sui_system::staking_pool::StakedSui;
 
   use interest_lst::errors;
 

@@ -4,7 +4,7 @@ module interest_lst::interest_lst_inner_state {
 
   use sui::table;
   use sui::sui::SUI;
-  use sui::object::{Self, UID, ID};
+  use sui::object::ID;
   use sui::balance::{Self, Balance};
   use sui::coin::{Self, Coin, TreasuryCap};
   use sui::versioned::{Self, Versioned};
@@ -28,7 +28,7 @@ module interest_lst::interest_lst_inner_state {
   use interest_lst::validator::{Self, Validator};
   use interest_lst::isui_principal::ISUI_PRINCIPAL;
   use interest_lst::unstake_utils::{Self, UnstakePayload};
-  use interest_lst::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
+  use interest_lst::fee_utils::{new as new_fee, calculate_fee_percentage, Fee};
   use interest_lst::staking_pool_utils::{calc_staking_pool_rewards, get_most_recent_exchange_rate};
 
 
@@ -87,13 +87,25 @@ module interest_lst::interest_lst_inner_state {
 
   // ** Core Functions
 
+  public(friend) fun get_pending_yield(
+    sui_state: &mut SuiSystemState,
+    state: &mut State,  
+    coupon: &Yield<ISUI_YIELD>,
+    maturity: u64,
+    ctx: &mut TxContext  
+  ): u64 {
+    let state = load_state_mut(state);
+    update_fund_logic(sui_state, state, tx_context::epoch(ctx));
+    get_pending_yield_logic(state, coupon, maturity, ctx)
+  }
+
   public(friend) fun update_fund(
     sui_state: &mut SuiSystemState,
     state: &mut State,
     ctx: &mut TxContext,
   ) {
     let epoch = tx_context::epoch(ctx);
-    let state = load_state_maybe_upgrade(state);
+    let state = load_state_mut(state);
 
     update_fund_logic(sui_state, state, epoch);
   }
@@ -111,7 +123,7 @@ module interest_lst::interest_lst_inner_state {
 
     let shares = mint_isui_logic(sui_state, state, asset, validator_address, ctx);
 
-    let isui_amount = if (is_whitelisted(state, validator_address)) {
+    let isui_amount = if (is_whitelisted_logic(state, validator_address)) {
       shares
     } else {
       let validator_principal = validator::total_principal(linked_table::borrow_mut(&mut state.validators_table, validator_address));
@@ -164,7 +176,7 @@ module interest_lst::interest_lst_inner_state {
 
     mint_isui_logic(sui_state, state, asset, validator_address, ctx);
 
-    let sui_amount = if (is_whitelisted(state, validator_address)) 
+    let sui_amount = if (is_whitelisted_logic(state, validator_address)) 
       sui_amount
     else {
       let validator = linked_table::borrow_mut(&mut state.validators_table, validator_address);
@@ -223,6 +235,67 @@ module interest_lst::interest_lst_inner_state {
     remove_staked_sui(sui_state, state, sui_amount, validator_address, unstake_payload, ctx)
   }
 
+  public(friend) fun burn_sui_principal(
+    sui_state: &mut SuiSystemState,
+    state: &mut State,
+    principal: SemiFungibleToken<ISUI_PRINCIPAL>,
+    validator_address: address,
+    unstake_payload: vector<UnstakePayload>,
+    ctx: &mut TxContext,
+  ): Coin<SUI> {
+    assert!(tx_context::epoch(ctx) >= (sft::slot(&principal) as u64), errors::pool_bond_not_matured());
+
+    let state = load_state_mut(state);
+
+    update_fund_logic(sui_state, state, tx_context::epoch(ctx));
+
+    let sui_amount = sft::burn(&mut state.principal_cap, principal);
+
+    fund::sub_underlying(&mut state.pool, sui_amount, false);
+
+    events::emit_burn_sui_principal(tx_context::sender(ctx), sui_amount);
+
+    remove_staked_sui(sui_state, state, sui_amount, validator_address, unstake_payload, ctx)
+  }
+
+  public(friend) fun claim_yield(
+    sui_state: &mut SuiSystemState,
+    state: &mut State,
+    coupon: Yield<ISUI_YIELD>,
+    validator_address: address,
+    unstake_payload: vector<UnstakePayload>,
+    maturity: u64,
+    ctx: &mut TxContext,
+  ): (Yield<ISUI_YIELD>, Coin<SUI>) {
+    let state = load_state_mut(state);
+
+    update_fund_logic(sui_state, state, tx_context::epoch(ctx));
+    
+    let sui_amount = get_pending_yield_logic(state, &coupon, maturity, ctx);
+
+    let is_zero_amount = sui_amount == 0;
+
+    if (!is_zero_amount) {
+      // Consider yield paid
+      yield::add_rewards_paid(&state.yield_cap, &mut coupon, sui_amount);
+      // We need to update the pool
+      fund::sub_underlying(&mut state.pool, sui_amount, false);
+    };
+
+    events::emit_claim_yield(tx_context::sender(ctx), sui_amount);
+
+    (
+      if (tx_context::epoch(ctx) > (yield::slot(&coupon) as u64)) 
+          yield::expire(&mut state.yield_cap, coupon, ctx)
+        else
+          coupon,
+      if (is_zero_amount)
+        coin::zero(ctx)
+      else 
+        remove_staked_sui(sui_state, state, sui_amount, validator_address, unstake_payload, ctx)
+    )
+  }
+
   // ** Read only Functions
 
   public(friend) fun read_state(state: &mut State): (&Fund, u64, &LinkedTable<address, Validator>, u64, &Fee, &Balance<ISUI>, &LinkedTable<u64, Fund>) {
@@ -246,6 +319,11 @@ module interest_lst::interest_lst_inner_state {
     (validator::borrow_staked_sui_table(validator), total_principal)
   }
 
+  public(friend) fun is_whitelisted(state: &mut State, validator_address: address): bool {
+    let state = load_state(state);
+    is_whitelisted_logic(state, validator_address)
+  }
+
   // ** Private Functions
 
   fun load_state(self: &mut State): &StateV1 {
@@ -256,6 +334,9 @@ module interest_lst::interest_lst_inner_state {
     load_state_maybe_upgrade(self)
   }
 
+  fun is_whitelisted_logic(state: &StateV1, validator: address): bool {
+    vector::contains(&state.whitelist_validators, &validator)
+  }
 
   fun mint_isui_logic(
     sui_state: &mut SuiSystemState,
@@ -354,10 +435,6 @@ module interest_lst::interest_lst_inner_state {
     );
 
     events::emit_update_fund(state.total_principal, total_rewards);    
-  }
-
-  fun is_whitelisted(state: &StateV1, validator: address): bool {
-    vector::contains(&state.whitelist_validators, &validator)
   }
 
   fun add_validator(
