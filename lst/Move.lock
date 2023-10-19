@@ -2,53 +2,24 @@
 
 [move]
 version = 0
-manifest_digest = "6DA5261EBD9EA3EFC2F705F7AD0AC80F68F67D76E9FC7AC059369F0ABCD531FF"
-deps_digest = "52B406A7A21811BEF51751CF88DA0E76DAEFFEAC888D4F4060B1A72BBE7D8D35"
+manifest_digest = "80EECF163295EE5BEBF442A03B775C12938222A8C9ECFC4095D41FBB6DF49796"
+deps_digest = "397E6A9F7A624706DBDFEE056CE88391A15876868FD18A88504DA74EB458D697"
 
 dependencies = [
-  { name = "Access" },
-  { name = "InterestFramework" },
-  { name = "InterestTokens" },
   { name = "MoveStdlib" },
   { name = "Sui" },
   { name = "SuiSystem" },
-]
-
-[[move.package]]
-name = "Access"
-source = { local = "../access" }
-
-dependencies = [
-  { name = "Sui" },
-]
-
-[[move.package]]
-name = "InterestFramework"
-source = { local = "../framework" }
-
-dependencies = [
-  { name = "MoveStdlib" },
-  { name = "Sui" },
-]
-
-[[move.package]]
-name = "InterestTokens"
-source = { local = "../tokens" }
-
-dependencies = [
-  { name = "Access" },
-  { name = "InterestFramework" },
-  { name = "MoveStdlib" },
-  { name = "Sui" },
+  { name = "SuiTears" },
+  { name = "Yield" },
 ]
 
 [[move.package]]
 name = "MoveStdlib"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet-v1.10.1", subdir = "crates/sui-framework/packages/move-stdlib" }
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet-v1.12.0", subdir = "crates/sui-framework/packages/move-stdlib" }
 
 [[move.package]]
 name = "Sui"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet-v1.10.1", subdir = "crates/sui-framework/packages/sui-framework" }
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet-v1.12.0", subdir = "crates/sui-framework/packages/sui-framework" }
 
 dependencies = [
   { name = "MoveStdlib" },
@@ -56,9 +27,28 @@ dependencies = [
 
 [[move.package]]
 name = "SuiSystem"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet-v1.10.1", subdir = "crates/sui-framework/packages/sui-system" }
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet-v1.12.0", subdir = "crates/sui-framework/packages/sui-system" }
 
 dependencies = [
   { name = "MoveStdlib" },
   { name = "Sui" },
+]
+
+[[move.package]]
+name = "SuiTears"
+source = { git = "https://github.com/interest-protocol/suitears.git", rev = "testnet", subdir = "contracts" }
+
+dependencies = [
+  { name = "MoveStdlib" },
+  { name = "Sui" },
+]
+
+[[move.package]]
+name = "Yield"
+source = { local = "../yield" }
+
+dependencies = [
+  { name = "MoveStdlib" },
+  { name = "Sui" },
+  { name = "SuiTears" },
 ]

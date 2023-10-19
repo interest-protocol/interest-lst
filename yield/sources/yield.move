@@ -1,7 +1,5 @@
 module yield::yield {
-  use std::ascii;
   use std::option::Option;
-  use std::string::String;
 
   use sui::url::Url;
   use sui::object::{Self, UID};
@@ -18,6 +16,12 @@ module yield::yield {
     rewards_paid: u64
   }
 
+  // Prevent modules from mistakenly passing the cap to the sft library directly
+  struct YieldCap<phantom OTW: drop> has key, store {
+    id: UID,
+    cap: SftTreasuryCap<OTW>
+  }
+
 
   public fun create<OTW: drop>(    
     witness: OTW,
@@ -28,8 +32,8 @@ module yield::yield {
     slot_description: vector<u8>,
     icon_url: Option<Url>,
     ctx: &mut TxContext 
-  ): (SftTreasuryCap<OTW>, SftMetadata<OTW>) {
-    sft::create_sft(
+  ): (YieldCap<OTW>, SftMetadata<OTW>) {
+    let (cap, metadata) = sft::create_sft(
       witness,
       decimals,
       symbol,
@@ -38,11 +42,16 @@ module yield::yield {
       slot_description,
       icon_url,
       ctx
+    );
+
+    (
+      YieldCap { id: object::new(ctx), cap },
+      metadata
     )
   }
 
-  public fun total_supply<T: drop>(cap: &SftTreasuryCap<T>, slot: u256): u64 {
-    sft::total_supply(cap, slot)
+  public fun total_supply<T: drop>(cap: &YieldCap<T>, slot: u256): u64 {
+    sft::total_supply(&cap.cap, slot)
   }
 
   public fun value<T: drop>(asset: &Yield<T>): u64 {
@@ -118,19 +127,19 @@ module yield::yield {
     object::delete(id);
   }
 
-  public fun burn<T: drop>(cap: &mut SftTreasuryCap<T>, asset: Yield<T>): (u64, u64, u64) {
+  public fun burn<T: drop>(cap: &mut YieldCap<T>, asset: Yield<T>): (u64, u64, u64) {
     let (x, y, z) = read_data(&asset);
 
     let Yield { id, sft, shares:_, rewards_paid:_} = asset;
     object::delete(id);
-    sft::burn(cap, sft);
+    sft::burn(&mut cap.cap, sft);
     (x, y, z)
   } 
 
   // === MINTER ONLY Functions ===
 
   public fun mint<T: drop>(
-    cap: &mut SftTreasuryCap<T>, 
+    cap: &mut YieldCap<T>, 
     slot: u256, 
     principal: u64, 
     shares: u64, 
@@ -138,14 +147,14 @@ module yield::yield {
   ): Yield<T> {
     Yield {
       id: object::new(ctx),
-      sft: sft::mint(cap, slot, principal, ctx),
+      sft: sft::mint(&mut cap.cap, slot, principal, ctx),
       shares,
       rewards_paid: 0 
     }
   } 
 
   public fun add_rewards_paid<T: drop>(
-    _: &SftTreasuryCap<T>, 
+    _: &YieldCap<T>, 
     asset: &mut Yield<T>,
     rewards_paid: u64,     
     ) {
@@ -153,7 +162,7 @@ module yield::yield {
   }
 
   public fun set_shares<T: drop>(
-    _: &SftTreasuryCap<T>,  
+    _: &YieldCap<T>,  
     asset: &mut Yield<T>,
     shares: u64,     
   ) {
@@ -161,43 +170,18 @@ module yield::yield {
   }
 
   public fun set_rewards_paid<T: drop>(
-    _: &SftTreasuryCap<T>,  
+    _: &YieldCap<T>,  
     asset: &mut Yield<T>,
     rewards_paid: u64,     
     ) {
     asset.rewards_paid =  rewards_paid;
   }
 
-  public fun expire<T: drop>(cap: &mut SftTreasuryCap<T>, asset: Yield<T>, ctx: &mut TxContext): Yield<T> {
+  public fun expire<T: drop>(cap: &mut YieldCap<T>, asset: Yield<T>, ctx: &mut TxContext): Yield<T> {
     let x = zero(slot(&asset),  ctx);
     burn(cap, asset);
     x
   }
-
-  // === ADMIN ONLY Functions ===
-
-  public entry fun update_name<T: drop>(
-    cap: &mut SftTreasuryCap<T>, metadata: &mut SftMetadata<T>, name: String
-  ) { sft::update_name(cap, metadata, name); }
-
-  public entry fun update_symbol<T: drop>(
-    cap: &mut SftTreasuryCap<T>, metadata: &mut SftMetadata<T>, symbol: ascii::String
-  ) { sft::update_symbol(cap, metadata, symbol) }
-
-  public entry fun update_description<T: drop>(
-    cap: &mut SftTreasuryCap<T>, metadata: &mut SftMetadata<T>, description: String
-  ) { sft::update_description(cap, metadata, description) }
-
-  public entry fun update_slot_description<T: drop>(
-    cap: &mut SftTreasuryCap<T>, metadata: &mut SftMetadata<T>, slot_description: String
-  ) { sft::update_slot_description(cap, metadata, slot_description) }
-
-  public entry fun update_icon_url<T: drop>(
-    cap: &mut SftTreasuryCap<T>, metadata: &mut SftMetadata<T>, url: ascii::String
-  ) {
-    sft::update_icon_url(cap, metadata, url);
-  }
-
 
   // === TEST ONLY Functions ===
 
