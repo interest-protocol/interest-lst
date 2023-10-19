@@ -137,12 +137,13 @@ module interest_lst::interest_lst {
     inner_state::claim_yield(sui_state, state, coupon, validator_address, unstake_payload, maturity, ctx)
   }
 
+  // ** Read only Functions
+
   public fun is_whitelisted(self: &mut InterestLST, validator_address: address): bool {
     let state = load_state_mut(self);
     inner_state::is_whitelisted(state, validator_address)
   }
 
-  // ** Read only Functions
 
   public fun read_state(self: &mut InterestLST): (&Fund, u64, &LinkedTable<address, Validator>, u64, &Fee, &Balance<ISUI>, &LinkedTable<u64, Fund>) {
     let state = load_state_mut(self);

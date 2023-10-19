@@ -219,6 +219,7 @@ module interest_lst::interest_lst_inner_state {
     let slot = (yield::slot(&coupon) as u64);
 
     assert!((slot as u256) == sft::slot(&principal), errors::pool_mismatched_maturity());
+    assert!(yield::value(&coupon) == sft::value(&principal), errors::pool_mismatched_values());
 
     let state = load_state_mut(state);
 
