@@ -24,12 +24,16 @@ module interest_lst::validator {
     inner: Versioned
   }
 
-  public(friend) fun create_v1(staking_pool_id: ID, ctx: &mut TxContext): ValidatorV1 {
-    ValidatorV1 {
+  public(friend) fun create_genesis_state(staking_pool_id: ID, ctx: &mut TxContext): Validator {
+    let validator_v1 = ValidatorV1 {
       staking_pool_id,
       staked_sui_table: linked_table::new(ctx),
       total_principal: 0
-    }  
+    };
+
+    Validator {
+      inner: versioned::create(VALIDATOR_VERSION_V1, validator_v1, ctx)  
+    }
   }
 
   fun load_state(self: &mut Validator): &ValidatorV1 {
