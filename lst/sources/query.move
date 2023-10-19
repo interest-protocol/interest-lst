@@ -5,10 +5,9 @@ module interest_lst::query {
   use sui::linked_table;
 
   use sui_system::staking_pool;
- 
-  use interest_lst::fee_utils::calculate_fee_percentage;
-  use interest_lst::interest_lst::{Self, InterestLST};
 
+  use interest_lst::interest_lst::{Self, InterestLST};
+  use interest_lst::fee_utils::calculate_fee_percentage;
 
   struct StakePosition has store, drop {
     epoch: u64,

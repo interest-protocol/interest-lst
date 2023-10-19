@@ -15,8 +15,8 @@ module interest_lst::interest_lst_inner_state {
   use suitears::fixed_point_wad::{wad_mul_up as fmul, wad_div_up as fdiv};
   use suitears::semi_fungible_token::{Self as sft, SftTreasuryCap, SemiFungibleToken};
 
-  use sui_system::sui_system::{Self, SuiSystemState};
   use sui_system::staking_pool::{Self, StakedSui};
+  use sui_system::sui_system::{Self, SuiSystemState};
 
   use yield::yield::{Self, YieldCap, Yield};
   
