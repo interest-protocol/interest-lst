@@ -54,6 +54,26 @@ module interest_lst::interest_lst {
     df::add(&mut self.id, StateKey {}, genesis_state);
   }
 
+  public fun get_exchange_rate_isui_to_sui(
+    sui_state: &mut SuiSystemState,
+    self: &mut InterestLST,
+    isui_amount: u64,
+    ctx: &mut TxContext
+  ): u64 {
+    let state = load_state_mut(self);
+    inner_state::get_exchange_rate_isui_to_sui(sui_state, state, isui_amount, ctx)
+  }
+
+  public fun get_exchange_rate_sui_to_isui(
+    sui_state: &mut SuiSystemState,
+    self: &mut InterestLST,
+    sui_amount: u64,
+    ctx: &mut TxContext
+  ): u64 {
+    let state = load_state_mut(self);
+    inner_state::get_exchange_rate_sui_to_isui(sui_state, state, sui_amount, ctx)
+  }
+
   public fun update_fund(
     sui_state: &mut SuiSystemState,
     self: &mut InterestLST,

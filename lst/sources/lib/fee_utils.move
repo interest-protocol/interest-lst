@@ -8,7 +8,7 @@ module interest_lst::fee_utils {
   // If the dominance >= kink
   // Fee = ((dominance - kink) * jump) + (kink * base)
   // Fee = dominance * base
-  struct Fee has store {
+  struct Fee has store, copy, drop {
     base: u128, // Base Multiplier
     kink: u128, // Threshold
     jump: u128 // Jump Multiplier

@@ -87,6 +87,31 @@ module interest_lst::interest_lst_inner_state {
 
   // ** Core Functions
 
+  public(friend) fun get_exchange_rate_isui_to_sui(
+    sui_state: &mut SuiSystemState,
+    state: &mut State,  
+    isui_amount: u64,
+    ctx: &mut TxContext
+  ): u64 {
+    let state = load_state_mut(state);
+
+    update_fund_logic(sui_state, state, tx_context::epoch(ctx));
+    fund::to_underlying(&state.pool, isui_amount, false)
+  }
+
+  public(friend) fun get_exchange_rate_sui_to_isui(
+    sui_state: &mut SuiSystemState,
+    state: &mut State,  
+    sui_amount: u64,
+    ctx: &mut TxContext
+  ): u64 {
+    let state = load_state_mut(state);
+
+    update_fund_logic(sui_state, state, tx_context::epoch(ctx));
+    fund::to_shares(&state.pool, sui_amount, false)
+  }
+
+
   public(friend) fun get_pending_yield(
     sui_state: &mut SuiSystemState,
     state: &mut State,  
