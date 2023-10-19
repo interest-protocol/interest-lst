@@ -45,6 +45,11 @@ module interest_lst::validator {
     validator.total_principal
   }
 
+  public(friend) fun borrow_mut_total_principal(self: &mut Validator): &mut u64 {
+    let validator = load_state_mut(self);
+    &mut validator.total_principal
+  }
+
   public(friend) fun borrow_mut_staked_sui_table(self: &mut Validator): &mut LinkedTable<u64, StakedSui> {
     let validator = load_state_mut(self);
     &mut validator.staked_sui_table    

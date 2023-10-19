@@ -27,6 +27,7 @@ module interest_lst::interest_lst_inner_state {
   use interest_lst::isui_yield::ISUI_YIELD;
   use interest_lst::validator::{Self, Validator};
   use interest_lst::isui_principal::ISUI_PRINCIPAL;
+  use interest_lst::unstake_utils::{Self, UnstakePayload};
   use interest_lst::fee_utils::{new as new_fee, calculate_fee_percentage, set_fee, Fee};
   use interest_lst::staking_pool_utils::{calc_staking_pool_rewards, get_most_recent_exchange_rate};
 
@@ -123,6 +124,48 @@ module interest_lst::interest_lst_inner_state {
     events::emit_mint_isui(tx_context::sender(ctx), sui_amount, isui_amount, validator_address);
 
     coin::mint(&mut state.isui_cap, isui_amount, ctx)
+  }
+
+  public(friend) fun burn_isui(
+    sui_state: &mut SuiSystemState,
+    state: &mut State,
+    asset: Coin<ISUI>,
+    validator_address: address,
+    unstake_payload: vector<UnstakePayload>,
+    ctx: &mut TxContext,    
+  ): Coin<SUI> {
+    let state = load_state_mut(state);
+
+    update_fund_logic(sui_state, state, tx_context::epoch(ctx));
+
+    let isui_amount = coin::burn(&mut state.isui_cap, asset);
+
+    let sui_amount = fund::sub_shares(&mut state.pool, isui_amount, false);
+
+    events::emit_burn_isui(tx_context::sender(ctx), sui_amount, isui_amount);
+
+    remove_staked_sui(sui_state, state, sui_amount, validator_address, unstake_payload, ctx)
+  }
+
+  public(friend) fun read_state(state: &mut State): (&Fund, u64, &LinkedTable<address, Validator>, u64, &Fee, &Balance<ISUI>, &LinkedTable<u64, Fund>) {
+    let state = load_state(state);
+    (
+      &state.pool, 
+      state.last_epoch,
+      &state.validators_table,
+      state.total_principal,
+      &state.fee,
+      &state.dao_balance,
+      &state.pool_history
+    )
+  }
+
+  public(friend) fun read_validator_data(state: &mut State, validator_address: address): (&LinkedTable<u64, StakedSui>, u64) {
+    let state = load_state_mut(state);
+    let validator = linked_table::borrow_mut(&mut state.validators_table, validator_address);
+    let total_principal = validator::total_principal(validator);
+
+    (validator::borrow_staked_sui_table(validator), total_principal)
   }
 
   fun load_state(self: &mut State): &StateV1 {
@@ -264,6 +307,100 @@ module interest_lst::interest_lst_inner_state {
         // If there is no StakedSui with the {activation_epoch} on our table, we add it.
         linked_table::push_back(staked_sui_table, activation_epoch, staked_sui);
       };
+  }
+
+  fun remove_staked_sui(
+    sui_state: &mut SuiSystemState,
+    state: &mut StateV1,
+    amount: u64,
+    validator_address: address,
+    unstake_payload: vector<UnstakePayload>,
+    ctx: &mut TxContext,  
+  ): Coin<SUI> {
+    // Create Zero Coin<SUI>, which we will join all Sui to return
+    let coin_sui_unstaked = coin::zero<SUI>(ctx);
+
+    let len = vector::length(&unstake_payload);
+    let i = 0;
+
+    while (len > i) {
+      let (validator_address, epoch_amount_vector) = unstake_utils::read_unstake_payload(vector::borrow(&unstake_payload, i));
+
+      let validator = linked_table::borrow_mut(&mut state.validators_table, validator_address);
+
+
+      let j = 0;
+      let l = vector::length(epoch_amount_vector);
+      while (l > j) {
+        let epoch_amount = vector::borrow(epoch_amount_vector, j);
+        let (activation_epoch, unstake_amount, split) = unstake_utils::read_epoch_amount(epoch_amount);
+
+        let staked_sui_table = validator::borrow_mut_staked_sui_table(validator);
+
+        let staked_sui = linked_table::remove(staked_sui_table, activation_epoch);
+
+        let value = staking_pool::staked_sui_amount(&staked_sui);
+
+        if (split) {
+          // Split the Staked Sui -> Unstake -> Join with the Return Coin
+          coin::join(&mut coin_sui_unstaked, coin::from_balance(sui_system::request_withdraw_stake_non_entry(sui_state, staking_pool::split(&mut staked_sui, unstake_amount, ctx), ctx), ctx));
+
+          // Store the left over Staked Sui
+          store_staked_sui(validator, staked_sui);
+          
+          // Update the validator data
+          let validator_total_principal = validator::borrow_mut_total_principal(validator);
+          *validator_total_principal =  *validator_total_principal - unstake_amount;
+
+          // We have unstaked enough          
+        } else {
+          // If we cannot split, we simply unstake the whole Staked Sui
+          coin::join(&mut coin_sui_unstaked, coin::from_balance(sui_system::request_withdraw_stake_non_entry(sui_state, staked_sui, ctx), ctx));
+          // Update the validator data
+          let validator_total_principal = validator::borrow_mut_total_principal(validator);
+          *validator_total_principal =  *validator_total_principal - value;        
+        };
+
+        j = j + 1;
+      };
+
+      i = i + 1;
+    };
+
+    // Check how much we unstaked
+    let total_value_unstaked = coin::value(&coin_sui_unstaked);
+
+    // Update the total principal
+    state.total_principal = state.total_principal - total_value_unstaked;
+    state.total_activate_staked_sui = state.total_activate_staked_sui - total_value_unstaked;
+
+    // If we unstaked more than the desired amount, we need to restake the different
+    if (total_value_unstaked > amount) {
+      let extra_value = total_value_unstaked - amount;
+      // Split the different in a new coin
+      let extra_coin_sui = coin::split(&mut coin_sui_unstaked, extra_value, ctx);
+      // Save the current dust in storage
+      let dust_value = balance::value(&state.dust);
+
+      // If we have enough dust and extra sui to stake -> we stake and store in the table
+      if (extra_value + dust_value >= constants::min_stake_amount()) {
+        // Join Dust and extra coin
+        coin::join(&mut extra_coin_sui, coin::take(&mut state.dust, dust_value, ctx));
+        let validator = linked_table::borrow_mut(&mut state.validators_table, validator_address);
+        // Stake and store
+        store_staked_sui(validator, sui_system::request_add_stake_non_entry(sui_state, extra_coin_sui, validator_address, ctx));
+        let validator_total_principal = validator::borrow_mut_total_principal(validator);
+        *validator_total_principal =  *validator_total_principal - extra_value;  
+      } else {
+        // If we do not have enough to stake we save in the dust to be staked later on
+        coin::put(&mut state.dust, extra_coin_sui);
+      };
+
+      state.total_principal = state.total_principal + extra_value;
+    };
+
+    // Return the Sui Coin
+    coin_sui_unstaked
   }
 
   fun charge_isui_mint(

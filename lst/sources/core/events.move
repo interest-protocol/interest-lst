@@ -16,6 +16,12 @@ module interest_lst::events {
     validator: address
   }
 
+  struct BurnISui has copy, drop {
+    sender: address,
+    sui_amount: u64,
+    isui_amount: u64,
+  }
+
   public(friend) fun emit_update_fund(principal: u64, rewards: u64) {
     emit(UpdateFund { principal, rewards });  
   }
@@ -27,5 +33,13 @@ module interest_lst::events {
     validator: address
   ) {
     emit(MintISui { sender, sui_amount, isui_amount, validator });
+  }
+
+  public(friend) fun emit_burn_isui(
+    sender: address,
+    sui_amount: u64,
+    isui_amount: u64,
+  ) {
+    emit(BurnISui { sender, sui_amount, isui_amount });
   }
 }
