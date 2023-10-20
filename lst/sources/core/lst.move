@@ -167,6 +167,11 @@ module interest_lst::interest_lst {
     inner_state::whitelist_validators(state, action);
   }
 
+  public(friend) fun update_fee(self: &mut InterestLST, action: Action<INTEREST_PROTOCOL, LstWitness, IPX, Fee>) {
+    let state = load_state_mut(self);
+    inner_state::update_fee(state, action);
+  }
+
   // ** Read only Functions
 
   public fun is_whitelisted(self: &mut InterestLST, validator_address: address): bool {

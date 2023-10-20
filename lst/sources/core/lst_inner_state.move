@@ -31,7 +31,7 @@ module interest_lst::interest_lst_inner_state {
   use interest_lst::isui_principal::ISUI_PRINCIPAL;
   use interest_lst::interest_protocol::INTEREST_PROTOCOL;
   use interest_lst::unstake_utils::{Self, UnstakePayload};
-  use interest_lst::fee_utils::{new as new_fee, calculate_fee_percentage, Fee};
+  use interest_lst::fee_utils::{new as new_fee, calculate_fee_percentage, Fee, set_fee, read_fee};
   use interest_lst::staking_pool_utils::{calc_staking_pool_rewards, get_most_recent_exchange_rate};
 
 
@@ -352,6 +352,18 @@ module interest_lst::interest_lst_inner_state {
     };
 
     events::emit_whitelist_validators(new_whitelist);
+  }
+  
+  public(friend) fun update_fee(state: &mut State, action: Action<INTEREST_PROTOCOL, LstWitness, IPX, Fee>) {
+    let state = load_state_mut(state);
+
+    let new_fee = dao_action::finish_action(LstWitness {}, action);
+
+    set_fee(&mut state.fee, new_fee);
+
+    let (base, kink, jump) = read_fee(&new_fee);
+
+    events::emit_new_fee(base, kink, jump);
   }
 
   // ** Read only Functions

@@ -22,6 +22,18 @@ module interest_lst::fee_utils {
     }
   }
 
+  public fun create_fee(
+    base: u128,
+    kink: u128,
+    jump: u128
+  ): Fee {
+    Fee {
+      base,
+      kink,
+      jump
+    }
+  }
+
   public fun calculate_fee_percentage(
     fee: &Fee,
     principal: u128,
@@ -41,16 +53,13 @@ module interest_lst::fee_utils {
 
   public fun set_fee(
     fee: &mut Fee,
-    base: u128,
-    kink: u128,
-    jump: u128
+    new_fee: Fee
   ) {
-    fee.base = base;
-    fee.kink = kink;
-    fee.jump = jump;
+    fee.base = new_fee.base;
+    fee.kink = new_fee.kink;
+    fee.jump = new_fee.jump;
   }
 
-  #[test_only]
   public fun read_fee(fee:&Fee): (u128, u128, u128) {
     (fee.base, fee.kink, fee.jump)
   }

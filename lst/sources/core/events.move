@@ -49,6 +49,12 @@ module interest_lst::events {
     list: vector<address>
   }
 
+  struct NewFee has copy, drop {
+    base: u128,
+    kink: u128,
+    jump: u128
+  }
+
   public(friend) fun emit_update_fund(principal: u64, rewards: u64) {
     emit(UpdateFund { principal, rewards });  
   }
@@ -97,5 +103,9 @@ module interest_lst::events {
 
   public(friend) fun emit_whitelist_validators(list: vector<address>) {
     emit(WhitelistValidators { list })  
+  }
+
+  public(friend) fun emit_new_fee(base: u128, kink: u128, jump: u128) {
+    emit(NewFee { base, kink, jump });
   }
 }
