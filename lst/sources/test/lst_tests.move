@@ -3,44 +3,45 @@
  We only tested the core functionality
 */
 #[test_only]
-module interest_lst::pool_tests {
-//   use std::option;
+module interest_lst::lst_tests {
+  use std::option;
 
-//   use sui::balance;
-//   use sui::sui::SUI;
-//   use sui::linked_table;
-//   use sui::test_utils::assert_eq;
-//   use sui::coin::{mint_for_testing, burn_for_testing as burn};
-//   use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
+  use sui::balance;
+  use sui::sui::SUI;
+  use sui::linked_table;
+  use sui::test_utils::assert_eq;
+  use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
+  use sui::coin::{mint_for_testing, burn_for_testing as burn, TreasuryCap};
 
-//   use sui_system::staking_pool;
-//   use sui_system::sui_system::SuiSystemState;
-//   use sui_system::governance_test_utils::{
-//     create_sui_system_state_for_testing, 
-//     create_validator_for_testing, 
-//     advance_epoch, 
-//     assert_validator_total_stake_amounts, 
-//     advance_epoch_with_reward_amounts
-//   };
-
-//   use access::admin::{Self, AdminCap};
+  use sui_system::staking_pool;
+  use sui_system::sui_system::SuiSystemState;
+  use sui_system::governance_test_utils::{
+    create_sui_system_state_for_testing, 
+    create_validator_for_testing, 
+    advance_epoch, 
+    assert_validator_total_stake_amounts, 
+    advance_epoch_with_reward_amounts
+  };
   
-//   use interest_framework::rebase;
-//   use interest_framework::test_utils::{people, scenario, mint, add_decimals}; 
+  use suitears::fund;
+  use suitears::semi_fungible_token::{Self as sft, TreasuryCap};
 
-//   use interest_tokens::sui_yield::{Self, SuiYieldStorage};
-//   use interest_tokens::isui::{Self, ISUI, InterestSuiStorage};
-//   use interest_tokens::sui_principal::{Self, SuiPrincipalStorage};
+  use yield::yield;
 
-//   use interest_lst::fee_utils::read_fee;
-//   use interest_lst::pool::{Self, PoolStorage};
-//   use interest_lst::unstake_algorithms::default_unstake_algorithm;
+  use interest_lst::isui::{Self, ISUI};
+  use interest_lst::interest_lst as lst;
+  use interest_lst::fee_utils::read_fee;
+  use interest_lst::lst::{Self, InterestLST};
+  use interest_lst::isui_yield::{Self, ISUI_YIELD};
+  use interest_lst::isui_principal::{Self, ISUI_PRINCIPAL};
+  use interest_lst::unstake_algorithms::default_unstake_algorithm;
+  use interest_lst::test_utils::{people, scenario, mint, add_decimals}; 
 
-//   const MYSTEN_LABS: address = @0x4;
-//   const FIGMENT: address = @0x5;
-//   const COINBASE_CLOUD: address = @0x6;
-//   const SPARTA: address = @0x7;
-//   const JOSE: address = @0x8;
+  const MYSTEN_LABS: address = @0x4;
+  const FIGMENT: address = @0x5;
+  const COINBASE_CLOUD: address = @0x6;
+  const SPARTA: address = @0x7;
+  const JOSE: address = @0x8;
 
 //   #[test]
 //   fun test_first_mint_isui() {
@@ -646,84 +647,71 @@ module interest_lst::pool_tests {
 //     test::end(scenario);
 //   }
 
-//   // Set up Functions
+  // Set up Functions
 
-//   fun init_test(test: &mut Scenario) {
-//     set_up_sui_system_state();
+  fun init_test(test: &mut Scenario) {
+    set_up_sui_system_state();
 
-//     let (alice, _) = people();
+    let (alice, _) = people();
 
-//     next_tx(test, alice);
-//     {
-//       admin::init_for_testing(ctx(test));
-//       isui::init_for_testing(ctx(test)); 
-//       sui_principal::init_for_testing(ctx(test));
-//       sui_yield::init_for_testing(ctx(test));
-//       pool::init_for_testing(ctx(test));
-//     };
+    next_tx(test, alice);
+    {
+      isui::init_for_testing(ctx(test)); 
+      isui_principal::init_for_testing(ctx(test));
+      isui_yield::init_for_testing(ctx(test));
+      lst::init_for_testing(ctx(test));
+    };
 
-//     next_tx(test, alice);
-//     {
-//       let admin_cap = test::take_from_address<AdminCap>(test, alice);
-//       let pool_storage = test::take_shared<PoolStorage>(test);
-//       let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
-//       let interest_sui_principal_storage = test::take_shared<SuiPrincipalStorage>(test);
-//       let interest_sui_yield_Storage = test::take_shared<SuiYieldStorage>(test);
+    next_tx(test, alice);
+    {
+      let isui_cap = test::take_from_sender<TreasuryCap<ISUI>>(test);
+      let principal_cap = test::take_from_sender<TreasuryCap<ISUI_PRINCIPAL>>(test);
+      let yield_cap = test::take_from_sender<TreasuryCap<ISUI_YIELD>>(test);
+      let storage = test::take_shared<InterestLST>(test);
 
-//       let publisher_id = pool::get_publisher_id(&pool_storage);
+      lst::create_genesis_state(&mut storage, isui_cap, principal_cap, yield_cap, ctx(test));
 
-//       isui::add_minter(&admin_cap, &mut interest_sui_storage, publisher_id);
-//       sui_yield::add_minter(&admin_cap, &mut interest_sui_yield_Storage, publisher_id);
-//       sui_principal::add_minter(&admin_cap, &mut interest_sui_principal_storage, publisher_id);
+      test::return_shared(storage);
+    };
 
-//       test::return_shared(interest_sui_storage);
-//       test::return_shared(interest_sui_principal_storage);
-//       test::return_shared(interest_sui_yield_Storage);
-//       test::return_to_address(alice, admin_cap);
-//       test::return_shared(pool_storage);
-//     };
+    advance_epoch(test);
+  }
 
-//     advance_epoch(test);
-//   }
+  fun set_up_sui_system_state() {
+    let scenario_val = test::begin(@0x0);
+    let scenario = &mut scenario_val;
+    let ctx = test::ctx(scenario);
 
-//   fun set_up_sui_system_state() {
-//     let scenario_val = test::begin(@0x0);
-//     let scenario = &mut scenario_val;
-//     let ctx = test::ctx(scenario);
+    let validators = vector[
+            create_validator_for_testing(MYSTEN_LABS, 100, ctx),
+            create_validator_for_testing(FIGMENT, 200, ctx),
+            create_validator_for_testing(COINBASE_CLOUD, 300, ctx),
+            create_validator_for_testing(SPARTA, 400, ctx),
+    ];
+    create_sui_system_state_for_testing(validators, 1000, 0, ctx);
+    test::end(scenario_val);
+  }
 
-//     let validators = vector[
-//             create_validator_for_testing(MYSTEN_LABS, 100, ctx),
-//             create_validator_for_testing(FIGMENT, 200, ctx),
-//             create_validator_for_testing(COINBASE_CLOUD, 300, ctx),
-//             create_validator_for_testing(SPARTA, 400, ctx),
-//     ];
-//     create_sui_system_state_for_testing(validators, 1000, 0, ctx);
-//     test::end(scenario_val);
-//   }
+  fun validator_addrs() : vector<address> {
+    vector[MYSTEN_LABS, FIGMENT, COINBASE_CLOUD, SPARTA]
+  }
 
-//   fun validator_addrs() : vector<address> {
-//     vector[MYSTEN_LABS, FIGMENT, COINBASE_CLOUD, SPARTA]
-//   }
+  fun mint_isui(test: &mut Scenario, validator: address, sender: address, amount: u64) {
+    next_tx(test, sender);
+    {
+      let sui_state = test::take_shared<SuiSystemState>(test);
+      let storage = test::take_shared<InterestLST>(test);
 
-//   fun mint_isui(test: &mut Scenario, validator: address, sender: address, amount: u64) {
-//     next_tx(test, sender);
-//     {
-//       let pool_storage = test::take_shared<PoolStorage>(test);
-//       let wrapper = test::take_shared<SuiSystemState>(test);
-//       let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
+      burn(pool::mint_isui(
+        &mut sui_state,
+        &mut storage,
+        mint<SUI>(amount, 9, ctx(test)),
+        validator,
+        ctx(test)
+      ));
 
-//       burn(pool::mint_isui(
-//         &mut wrapper,
-//         &mut pool_storage,
-//         &mut interest_sui_storage,
-//         mint<SUI>(amount, 9, ctx(test)),
-//         validator,
-//         ctx(test)
-//       ));
-
-//       test::return_shared(interest_sui_storage);
-//       test::return_shared(wrapper);
-//       test::return_shared(pool_storage);
-//     };
-//   }
+      test::return_shared(sui_state);
+      test::return_shared(storage);
+    };
+  }
 }

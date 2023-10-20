@@ -22,9 +22,9 @@ module interest_lst::interest_lst {
 
   use yield::yield::{Yield, YieldCap};
 
-  use interest_lst::isui::ISUI;
   
   use interest_lst::ipx::IPX;
+  use interest_lst::isui::ISUI;
   use interest_lst::fee_utils::Fee;
   use interest_lst::validator::Validator;
   use interest_lst::isui_yield::ISUI_YIELD;
@@ -193,8 +193,14 @@ module interest_lst::interest_lst {
 
   // ** Private Functions
 
-
   fun load_state_mut(self: &mut InterestLST): &mut State {
     df::borrow_mut(&mut self.id, StateKey {})
+  }
+
+  // ** Test Functions
+
+  #[test_only]
+  public fun init_for_testing(ctx: &mut TxContext) {
+    init(ctx);
   }
 }
