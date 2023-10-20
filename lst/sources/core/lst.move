@@ -74,13 +74,13 @@ module interest_lst::interest_lst {
     inner_state::get_exchange_rate_sui_to_isui(sui_state, state, sui_amount, ctx)
   }
 
-  public fun update_fund(
+  public fun update_pool(
     sui_state: &mut SuiSystemState,
     self: &mut InterestLST,
     ctx: &mut TxContext,
   ) {
     let state = load_state_mut(self);
-    inner_state::update_fund(sui_state, state, ctx);
+    inner_state::update_pool(sui_state, state, ctx);
   }
 
   public fun mint_isui(

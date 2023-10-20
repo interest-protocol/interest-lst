@@ -95,7 +95,7 @@ module interest_lst::interest_lst_inner_state {
   ): u64 {
     let state = load_state_mut(state);
 
-    update_fund_logic(sui_state, state, tx_context::epoch(ctx));
+    update_pool_logic(sui_state, state, tx_context::epoch(ctx));
     fund::to_underlying(&state.pool, isui_amount, false)
   }
 
@@ -107,7 +107,7 @@ module interest_lst::interest_lst_inner_state {
   ): u64 {
     let state = load_state_mut(state);
 
-    update_fund_logic(sui_state, state, tx_context::epoch(ctx));
+    update_pool_logic(sui_state, state, tx_context::epoch(ctx));
     fund::to_shares(&state.pool, sui_amount, false)
   }
 
@@ -120,11 +120,11 @@ module interest_lst::interest_lst_inner_state {
     ctx: &mut TxContext  
   ): u64 {
     let state = load_state_mut(state);
-    update_fund_logic(sui_state, state, tx_context::epoch(ctx));
+    update_pool_logic(sui_state, state, tx_context::epoch(ctx));
     get_pending_yield_logic(state, coupon, maturity, ctx)
   }
 
-  public(friend) fun update_fund(
+  public(friend) fun update_pool(
     sui_state: &mut SuiSystemState,
     state: &mut State,
     ctx: &mut TxContext,
@@ -132,7 +132,7 @@ module interest_lst::interest_lst_inner_state {
     let epoch = tx_context::epoch(ctx);
     let state = load_state_mut(state);
 
-    update_fund_logic(sui_state, state, epoch);
+    update_pool_logic(sui_state, state, epoch);
   }
 
   public(friend) fun mint_isui(
@@ -175,7 +175,7 @@ module interest_lst::interest_lst_inner_state {
   ): Coin<SUI> {
     let state = load_state_mut(state);
 
-    update_fund_logic(sui_state, state, tx_context::epoch(ctx));
+    update_pool_logic(sui_state, state, tx_context::epoch(ctx));
 
     let isui_amount = coin::burn(&mut state.isui_cap, asset);
 
@@ -248,7 +248,7 @@ module interest_lst::interest_lst_inner_state {
 
     let state = load_state_mut(state);
 
-    update_fund_logic(sui_state, state, tx_context::epoch(ctx));
+    update_pool_logic(sui_state, state, tx_context::epoch(ctx));
 
     let burn_amount = sft::burn(&mut state.principal_cap, principal);
     let sui_amount = get_pending_yield_logic(state, &coupon, maturity, ctx) + burn_amount;
@@ -273,7 +273,7 @@ module interest_lst::interest_lst_inner_state {
 
     let state = load_state_mut(state);
 
-    update_fund_logic(sui_state, state, tx_context::epoch(ctx));
+    update_pool_logic(sui_state, state, tx_context::epoch(ctx));
 
     let sui_amount = sft::burn(&mut state.principal_cap, principal);
 
@@ -295,7 +295,7 @@ module interest_lst::interest_lst_inner_state {
   ): (Yield<ISUI_YIELD>, Coin<SUI>) {
     let state = load_state_mut(state);
 
-    update_fund_logic(sui_state, state, tx_context::epoch(ctx));
+    update_pool_logic(sui_state, state, tx_context::epoch(ctx));
     
     let sui_amount = get_pending_yield_logic(state, &coupon, maturity, ctx);
 
@@ -376,7 +376,7 @@ module interest_lst::interest_lst_inner_state {
     // Will save gas since the sui_system will throw
     assert!(sui_amount >= constants::min_stake_amount(), errors::pool_invalid_stake_amount());
 
-    update_fund_logic(sui_state, state, tx_context::epoch(ctx));
+    update_pool_logic(sui_state, state, tx_context::epoch(ctx));
 
     let staked_sui = sui_system::request_add_stake_non_entry(sui_state, asset, validator_address, ctx);
 
@@ -391,7 +391,7 @@ module interest_lst::interest_lst_inner_state {
     fund::add_underlying(&mut state.pool, sui_amount, false)
   }
 
-  fun update_fund_logic(
+  fun update_pool_logic(
     sui_state: &mut SuiSystemState,
     state: &mut StateV1,
     epoch: u64   
