@@ -192,7 +192,7 @@ module yield::yield {
     principal: u64, 
     shares: u64, 
     ctx: &mut TxContext
-  ): Yield {
+  ): Yield<T> {
       Yield {
       id: object::new(ctx),
       sft: sft::mint(cap, slot, principal, ctx),
@@ -202,13 +202,13 @@ module yield::yield {
   } 
 
   #[test_only]
-  public fun mint_for_testing(
+  public fun mint_for_testing<T: drop>(
     slot: u256, 
     principal: u64, 
     shares: u64,
     rewards_paid: u64,
     ctx: &mut TxContext
-  ): Yield {
+  ): Yield<T> {
     Yield {
       id: object::new(ctx),
       sft: sft::mint_for_testing( slot, principal, ctx),
@@ -218,7 +218,7 @@ module yield::yield {
   }  
 
   #[test_only]
-  public fun burn_for_testing(asset: Yield): (u64, u64, u64) {
+  public fun burn_for_testing<T: drop>(asset: Yield<T>): (u64, u64, u64) {
     let (x, y, z) = read_data(&asset);
 
     let Yield { id, sft, shares:_, rewards_paid:_} = asset;
@@ -228,24 +228,24 @@ module yield::yield {
   } 
 
   #[test_only]
-  public fun add_rewards_paid_for_testing(
-    asset: &mut Yield,
+  public fun add_rewards_paid_for_testing<T: drop>(
+    asset: &mut Yield<T>,
     rewards_paid: u64,     
     ) {
     asset.rewards_paid = asset.rewards_paid + rewards_paid;
   }
 
   #[test_only]
-  public fun set_shares_for_testing(
-    asset: &mut Yield,
+  public fun set_shares_for_testing<T: drop>(
+    asset: &mut Yield<T>,
     shares: u64,     
     ) {
     asset.shares = shares;
   }
 
   #[test_only]
-  public fun set_rewards_paid_for_testing(
-    asset: &mut Yield,
+  public fun set_rewards_paid_for_testing<T: drop>(
+    asset: &mut Yield<T>,
     rewards_paid: u64,     
     ) {
     asset.rewards_paid =  rewards_paid;
