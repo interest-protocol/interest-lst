@@ -45,6 +45,10 @@ module interest_lst::events {
     sui_amount: u64,   
   }
 
+  struct WhitelistValidators has copy, drop {
+    list: vector<address>
+  }
+
   public(friend) fun emit_update_fund(principal: u64, rewards: u64) {
     emit(UpdateFund { principal, rewards });  
   }
@@ -89,5 +93,9 @@ module interest_lst::events {
 
   public(friend) fun emit_claim_yield(sender: address, sui_amount: u64) {
     emit(ClaimYield{ sender, sui_amount });
+  }
+
+  public(friend) fun emit_whitelist_validators(list: vector<address>) {
+    emit(WhitelistValidators { list })  
   }
 }

@@ -12,6 +12,7 @@ module interest_lst::interest_lst_inner_state {
   use sui::linked_table::{Self, LinkedTable};
 
   use suitears::fund::{Self, Fund};
+  use suitears::dao_action::{Self, Action};
   use suitears::fixed_point_wad::{wad_mul_up as fmul, wad_div_up as fdiv};
   use suitears::semi_fungible_token::{Self as sft, SftTreasuryCap, SemiFungibleToken};
 
@@ -22,11 +23,13 @@ module interest_lst::interest_lst_inner_state {
   
   use interest_lst::errors;
   use interest_lst::events;
+  use interest_lst::ipx::IPX;
   use interest_lst::constants;
   use interest_lst::isui::ISUI;
   use interest_lst::isui_yield::ISUI_YIELD;
   use interest_lst::validator::{Self, Validator};
   use interest_lst::isui_principal::ISUI_PRINCIPAL;
+  use interest_lst::interest_protocol::INTEREST_PROTOCOL;
   use interest_lst::unstake_utils::{Self, UnstakePayload};
   use interest_lst::fee_utils::{new as new_fee, calculate_fee_percentage, Fee};
   use interest_lst::staking_pool_utils::{calc_staking_pool_rewards, get_most_recent_exchange_rate};
@@ -35,6 +38,8 @@ module interest_lst::interest_lst_inner_state {
   friend interest_lst::interest_lst;
 
   const STATE_VERSION_V1: u64 = 1;
+
+  struct LstWitness has drop, copy, store {}
 
   struct StateV1 has store {
     pool: Fund, // This struct holds the total shares of ISUI and the total SUI (Principal + Rewards). Rebase {base: ISUI total supply, elastic: total Sui}
@@ -320,6 +325,33 @@ module interest_lst::interest_lst_inner_state {
       else 
         remove_staked_sui(sui_state, state, sui_amount, validator_address, unstake_payload, ctx)
     )
+  }
+
+  // ** DAO functions Functions
+
+  public(friend) fun whitelist_validators(state: &mut State, action: Action<INTEREST_PROTOCOL, LstWitness, IPX, vector<address>>) {
+    let state = load_state_mut(state);
+
+    let new_whitelist = dao_action::finish_action(LstWitness {}, action);
+
+    let length = vector::length(&state.whitelist_validators);
+    let i = 0;
+
+    // Empty the vector
+    while (length > i) {
+      vector::pop_back(&mut state.whitelist_validators);
+      i = i + 1;
+    };
+
+    let length = vector::length(&new_whitelist);
+    let i = 0;
+    
+    while(length > i) {
+      vector::push_back(&mut state.whitelist_validators, *vector::borrow(&new_whitelist, i));
+      i = i + 1;
+    };
+
+    events::emit_whitelist_validators(new_whitelist);
   }
 
   // ** Read only Functions
