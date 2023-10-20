@@ -24,14 +24,13 @@ module interest_lst::lst_tests {
   };
   
   use suitears::fund;
-  use suitears::semi_fungible_token::{Self as sft, TreasuryCap};
+  use suitears::semi_fungible_token::{Self as sft, SftTreasuryCap};
 
-  use yield::yield;
+  use yield::yield::{Self, YieldCap};
 
   use interest_lst::isui::{Self, ISUI};
-  use interest_lst::interest_lst as lst;
   use interest_lst::fee_utils::read_fee;
-  use interest_lst::lst::{Self, InterestLST};
+  use interest_lst::interest_lst::{Self as lst, InterestLST};
   use interest_lst::isui_yield::{Self, ISUI_YIELD};
   use interest_lst::isui_principal::{Self, ISUI_PRINCIPAL};
   use interest_lst::unstake_algorithms::default_unstake_algorithm;
@@ -43,91 +42,86 @@ module interest_lst::lst_tests {
   const SPARTA: address = @0x7;
   const JOSE: address = @0x8;
 
-//   #[test]
-//   fun test_first_mint_isui() {
-//     let scenario = scenario();
+  #[test]
+  fun test_first_mint_isui() {
+    let scenario = scenario();
 
-//     let test = &mut scenario;
+    let test = &mut scenario;
 
-//     init_test(test);
+    init_test(test);
 
-//     let (alice, _) = people();
+    let (alice, _) = people();
 
-//     next_tx(test, alice);
-//     {
-//       let pool_storage = test::take_shared<PoolStorage>(test);
+    next_tx(test, alice);
+    {
+      let storage = test::take_shared<InterestLST>(test);
 
-//       let (pool_rebase, last_epoch, validators_table, total_principal, fee, dao_balance, _) = pool::read_pool_storage(&pool_storage);
+      let (lst_fund, last_epoch, validators_table, total_principal, fee, dao_balance, _) = lst::read_state(&mut storage);
 
-//       let (base, kink, jump) = read_fee(fee);
+      let (base, kink, jump) = read_fee(fee);
 
-//       // Nothing deposited on the pool
-//       assert_eq(rebase::base(pool_rebase), 0);
-//       assert_eq(rebase::elastic(pool_rebase), 0);
-//       // There has been no calls to {updatePool}
-//       assert_eq(last_epoch, 0);
-//       // No validator has been registered
-//       assert_eq(linked_table::length(validators_table), 0);
-//       assert_eq(total_principal, 0);
-//       assert_eq(base, 0);
-//       assert_eq(kink, 0);
-//       assert_eq(jump, 0);
-//       assert_eq(balance::value(dao_balance), 0);
+      // Nothing deposited on the pool
+      assert_eq(fund::shares(lst_fund), 0);
+      assert_eq(fund::underlying(lst_fund), 0);
+      // There has been no calls to {updatePool}
+      assert_eq(last_epoch, 0);
+      // No validator has been registered
+      assert_eq(linked_table::length(validators_table), 0);
+      assert_eq(total_principal, 0);
+      assert_eq(base, 0);
+      assert_eq(kink, 0);
+      assert_eq(jump, 0);
+      assert_eq(balance::value(dao_balance), 0);
 
-//       // First deposit should update the data correctly
-//       let wrapper = test::take_shared<SuiSystemState>(test);
-//       let interest_sui_storage = test::take_shared<InterestSuiStorage>(test);
+      // First deposit should update the data correctly
+      let sui_state = test::take_shared<SuiSystemState>(test);
 
-//       let coin_isui = pool::mint_isui(
-//         &mut wrapper,
-//         &mut pool_storage,
-//         &mut interest_sui_storage,
-//         mint<SUI>(1000, 9, ctx(test)),
-//         MYSTEN_LABS,
-//         ctx(test)
-//       );
+      let coin_isui = lst::mint_isui(
+        &mut sui_state,
+        &mut storage,
+        mint<SUI>(1000, 9, ctx(test)),
+        MYSTEN_LABS,
+        ctx(test)
+      );
 
-//       assert_eq(burn(coin_isui), add_decimals(1000, 9));
+      assert_eq(burn(coin_isui), add_decimals(1000, 9));
 
-//       let (pool_rebase, last_epoch, validators_table, total_principal, _, dao_balance, _) = pool::read_pool_storage(&pool_storage);
+      let (lst_fund, last_epoch, validators_table, total_principal, _, dao_balance, _) = lst::read_state(&mut storage);
 
-//       // The first deposit gets all shares
-//       assert_eq(rebase::base(pool_rebase), add_decimals(1000, 9));
-//       assert_eq(rebase::elastic(pool_rebase), add_decimals(1000, 9));
-//       // We update to the prev epoch which is 0
-//       assert_eq(last_epoch, 0);
-//       // We registered the validator
-//       assert_eq(linked_table::length(validators_table), 1);
-//       // Update the total_principal
-//       assert_eq(total_principal, add_decimals(1000, 9));
-//       // No fees
-//       assert_eq(balance::value(dao_balance), 0);
+      // The first deposit gets all shares
+      assert_eq(fund::shares(lst_fund), add_decimals(1000, 9));
+      assert_eq(fund::underlying(lst_fund), add_decimals(1000, 9));
+      // We update to the prev epoch which is 0
+      assert_eq(last_epoch, 0);
+      // We registered the validator
+      assert_eq(linked_table::length(validators_table), 1);
+      // Update the total_principal
+      assert_eq(total_principal, add_decimals(1000, 9));
+      // No fees
+      assert_eq(balance::value(dao_balance), 0);
 
-//       let mysten_labs_data = linked_table::borrow(validators_table, MYSTEN_LABS);
-
-//       let (staked_sui_table,   total_principal) = pool::read_validator_data(mysten_labs_data);
+      let (staked_sui_table, total_principal) = lst::read_validator_data(&mut storage, MYSTEN_LABS);
       
-//       // We cached the sui
-//       assert_eq(linked_table::length(staked_sui_table), 1);
-//       // StakedSUi become active after the epoch they were created
-//       // We deposited on Epoch 1, so it is activated and saved in the table at epoch 2
-//       assert_eq(staking_pool::staked_sui_amount(linked_table::borrow(staked_sui_table, 2)), add_decimals(1000, 9));
-//       assert_eq(total_principal ,add_decimals(1000, 9));
+      // We cached the sui
+      assert_eq(linked_table::length(staked_sui_table), 1);
+      // StakedSUi become active after the epoch they were created
+      // We deposited on Epoch 1, so it is activated and saved in the table at epoch 2
+      assert_eq(staking_pool::staked_sui_amount(linked_table::borrow(staked_sui_table, 2)), add_decimals(1000, 9));
+      assert_eq(total_principal ,add_decimals(1000, 9));
 
-//       test::return_shared(interest_sui_storage);
-//       test::return_shared(wrapper);
-//       test::return_shared(pool_storage);
-//     };    
+      test::return_shared(sui_state);
+      test::return_shared(storage);
+    };    
 
-//     // Test if we deposited to the right validator
-//     advance_epoch(test);
-//     next_tx(test, @0x0);
-//     {
-//       assert_validator_total_stake_amounts(validator_addrs(), vector[add_decimals(1100, 9), add_decimals(200, 9), add_decimals(300, 9), add_decimals(400, 9)], test);
-//     };
+    // Test if we deposited to the right validator
+    advance_epoch(test);
+    next_tx(test, @0x0);
+    {
+      assert_validator_total_stake_amounts(validator_addrs(), vector[add_decimals(1100, 9), add_decimals(200, 9), add_decimals(300, 9), add_decimals(400, 9)], test);
+    };
 
-//     test::end(scenario); 
-//   }
+    test::end(scenario); 
+  }
 
 //   #[test]
 //   fun test_mint_isui_multiple_stakes_one_validator() {
@@ -665,8 +659,8 @@ module interest_lst::lst_tests {
     next_tx(test, alice);
     {
       let isui_cap = test::take_from_sender<TreasuryCap<ISUI>>(test);
-      let principal_cap = test::take_from_sender<TreasuryCap<ISUI_PRINCIPAL>>(test);
-      let yield_cap = test::take_from_sender<TreasuryCap<ISUI_YIELD>>(test);
+      let principal_cap = test::take_from_sender<SftTreasuryCap<ISUI_PRINCIPAL>>(test);
+      let yield_cap = test::take_from_sender<YieldCap<ISUI_YIELD>>(test);
       let storage = test::take_shared<InterestLST>(test);
 
       lst::create_genesis_state(&mut storage, isui_cap, principal_cap, yield_cap, ctx(test));
@@ -702,7 +696,7 @@ module interest_lst::lst_tests {
       let sui_state = test::take_shared<SuiSystemState>(test);
       let storage = test::take_shared<InterestLST>(test);
 
-      burn(pool::mint_isui(
+      burn(lst::mint_isui(
         &mut sui_state,
         &mut storage,
         mint<SUI>(amount, 9, ctx(test)),

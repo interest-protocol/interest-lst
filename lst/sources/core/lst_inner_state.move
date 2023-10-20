@@ -431,6 +431,8 @@ module interest_lst::interest_lst_inner_state {
     store_staked_sui(validator, staked_sui);
 
     state.total_principal = state.total_principal + sui_amount;
+    let validator_total_principal = validator::borrow_mut_total_principal(validator);
+    *validator_total_principal =  *validator_total_principal + sui_amount;
 
     fund::add_underlying(&mut state.pool, sui_amount, false)
   }
