@@ -431,6 +431,8 @@ module interest_lst::interest_lst_inner_state {
     store_staked_sui(validator, staked_sui);
 
     state.total_principal = state.total_principal + sui_amount;
+    let validator_total_principal = validator::borrow_mut_total_principal(validator);
+    *validator_total_principal =  *validator_total_principal + sui_amount;
 
     fund::add_underlying(&mut state.pool, sui_amount, false)
   }
@@ -739,5 +741,13 @@ module interest_lst::interest_lst_inner_state {
   fun upgrade_to_latest(self: &mut State) {
     // * IMPORTANT: When new versions are added, we need to explicitly upgrade here.
     assert!(versioned::version(&self.inner) == STATE_VERSION_V1, errors::invalid_version());
+  }
+
+  // ** Test Functions
+
+  #[test_only]
+  public fun borrow_mut_caps(self: &mut State): (&mut TreasuryCap<ISUI>, &mut SftTreasuryCap<ISUI_PRINCIPAL>, &mut YieldCap<ISUI_YIELD>) {
+    let state = load_state_mut(self);
+    (&mut state.isui_cap, &mut state.principal_cap, &mut state.yield_cap)
   }
 }

@@ -187,7 +187,7 @@ module yield::yield {
 
   #[test_only]
   public fun mint_with_supply_for_testing<T: drop>(
-    cap: &mut SftTreasuryCap<T>, 
+    cap: &mut YieldCap<T>, 
     slot: u256, 
     principal: u64, 
     shares: u64, 
@@ -195,7 +195,7 @@ module yield::yield {
   ): Yield<T> {
       Yield {
       id: object::new(ctx),
-      sft: sft::mint(cap, slot, principal, ctx),
+      sft: sft::mint(&mut cap.cap, slot, principal, ctx),
       shares,
       rewards_paid: 0 
     }
