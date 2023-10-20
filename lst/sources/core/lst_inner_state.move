@@ -742,4 +742,12 @@ module interest_lst::interest_lst_inner_state {
     // * IMPORTANT: When new versions are added, we need to explicitly upgrade here.
     assert!(versioned::version(&self.inner) == STATE_VERSION_V1, errors::invalid_version());
   }
+
+  // ** Test Functions
+
+  #[test_only]
+  public fun borrow_mut_caps(self: &mut State): (&mut TreasuryCap<ISUI>, &mut SftTreasuryCap<ISUI_PRINCIPAL>, &mut YieldCap<ISUI_YIELD>) {
+    let state = load_state_mut(self);
+    (&mut state.isui_cap, &mut state.principal_cap, &mut state.yield_cap)
+  }
 }

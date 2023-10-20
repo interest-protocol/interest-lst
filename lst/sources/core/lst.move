@@ -77,6 +77,17 @@ module interest_lst::interest_lst {
     inner_state::get_exchange_rate_sui_to_isui(sui_state, state, sui_amount, ctx)
   }
 
+  public fun get_pending_yield(
+    sui_state: &mut SuiSystemState,
+    self: &mut InterestLST,
+    coupon: &Yield<ISUI_YIELD>,
+    maturity: u64,
+    ctx: &mut TxContext  
+  ): u64 {
+    let state = load_state_mut(self);
+    inner_state::get_pending_yield(sui_state, state, coupon, maturity, ctx)
+  }
+
   public fun update_pool(
     sui_state: &mut SuiSystemState,
     self: &mut InterestLST,
@@ -202,5 +213,11 @@ module interest_lst::interest_lst {
   #[test_only]
   public fun init_for_testing(ctx: &mut TxContext) {
     init(ctx);
+  }
+
+  #[test_only]
+  public fun borrow_mut_caps(self: &mut InterestLST): (&mut TreasuryCap<ISUI>, &mut SftTreasuryCap<ISUI_PRINCIPAL>, &mut YieldCap<ISUI_YIELD>) {
+    let state = load_state_mut(self);
+    inner_state::borrow_mut_caps(state)
   }
 }
