@@ -6,7 +6,7 @@ module interest_lst::interest_protocol {
 
   use suitears::dao::create_with_treasury;
 
-  use interest_lst::isui::ISUI;
+  use interest_lst::ipx::IPX;
 
   const VOTING_DELAY: u64 = 259_200_000; // Three days - Time delay between proposal creation and voting
   const VOTING_PERIOD: u64 = 1_209_600_000; // 2 Weeks Voters have two weeks to vote
@@ -18,7 +18,7 @@ module interest_lst::interest_protocol {
   struct INTEREST_PROTOCOL has drop {}
 
   fun init(otw: INTEREST_PROTOCOL, ctx: &mut TxContext) {
-   let (dao, treasury) = create_with_treasury<INTEREST_PROTOCOL, ISUI>(
+   let (dao, treasury) = create_with_treasury<INTEREST_PROTOCOL, IPX>(
     otw,
     VOTING_DELAY,
     VOTING_PERIOD,
