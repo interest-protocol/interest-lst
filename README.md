@@ -1,6 +1,6 @@
 # [IPX Liquid Staking Tokens](https://www.interestprotocol.com/)
 
-<p>  <img  width="75px"height="75px"  src="./assets/logo.png" /></p>
+<p>  <img  width="75px"height="75px"  src="./img/logo.png" /></p>
 
 ## Quick start
 

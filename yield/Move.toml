@@ -1,16 +1,13 @@
 [package]
-name = "InterestLST"
+name = "Yield"
 version = "0.0.1"
 
 [dependencies]
 MoveStdlib = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/move-stdlib", rev = "testnet-v1.12.0", override = true }
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet-v1.12.0", override = true }
-SuiSystem = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-system", rev = "testnet-v1.12.0", override = true }
 SuiTears = { git = "https://github.com/interest-protocol/suitears.git", subdir = "contracts", rev = "testnet" }
-Yield = { local = "../yield" }
 
 [addresses]
-interest_lst = "0x0"
+yield = "0x0"
 std = "0x1"
 sui = "0x2"
-sui_system = "0x3"

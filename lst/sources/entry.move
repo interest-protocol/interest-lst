@@ -5,14 +5,11 @@ module interest_lst::entry {
 
   use sui_system::sui_system::SuiSystemState;
 
-  use interest_framework::semi_fungible_token::SemiFungibleToken;
-
-  use interest_tokens::isui::{ISUI, InterestSuiStorage};
-  use interest_tokens::sui_yield::{SuiYieldStorage, SuiYield};
-  use interest_tokens::sui_principal::{SuiPrincipalStorage, SUI_PRINCIPAL};
-
-  use interest_lst::pool::{Self, PoolStorage};
+  use interest_lst::isui::ISUI;
+  use interest_lst::isui_yield::ISUI_YIELD;
   use interest_lst::unstake_utils::UnstakePayload;
+  use interest_lst::isui_principal::ISUI_PRINCIPAL;
+  use interest_lst::interest_lst::{Self, InterestLST};
   use interest_lst::asset_utils::{
     handle_coin_vector, 
     handle_yield_vector,
@@ -22,40 +19,40 @@ module interest_lst::entry {
     public_transfer_principal
   };
 
+  use yield::yield::Yield;
+
+  use suitears::semi_fungible_token::SemiFungibleToken;
+
   entry fun mint_isui(
-    wrapper: &mut SuiSystemState,
-    storage: &mut PoolStorage,
-    interest_sui_storage: &mut InterestSuiStorage,
-    tokens: vector<Coin<SUI>>,
-    token_value: u64,
+    sui_state: &mut SuiSystemState,
+    self: &mut InterestLST,
+    assets: vector<Coin<SUI>>,
+    asset_value: u64,
     validator_address: address,
     ctx: &mut TxContext,
   ) {
-    public_transfer_coin(pool::mint_isui(
-      wrapper,
-      storage,
-      interest_sui_storage,
-      handle_coin_vector(tokens, token_value, ctx),
+    public_transfer_coin(interest_lst::mint_isui(
+      sui_state,
+      self,
+      handle_coin_vector(assets, asset_value, ctx),
       validator_address,
       ctx
     ), tx_context::sender(ctx));
   }
 
   public fun burn_isui(
-    wrapper: &mut SuiSystemState,
-    storage: &mut PoolStorage,
-    interest_sui_storage: &mut InterestSuiStorage,
-    tokens: vector<Coin<ISUI>>,
-    token_value: u64,
+    sui_state: &mut SuiSystemState,
+    self: &mut InterestLST,
+    assets: vector<Coin<ISUI>>,
+    asset_value: u64,
     validator_address: address,
     unstake_payload: vector<UnstakePayload>,
     ctx: &mut TxContext,
   ) {
-    public_transfer_coin(pool::burn_isui(
-      wrapper,
-      storage,
-      interest_sui_storage,
-      handle_coin_vector(tokens, token_value, ctx),
+    public_transfer_coin(interest_lst::burn_isui(
+      sui_state,
+      self,
+      handle_coin_vector(assets, asset_value, ctx),
       validator_address,
       unstake_payload,
       ctx
@@ -63,24 +60,18 @@ module interest_lst::entry {
   }
 
   entry fun mint_stripped_bond(
-    wrapper: &mut SuiSystemState,
-    storage: &mut PoolStorage,
-    interest_sui_storage: &mut InterestSuiStorage,
-    sui_principal_storage: &mut SuiPrincipalStorage,
-    sui_yield_storage: &mut SuiYieldStorage,
-    tokens: vector<Coin<SUI>>,
-    token_value: u64,
+    sui_state: &mut SuiSystemState,
+    self: &mut InterestLST,
+    assets: vector<Coin<SUI>>,
+    asset_value: u64,
     validator_address: address,
     maturity: u64,
     ctx: &mut TxContext,
   ) {
-    let (principal, yield) = pool::mint_stripped_bond(
-      wrapper,
-      storage,
-      interest_sui_storage,
-      sui_principal_storage,
-      sui_yield_storage,
-      handle_coin_vector(tokens, token_value, ctx),
+    let (principal, yield) = interest_lst::mint_stripped_bond(
+      sui_state,
+      self,
+      handle_coin_vector(assets, asset_value, ctx),
       validator_address,
       maturity,
       ctx
@@ -93,12 +84,10 @@ module interest_lst::entry {
   }
 
   public fun call_bond(
-    wrapper: &mut SuiSystemState,
-    storage: &mut PoolStorage,
-    sui_principal_storage: &mut SuiPrincipalStorage,
-    sui_yield_storage: &mut SuiYieldStorage,
-    sft_principal_vector: vector<SemiFungibleToken<SUI_PRINCIPAL>>,
-    sft_yield_vector: vector<SuiYield>,
+    sui_state: &mut SuiSystemState,
+    self: &mut InterestLST,
+    principal_vector: vector<SemiFungibleToken<ISUI_PRINCIPAL>>,
+    yield_vector: vector<Yield<ISUI_YIELD>>,
     principal_value: u64,
     yield_value: u64,
     maturity: u64,
@@ -107,13 +96,11 @@ module interest_lst::entry {
     ctx: &mut TxContext,
   ) {
     public_transfer_coin(
-      pool::call_bond(
-        wrapper,
-        storage,
-        sui_principal_storage,
-        sui_yield_storage,
-        handle_principal_vector(sft_principal_vector, principal_value, ctx),
-        handle_yield_vector(sft_yield_vector, yield_value, ctx),
+      interest_lst::call_bond(
+        sui_state,
+        self,
+        handle_principal_vector(principal_vector, principal_value, ctx),
+        handle_yield_vector(yield_vector, yield_value, ctx),
         maturity,
         validator_address,
         unstake_payload,
@@ -124,21 +111,19 @@ module interest_lst::entry {
   }
 
   public fun burn_sui_principal(
-    wrapper: &mut SuiSystemState,
-    storage: &mut PoolStorage,
-    sui_principal_storage: &mut SuiPrincipalStorage,
-    sft_principal_vector: vector<SemiFungibleToken<SUI_PRINCIPAL>>,
+    sui_state: &mut SuiSystemState,
+    self: &mut InterestLST,
+    principal_vector: vector<SemiFungibleToken<ISUI_PRINCIPAL>>,
     principal_value: u64,
     validator_address: address,
     unstake_payload: vector<UnstakePayload>,
     ctx: &mut TxContext,
   ) {
     public_transfer_coin(
-      pool::burn_sui_principal(
-        wrapper,
-        storage,
-        sui_principal_storage,
-        handle_principal_vector(sft_principal_vector, principal_value, ctx),
+      interest_lst::burn_sui_principal(
+        sui_state,
+        self,
+        handle_principal_vector(principal_vector, principal_value, ctx),
         validator_address,
         unstake_payload,
         ctx
@@ -147,21 +132,19 @@ module interest_lst::entry {
   }
 
   public fun claim_yield(
-    wrapper: &mut SuiSystemState,
-    storage: &mut PoolStorage,
-    sui_yield_storage: &mut SuiYieldStorage,
-    sft_yield_vector: vector<SuiYield>,
+    sui_state: &mut SuiSystemState,
+    self: &mut InterestLST,
+    yield_vector: vector<Yield<ISUI_YIELD>>,
     yield_value: u64,
     validator_address: address,
     unstake_payload: vector<UnstakePayload>,
     maturity: u64,
     ctx: &mut TxContext,
   ) {
-    let (yield, coin_sui) = pool::claim_yield(
-      wrapper,
-      storage,
-      sui_yield_storage,
-      handle_yield_vector(sft_yield_vector, yield_value, ctx),
+    let (yield, coin_sui) = interest_lst::claim_yield(
+      sui_state,
+      self,
+      handle_yield_vector(yield_vector, yield_value, ctx),
       validator_address,
       unstake_payload,
       maturity,

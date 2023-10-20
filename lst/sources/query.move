@@ -2,12 +2,12 @@ module interest_lst::query {
   use std::option;
   use std::vector;
 
-  use sui::linked_table::{Self, LinkedTable};
+  use sui::linked_table;
 
   use sui_system::staking_pool;
-  
+
+  use interest_lst::interest_lst::{Self, InterestLST};
   use interest_lst::fee_utils::calculate_fee_percentage;
-  use interest_lst::pool::{Self, PoolStorage, ValidatorData};
 
   struct StakePosition has store, drop {
     epoch: u64,
@@ -20,63 +20,46 @@ module interest_lst::query {
     stakes: vector<StakePosition>
   }
   
-  // @dev It allows the frontend to find the current fee of a specific validator
-  /*
-  * @param pool_storage The shared object of the interest_lst::pool module
-  * @param validator_address The address of a validator
-  * @return The fee in 1e18
-  */
-  public fun get_validator_fee(storage: &PoolStorage, validator_address: address): u128 {
-    if (pool::is_whitelisted(storage, validator_address)) return 0;
+  public fun get_validator_fee(self: &mut InterestLST, validator_address: address): u128 {
+    if (interest_lst::is_whitelisted(self, validator_address)) return 0;
     
-    let (_, _, validator_table, total_principal, fee, _, _) = pool::read_pool_storage(storage);
-    let (_, validator_principal) = pool::read_validator_data(linked_table::borrow(validator_table, validator_address));
+    let (_, _, _, total_principal, fee, _, _) = interest_lst::read_state(self);
+    let fee = *fee;
+    let (_, validator_principal) = interest_lst::read_validator_data(self, validator_address);
 
-    calculate_fee_percentage(fee, (validator_principal as u128), (total_principal as u128))
+    calculate_fee_percentage(&fee, (validator_principal as u128), (total_principal as u128))
   }
 
-  // @dev It allows the frontend to find the current fee for all validators
-  /*
-  * @param pool_storage The shared object of the interest_lst::pool module
-  * @param validators A vector with the address of all validators
-  * @return The fee in 1e18
-  */
-  public fun get_validators_fee_vector(storage: &PoolStorage, validators: vector<address>): vector<u128> {
+  public fun get_validators_fee_vector(self: &mut InterestLST, validators: vector<address>): vector<u128> {
     let len = vector::length(&validators);
     let i = 0;
     let result = vector::empty();
 
     while(len > i) {
-      vector::push_back(&mut result, get_validator_fee(storage, *vector::borrow(&validators, i)));
+      vector::push_back(&mut result, get_validator_fee(self, *vector::borrow(&validators, i)));
       i = i + 1;
     };
     
     result
   }
 
-  // @dev It allows the frontend to know how much Sui was staked in each validator in our LST
-  // Because the validator list can be infinite and vectors are ideal for < 1000 items. We allow the caller to get a specific range
-  /*
-  * @param pool_storage The shared object of the interest_lst::pool module
-  * @param from The first key to get
-  * @param to The last key to get
-  * @return vector<ValidatorStakePosition>
-  */
-  public fun get_validators_stake_position(storage: &PoolStorage, from: address, to: address): vector<ValidatorStakePosition> {
+  public fun get_validators_stake_position(self: &mut InterestLST, from: address, to: address): vector<ValidatorStakePosition> {
     let data = vector::empty<ValidatorStakePosition>();
 
-    let (_, _, validators_table, _, _, _, _) = pool::read_pool_storage(storage);
+    push_stake_position(self, &mut data, from);
 
-    push_stake_position(&mut data, validators_table, from);
+    let (_, _, validators_table, _, _, _, _) = interest_lst::read_state(self);
 
     let next_validator = linked_table::next(validators_table, from);
     
     while (option::is_some(next_validator)) {
       let validator_address = *option::borrow(next_validator);
 
-      push_stake_position(&mut data, validators_table, validator_address);
+      push_stake_position(self, &mut data, validator_address);
 
       if (validator_address == to) break;
+
+      let (_, _, validators_table, _, _, _, _) = interest_lst::read_state(self);
 
       next_validator = linked_table::next(validators_table, validator_address);
     };
@@ -84,10 +67,8 @@ module interest_lst::query {
     data
   }
 
-  fun push_stake_position(data: &mut vector<ValidatorStakePosition>, validators_table: &LinkedTable<address, ValidatorData>, validator_address: address) {
-    let validator_data = linked_table::borrow(validators_table, validator_address);
-
-    let (staked_sui_table, total_principal) = pool::read_validator_data(validator_data);
+  fun push_stake_position(self: &mut InterestLST, data: &mut vector<ValidatorStakePosition>, validator_address: address) {
+    let (staked_sui_table, total_principal) = interest_lst::read_validator_data(self, validator_address);
 
     let validator_stake = ValidatorStakePosition { validator: validator_address, total_principal, stakes: vector::empty() };
 

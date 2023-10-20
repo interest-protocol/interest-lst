@@ -1,14 +1,14 @@
 // Module has the logic on the dominance fee rate
 module interest_lst::fee_utils {
 
-  use interest_framework::math::{fmul, fdiv};
+  use suitears::fixed_point_wad::{wad_mul_up as fmul, wad_div_up as fdiv};
 
   // Formula is
   // dominance = validator_principal / total_principal
   // If the dominance >= kink
   // Fee = ((dominance - kink) * jump) + (kink * base)
   // Fee = dominance * base
-  struct Fee has store {
+  struct Fee has store, copy, drop {
     base: u128, // Base Multiplier
     kink: u128, // Threshold
     jump: u128 // Jump Multiplier
@@ -19,6 +19,18 @@ module interest_lst::fee_utils {
       base: 0,
       kink: 0,
       jump: 0
+    }
+  }
+
+  public fun create_fee(
+    base: u128,
+    kink: u128,
+    jump: u128
+  ): Fee {
+    Fee {
+      base,
+      kink,
+      jump
     }
   }
 
@@ -41,16 +53,13 @@ module interest_lst::fee_utils {
 
   public fun set_fee(
     fee: &mut Fee,
-    base: u128,
-    kink: u128,
-    jump: u128
+    new_fee: Fee
   ) {
-    fee.base = base;
-    fee.kink = kink;
-    fee.jump = jump;
+    fee.base = new_fee.base;
+    fee.kink = new_fee.kink;
+    fee.jump = new_fee.jump;
   }
 
-  #[test_only]
   public fun read_fee(fee:&Fee): (u128, u128, u128) {
     (fee.base, fee.kink, fee.jump)
   }
