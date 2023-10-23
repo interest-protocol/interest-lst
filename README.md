@@ -25,7 +25,7 @@ sui  client  publish  --gas-budget  500000000 --skip-fetch-latest-git-deps
 
 ### Dependencies
 
-Interest LST is depends on the following packages
+Interest LST depends on the following packages
 
 - [MoveStdlib](https://github.com/MystenLabs/sui/tree/main/crates/sui-framework/packages/move-stdlib) - Standard Move library
 - [Sui](https://github.com/MystenLabs/sui/tree/main/crates/sui-framework/packages/sui-framework) - Sui Move Library
@@ -102,19 +102,27 @@ The Interest LST portfolio is managed by the **Fund struct**. It is stored in th
 
 - **shares** It represents the shares of the portfolio (iSui)
 - **underlying** It represents the assets held by the portfolio (Sui)
-  > Interest LST Portfolio:
-  > Shares: 1000
-  > Underlying: 1200
-  > 10 iSui is worth 12 Sui - _10 \* 1200 / 1000_
-  > 10 Sui is worth ~8.3 iSui - _10 \* 1000 / 1200_
+  
+> Interest LST Portfolio:
+> Shares: 1000
+> 
+> Underlying: 1200
+> 
+> 10 iSui is worth 12 Sui - _10 \* 1200 / 1000_
+> 
+> 10 Sui is worth ~8.3 iSui - _10 \* 1000 / 1200_
 
 ## SFT (Semi Fungible Tokens)
 
 ```move
+struct SftBalance<phantom T> has store {
+    slot: u256, // Provides fungibility between the NFTs
+    value: u64
+}
+
 struct SemiFungibleToken<phantom T> has key, store {
-	id: UID,
-	slot: u256,
-	value: u64,
+  id: UID, 
+  balance: SftBalance<T>
 }
 ```
 
