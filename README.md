@@ -119,8 +119,8 @@ The Interest LST portfolio is managed by the **Fund struct**. It is stored in th
 
 ```move
 struct SftBalance<phantom T> has store {
-    slot: u256, // Provides fungibility between the NFTs
-    value: u64
+  slot: u256, // Provides fungibility between the NFTs
+  value: u64
 }
 
 struct SemiFungibleToken<phantom T> has key, store {
