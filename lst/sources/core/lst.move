@@ -21,13 +21,7 @@ module interest_lst::interest_lst {
 
   use yield::yield::{Yield, YieldCap};
 
-  
-<<<<<<< HEAD
   use interest_lst::lst_admin::LstAdmin;
-=======
-  use interest_lst::ipx::IPX;
-  use interest_lst::isui::ISUI;
->>>>>>> 1d028c8f840c352fa2bc8b1ba63f687a4c12cd3a
   use interest_lst::fee_utils::Fee;
   use interest_lst::validator::Validator;
   use interest_lst::isui_yield::ISUI_YIELD;
