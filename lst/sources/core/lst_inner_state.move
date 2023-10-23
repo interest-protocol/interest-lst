@@ -378,7 +378,7 @@ module interest_lst::interest_lst_inner_state {
     )
   }
 
-  public(friend) fun read_validator_data(state: &mut State, validator_address: address): (&LinkedTable<u64, StakedSui>, u64) {
+  public(friend) fun read_validator(state: &mut State, validator_address: address): (&LinkedTable<u64, StakedSui>, u64) {
     let state = load_state_mut(state);
     let validator = linked_table::borrow_mut(&mut state.validators_table, validator_address);
     let total_principal = validator::total_principal(validator);

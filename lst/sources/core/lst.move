@@ -198,9 +198,9 @@ module interest_lst::interest_lst {
     inner_state::read_state(state)
   }
 
-  public fun read_validator_data(self: &mut InterestLST, validator_address: address): (&LinkedTable<u64, StakedSui>, u64) {
+  public fun read_validator(self: &mut InterestLST, validator_address: address): (&LinkedTable<u64, StakedSui>, u64) {
     let state = load_state_mut(self);
-    inner_state::read_validator_data(state, validator_address)  
+    inner_state::read_validator(state, validator_address)  
   }
 
 

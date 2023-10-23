@@ -100,7 +100,7 @@ module interest_lst::lst_tests {
       // No fees
       assert_eq(balance::value(dao_balance), 0);
 
-      let (staked_sui_table, total_principal) = lst::read_validator_data(&mut storage, MYSTEN_LABS);
+      let (staked_sui_table, total_principal) = lst::read_validator(&mut storage, MYSTEN_LABS);
       
       // We cached the sui
       assert_eq(linked_table::length(staked_sui_table), 1);
@@ -160,7 +160,7 @@ module interest_lst::lst_tests {
       // 40 principal (Jose + Alice + Bob) + Rewards
       assert_eq(fund::underlying(lst_fund), 45769230769);
 
-     let (staked_sui_table,  validator_total_principal) = lst::read_validator_data(&mut storage, MYSTEN_LABS);
+     let (staked_sui_table,  validator_total_principal) = lst::read_validator(&mut storage, MYSTEN_LABS);
 
       assert_eq(validator_total_principal, total_principal);
 
@@ -221,17 +221,17 @@ module interest_lst::lst_tests {
       assert_eq(linked_table::length(validator_data_table), 3);
 
       // Mysten Labs Data
-      let (staked_sui_table,  validator_total_principal) = lst::read_validator_data(&mut storage, MYSTEN_LABS);
+      let (staked_sui_table,  validator_total_principal) = lst::read_validator(&mut storage, MYSTEN_LABS);
       assert_eq(validator_total_principal, add_decimals(40, 9));
       assert_eq(linked_table::length(staked_sui_table), 2);
 
       // Coinbase Cloud Data
-      let (staked_sui_table,  validator_total_principal) = lst::read_validator_data(&mut storage, COINBASE_CLOUD);
+      let (staked_sui_table,  validator_total_principal) = lst::read_validator(&mut storage, COINBASE_CLOUD);
       assert_eq(validator_total_principal, add_decimals(20, 9));
       assert_eq(linked_table::length(staked_sui_table), 2);
 
       // Figment Data
-      let (staked_sui_table,  validator_total_principal) = lst::read_validator_data(&mut storage, FIGMENT);
+      let (staked_sui_table,  validator_total_principal) = lst::read_validator(&mut storage, FIGMENT);
       assert_eq(validator_total_principal, add_decimals(10, 9));
       assert_eq(linked_table::length(staked_sui_table), 1);
 
@@ -311,13 +311,13 @@ module interest_lst::lst_tests {
       assert_eq(total_principal, 60000000000);
 
       // Coinbase Cloud Data
-      let (staked_sui_table,  validator_total_principal) = lst::read_validator_data(&mut storage, FIGMENT);
+      let (staked_sui_table,  validator_total_principal) = lst::read_validator(&mut storage, FIGMENT);
       assert_eq(validator_total_principal, add_decimals(10, 9));
       // We removed One Staked Sui
       assert_eq(linked_table::length(staked_sui_table), 1);
 
       // Mysten Labs Data
-      let (staked_sui_table,  validator_total_principal) = lst::read_validator_data(&mut storage, MYSTEN_LABS);
+      let (staked_sui_table,  validator_total_principal) = lst::read_validator(&mut storage, MYSTEN_LABS);
       // Principal - The rewards are in Coinbase Cloud
       assert_eq(validator_total_principal, 30000000000);
       assert_eq(linked_table::length(staked_sui_table), 2);
@@ -362,7 +362,7 @@ module interest_lst::lst_tests {
 
       // Mysten Labs Data
       assert_eq(linked_table::length(validator_data_table), 1);
-      let (staked_sui_table,  validator_total_principal) = lst::read_validator_data(&mut storage, MYSTEN_LABS);
+      let (staked_sui_table,  validator_total_principal) = lst::read_validator(&mut storage, MYSTEN_LABS);
       // Principal + Rewards as we stake the left over here
       assert_eq(validator_total_principal, add_decimals(10, 9));
       assert_eq(linked_table::length(staked_sui_table), 1);

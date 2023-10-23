@@ -25,7 +25,7 @@ module interest_lst::query {
     
     let (_, _, _, total_principal, fee, _, _) = interest_lst::read_state(self);
     let fee = *fee;
-    let (_, validator_principal) = interest_lst::read_validator_data(self, validator_address);
+    let (_, validator_principal) = interest_lst::read_validator(self, validator_address);
 
     calculate_fee_percentage(&fee, (validator_principal as u128), (total_principal as u128))
   }
@@ -68,7 +68,7 @@ module interest_lst::query {
   }
 
   fun push_stake_position(self: &mut InterestLST, data: &mut vector<ValidatorStakePosition>, validator_address: address) {
-    let (staked_sui_table, total_principal) = interest_lst::read_validator_data(self, validator_address);
+    let (staked_sui_table, total_principal) = interest_lst::read_validator(self, validator_address);
 
     let validator_stake = ValidatorStakePosition { validator: validator_address, total_principal, stakes: vector::empty() };
 

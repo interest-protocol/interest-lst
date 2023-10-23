@@ -37,7 +37,7 @@ module interest_lst::unstake_algorithms {
       
 
       // Borrow Mut the validator data
-      let (staked_sui_table, total_principal) = interest_lst::read_validator_data(state, validator_address);
+      let (staked_sui_table, total_principal) = interest_lst::read_validator(state, validator_address);
 
       let unstake_payload = make_unstake_payload(validator_address, vector::empty());
 
