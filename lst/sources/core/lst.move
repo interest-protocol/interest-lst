@@ -17,21 +17,19 @@ module interest_lst::interest_lst {
   use sui_system::staking_pool::StakedSui;
 
   use suitears::fund::Fund;
-  use suitears::dao_action::Action;
   use suitears::semi_fungible_token::{SemiFungibleToken, SftTreasuryCap};
 
   use yield::yield::{Yield, YieldCap};
 
   use interest_lst::isui::ISUI;
   
-  use interest_lst::ipx::IPX;
+  use interest_lst::lst_admin::LstAdmin;
   use interest_lst::fee_utils::Fee;
   use interest_lst::validator::Validator;
   use interest_lst::isui_yield::ISUI_YIELD;
   use interest_lst::unstake_utils::UnstakePayload;
   use interest_lst::isui_principal::ISUI_PRINCIPAL;
-  use interest_lst::interest_protocol::INTEREST_PROTOCOL;
-  use interest_lst::interest_lst_inner_state::{Self as inner_state, State, LstWitness};
+  use interest_lst::interest_lst_inner_state::{Self as inner_state, State};
 
   // ** Structs
 
@@ -162,14 +160,14 @@ module interest_lst::interest_lst {
 
   // ** DAO Functions
 
-  public fun whitelist_validators(self: &mut InterestLST, action: Action<INTEREST_PROTOCOL, LstWitness, IPX, vector<address>>) {
+  public fun whitelist_validators(_: &LstAdmin, self: &mut InterestLST, new_whitelist: vector<address>) {
     let state = load_state_mut(self);
-    inner_state::whitelist_validators(state, action);
+    inner_state::whitelist_validators(state, new_whitelist);
   }
 
-  public fun update_fee(self: &mut InterestLST, action: Action<INTEREST_PROTOCOL, LstWitness, IPX, Fee>) {
+  public fun update_fee(_: &LstAdmin, self: &mut InterestLST, new_fee: Fee) {
     let state = load_state_mut(self);
-    inner_state::update_fee(state, action);
+    inner_state::update_fee(state, new_fee);
   }
 
   // ** Read only Functions
