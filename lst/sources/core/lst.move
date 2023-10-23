@@ -180,6 +180,11 @@ module interest_lst::interest_lst {
     inner_state::update_fee(state, new_fee);
   }
 
+  public fun take_dao_balance(_: &LstAdmin, self: &mut InterestLST, ctx: &mut TxContext): Coin<ISUI> {
+    let state = load_state_mut(self);
+    inner_state::take_dao_balance(state, ctx)
+  }
+
   // ** Read only Functions
 
   public fun is_whitelisted(self: &mut InterestLST, validator_address: address): bool {

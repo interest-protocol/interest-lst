@@ -357,6 +357,12 @@ module interest_lst::interest_lst_inner_state {
     events::emit_new_fee(base, kink, jump);
   }
 
+  public(friend) fun take_dao_balance(state: &mut State, ctx: &mut TxContext): Coin<ISUI> {
+    let state = load_state_mut(state);
+    let amount = balance::value(&state.dao_balance);
+    coin::take(&mut state.dao_balance, amount, ctx)
+  }
+
   // ** Read only Functions
 
   public(friend) fun read_state(state: &mut State): (&Fund, u64, &LinkedTable<address, Validator>, u64, &Fee, &Balance<ISUI>, &LinkedTable<u64, Fund>) {
