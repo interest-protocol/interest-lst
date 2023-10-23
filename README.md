@@ -70,6 +70,8 @@ C --> E((2 Sui))
 
 ## Repo Structure
 
+This module is structured to be easily upgraded to support Sui's latest Staking modules.
+
 - **lst:** The Interest LST modules
   - **assets** Assets minted by the protocol
     - **isui.move**: The Interest Sui Module
