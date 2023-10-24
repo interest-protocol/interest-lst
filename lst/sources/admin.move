@@ -9,6 +9,7 @@ module interest_lst::lst_admin {
     id: UID
   }
 
+  #[allow(unused_function)]
   fun init(ctx: &mut TxContext) {
     transfer::transfer(
       LstAdmin { id: object::new(ctx) },

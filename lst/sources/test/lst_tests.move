@@ -454,7 +454,6 @@ module interest_lst::lst_tests {
         &mut sui_state,
         &mut storage,
         &coupon,
-        20,
         ctx(test)
       );
 
@@ -469,7 +468,6 @@ module interest_lst::lst_tests {
         &mut storage,
         residue,
         coupon,
-        30,
          MYSTEN_LABS,
          unstake_payload,
         ctx(test)
@@ -596,7 +594,6 @@ module interest_lst::lst_tests {
         coupon,
         MYSTEN_LABS, 
         unstake_paylaod,
-        99,
         ctx(test)
       );
 

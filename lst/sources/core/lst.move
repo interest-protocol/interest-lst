@@ -78,11 +78,10 @@ module interest_lst::interest_lst {
     sui_state: &mut SuiSystemState,
     self: &mut InterestLST,
     coupon: &Yield<ISUI_YIELD>,
-    maturity: u64,
     ctx: &mut TxContext  
   ): u64 {
     let state = load_state_mut(self);
-    inner_state::get_pending_yield(sui_state, state, coupon, maturity, ctx)
+    inner_state::get_pending_yield(sui_state, state, coupon,  ctx)
   }
 
   public fun update_pool(
@@ -134,13 +133,12 @@ module interest_lst::interest_lst {
     self: &mut InterestLST,
     principal: SemiFungibleToken<ISUI_PRINCIPAL>,
     coupon: Yield<ISUI_YIELD>,
-    maturity: u64,
     validator_address: address,
     unstake_payload: vector<UnstakePayload>,
     ctx: &mut TxContext,    
   ): Coin<SUI> {
     let state = load_state_mut(self);
-    inner_state::call_bond(sui_state, state, principal, coupon, maturity, validator_address, unstake_payload, ctx)
+    inner_state::call_bond(sui_state, state, principal, coupon, validator_address, unstake_payload, ctx)
   }
 
   public fun burn_sui_principal(
@@ -161,11 +159,10 @@ module interest_lst::interest_lst {
     coupon: Yield<ISUI_YIELD>,
     validator_address: address,
     unstake_payload: vector<UnstakePayload>,
-    maturity: u64,
     ctx: &mut TxContext,
   ): (Yield<ISUI_YIELD>, Coin<SUI>) {
     let state = load_state_mut(self);
-    inner_state::claim_yield(sui_state, state, coupon, validator_address, unstake_payload, maturity, ctx)
+    inner_state::claim_yield(sui_state, state, coupon, validator_address, unstake_payload,  ctx)
   }
 
   // ** DAO Functions

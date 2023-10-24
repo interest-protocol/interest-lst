@@ -90,7 +90,6 @@ module interest_lst::entry {
     yield_vector: vector<Yield<ISUI_YIELD>>,
     principal_value: u64,
     yield_value: u64,
-    maturity: u64,
     validator_address: address,
     unstake_payload: vector<UnstakePayload>,
     ctx: &mut TxContext,
@@ -101,7 +100,6 @@ module interest_lst::entry {
         self,
         handle_principal_vector(principal_vector, principal_value, ctx),
         handle_yield_vector(yield_vector, yield_value, ctx),
-        maturity,
         validator_address,
         unstake_payload,
         ctx
@@ -138,7 +136,6 @@ module interest_lst::entry {
     yield_value: u64,
     validator_address: address,
     unstake_payload: vector<UnstakePayload>,
-    maturity: u64,
     ctx: &mut TxContext,
   ) {
     let (yield, coin_sui) = interest_lst::claim_yield(
@@ -147,7 +144,6 @@ module interest_lst::entry {
       handle_yield_vector(yield_vector, yield_value, ctx),
       validator_address,
       unstake_payload,
-      maturity,
       ctx
     );
 

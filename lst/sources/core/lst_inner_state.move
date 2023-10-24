@@ -116,12 +116,11 @@ module interest_lst::interest_lst_inner_state {
     sui_state: &mut SuiSystemState,
     state: &mut State,  
     coupon: &Yield<ISUI_YIELD>,
-    maturity: u64,
     ctx: &mut TxContext  
   ): u64 {
     let state = load_state_mut(state);
     update_pool_logic(sui_state, state, tx_context::epoch(ctx));
-    get_pending_yield_logic(state, coupon, maturity, ctx)
+    get_pending_yield_logic(state, coupon, ctx)
   }
 
   public(friend) fun update_pool(
@@ -236,7 +235,6 @@ module interest_lst::interest_lst_inner_state {
     state: &mut State,
     principal: SemiFungibleToken<ISUI_PRINCIPAL>,
     coupon: Yield<ISUI_YIELD>,
-    maturity: u64,
     validator_address: address,
     unstake_payload: vector<UnstakePayload>,
     ctx: &mut TxContext,    
@@ -251,10 +249,10 @@ module interest_lst::interest_lst_inner_state {
     update_pool_logic(sui_state, state, tx_context::epoch(ctx));
 
     let burn_amount = sft::burn(&mut state.principal_cap, principal);
-    let sui_amount = get_pending_yield_logic(state, &coupon, maturity, ctx) + burn_amount;
+    let sui_amount = get_pending_yield_logic(state, &coupon,  ctx) + burn_amount;
     yield::burn(&mut state.yield_cap, coupon);
 
-    events::emit_call_bond(tx_context::sender(ctx), sui_amount, maturity);
+    events::emit_call_bond(tx_context::sender(ctx), sui_amount, slot);
 
     fund::sub_underlying(&mut state.pool, sui_amount, false);
 
@@ -290,14 +288,13 @@ module interest_lst::interest_lst_inner_state {
     coupon: Yield<ISUI_YIELD>,
     validator_address: address,
     unstake_payload: vector<UnstakePayload>,
-    maturity: u64,
     ctx: &mut TxContext,
   ): (Yield<ISUI_YIELD>, Coin<SUI>) {
     let state = load_state_mut(state);
 
     update_pool_logic(sui_state, state, tx_context::epoch(ctx));
     
-    let sui_amount = get_pending_yield_logic(state, &coupon, maturity, ctx);
+    let sui_amount = get_pending_yield_logic(state, &coupon,  ctx);
 
     let is_zero_amount = sui_amount == 0;
 
@@ -632,7 +629,6 @@ module interest_lst::interest_lst_inner_state {
   fun get_pending_yield_logic(
     state: &mut StateV1,
     coupon: &Yield<ISUI_YIELD>,
-    maturity: u64,
     ctx: &mut TxContext
   ): u64 {
     let slot = (yield::slot(coupon) as u64);
@@ -645,13 +641,7 @@ module interest_lst::interest_lst_inner_state {
 
       // Check if the table has slot exchange rate
       // If it does not we use the back up maturity value
-      let pool = if (linked_table::contains(&state.pool_history, slot)) { 
-        linked_table::borrow(&state.pool_history, slot)
-      } else {
-        // Back up maturity needs to be before the slot
-        assert!(slot > maturity, errors::pool_invalid_backup_maturity());
-        linked_table::borrow(&state.pool_history, maturity)
-      };
+      let pool = unstake_utils::find_most_recent_pool_rate(&state.pool_history, slot);
 
       fund::to_underlying(pool, shares, false)
     } else {

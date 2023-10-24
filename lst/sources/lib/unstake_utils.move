@@ -1,7 +1,10 @@
 module interest_lst::unstake_utils { 
   use std::vector;
 
+  use sui::linked_table::{Self, LinkedTable};
+
   use interest_lst::errors;
+  use suitears::fund::Fund; 
 
   struct EpochAmount has store, copy, drop {
     epoch: u64,
@@ -12,6 +15,19 @@ module interest_lst::unstake_utils {
   struct UnstakePayload has store, copy, drop {
     validator: address,
     amounts: vector<EpochAmount>
+  }
+
+  public fun find_most_recent_pool_rate(pool_history: &LinkedTable<u64, Fund>, maturity: u64): &Fund {
+   if (linked_table::contains(pool_history, maturity)) return linked_table::borrow(pool_history, maturity);
+
+    let i = maturity - 1;
+    while (i > 0) {
+      if (linked_table::contains(pool_history, maturity)) return linked_table::borrow(pool_history, i);
+      i = i - 1;
+    };
+
+    // Should not happen
+    abort errors::no_exchange_rate_found()
   }
 
   public fun read_unstake_payload(self: &UnstakePayload): (address, &vector<EpochAmount>) {
